@@ -1,0 +1,22 @@
+{
+  "name": "takase-bot-local",
+  "private": true,
+  "scripts": {
+    "build:bot": "node build-discord-bot.js",
+    "build:windows": "node build.js",
+    "preview:completion": "node themes/completion-search/tools/render-preview.js",
+    "css:completion": "node themes/completion-search/tools/live-css-editor.js",
+    "preview:level": "node themes/level-score/tools/render-preview.js",
+    "preview:chartinfo": "node themes/chart-info/tools/render-preview.js",
+    "css:chartinfo": "node themes/chart-info/tools/live-css-editor.js",
+    "css:level": "node themes/level-score/tools/live-css-editor.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.27.0",
+    "https-proxy-agent": "^7.0.6",
+    "undici": "^6.28.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.9"
+  }
+}

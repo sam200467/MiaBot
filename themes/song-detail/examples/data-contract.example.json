@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-08-27T12:00:00.000Z",
+  "generatorName": "Takase bot",
+  "profile": {
+    "playerName": "DEMO PLAYER"
+  },
+  "song": {
+    "songId": 870,
+    "title": "VIIIbit Explorer",
+    "artist": "Lime",
+    "category": "チュウマイ",
+    "bpm": 188,
+    "duration": "2:19",
+    "releaseDate": "2023-09-14",
+    "version": "bright MEMORY Act.2",
+    "status": "online",
+    "jacketUrl": "https://example.invalid/jacket.webp",
+    "bossName": "高瀬 梨緒",
+    "bossCardId": 100030,
+    "bossCardName": "【R】高瀬 梨緒[体操着]",
+    "bossLevel": 61,
+    "attribute": "Aqua"
+  },
+  "charts": [
+    {
+      "difficultyId": 0,
+      "difficulty": "BASIC",
+      "hasChart": true,
+      "level": "4",
+      "constant": 4.0,
+      "constantStatus": "known",
+      "chartDesigner": "ものくろっく",
+      "noteCount": 451,
+      "bellCount": 37,
+      "personal": {
+        "played": false,
+        "techScore": null,
+        "technicalRank": null,
+        "isAllBreak": false,
+        "isFullBell": false
+      }
+    },
+    {
+      "difficultyId": 10,
+      "difficulty": "LUNATIC",
+      "hasChart": false,
+      "level": null,
+      "constant": null,
+      "constantStatus": "na",
+      "chartDesigner": null,
+      "noteCount": null,
+      "bellCount": null,
+      "personal": {
+        "played": false,
+        "techScore": null,
+        "technicalRank": null,
+        "isAllBreak": false,
+        "isFullBell": false
+      }
+    }
+  ]
+}

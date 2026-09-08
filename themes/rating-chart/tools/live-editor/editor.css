@@ -1,0 +1,12 @@
+@import url("/song-detail/tools/live-editor/editor.css");
+
+.preview-stage {
+  width: 1080px;
+  height: 540px;
+}
+
+#preview-frame {
+  width: 3600px;
+  height: 1800px;
+  transform: scale(0.3);
+}

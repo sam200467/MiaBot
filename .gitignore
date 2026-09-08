@@ -1,0 +1,53 @@
+# ---- 构建中间产物（node build.js / node build-discord-bot.js 可重新生成）----
+ongeki-exe.js
+ongeki-bundle.cjs
+ongeki-core.exe
+takase-discord-bundle.cjs
+takase-discord-core.exe
+takase-discord-vault.exe
+*.blob
+
+# ---- 运行时数据（含个人游戏数据，勿提交）----
+config.json
+ongeki-rating.json
+gui-prefs.txt
+
+# ---- 依赖与交付二进制 ----
+# exe 超过 GitHub 100MB 单文件限制，请通过 Release 发布：
+#   Takase Bot Discord.exe（Discord 查分 Bot，构建：node build-discord-bot.js）
+#   音击小工具 v3.0.exe（本地查分工具，构建：node build.js）
+node_modules/
+*.exe
+
+# 本机缓存、凭据和开发临时文件
+.npm-cache/
+.env
+.env.*
+!.env.example
+secrets.dat
+bindings.dat
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
+# 本地游戏资源包，不作为源代码发布
+/SDDT - O.N.G.E.K.I Re：Fresh/
+
+# ---- macOS 版构建产物（node mac/build-macos.js 可重建）----
+mac/dist/
+mac/assets/
+mac/takase-discord-bundle.cjs
+mac/vault/vault-bundle.cjs
+mac/AvaloniaGUI/bin/
+mac/AvaloniaGUI/obj/
+
+# 设计源文件与本地渲染预览
+*.psd
+themes/**/previews/
+
+# 不发布的设计过程文件
+/themes/*/design/
+/themes/chart-info/experiments/legacy-layout/
+/themes/chart-info/experiments/jacket-layout/*-preview.png

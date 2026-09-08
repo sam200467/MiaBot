@@ -1,0 +1,293 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  background: #12141a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  display: grid;
+  grid-template-columns: minmax(430px, 34vw) 1fr;
+  color: #eef2ff;
+}
+
+button,
+select,
+textarea,
+input {
+  font: inherit;
+}
+
+.editor-pane {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  border-right: 1px solid #343947;
+  background: #181b23;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+p {
+  margin: 4px 0 0;
+  color: #9da6ba;
+  font-size: 12px;
+}
+
+.state {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.state.saved {
+  color: #a9f0c2;
+  background: #173c28;
+}
+
+.state.dirty {
+  color: #ffe4a3;
+  background: #4b3814;
+}
+
+.state.saving {
+  color: #b9d7ff;
+  background: #173252;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 0 18px 12px;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #b8c0d2;
+  font-size: 12px;
+}
+
+.toolbar label {
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+}
+
+select,
+button {
+  height: 34px;
+  border: 1px solid #434a5c;
+  border-radius: 7px;
+  color: #edf1fb;
+  background: #252a35;
+}
+
+select {
+  min-width: 0;
+  padding: 0 9px;
+}
+
+button {
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: #6d7891;
+  background: #303745;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+button.primary {
+  border-color: #5275e8;
+  background: #365bc7;
+}
+
+button.primary:hover {
+  background: #4269db;
+}
+
+#css-editor {
+  width: calc(100% - 24px);
+  min-height: 0;
+  margin: 0 12px;
+  padding: 14px 16px 80px;
+  resize: none;
+  border: 1px solid #343a49;
+  border-radius: 8px;
+  outline: none;
+  color: #e6e9f2;
+  background: #101218;
+  font: 14px/1.55 Consolas, "Cascadia Mono", monospace;
+  tab-size: 2;
+  white-space: pre;
+}
+
+#css-editor:focus {
+  border-color: #5879dc;
+  box-shadow: 0 0 0 2px rgba(88, 121, 220, 0.18);
+}
+
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  color: #8f98ab;
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.preview-pane {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: 52px minmax(0, 1fr);
+  background: #0e1015;
+}
+
+.preview-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  border-bottom: 1px solid #343947;
+  background: #1b1e27;
+}
+
+.preview-toolbar strong {
+  font-size: 14px;
+}
+
+#preview-state {
+  min-width: 90px;
+  margin-right: auto;
+  color: #9da6ba;
+  font-size: 12px;
+}
+
+.preview-toolbar label {
+  flex-direction: row;
+}
+
+#zoom {
+  width: 110px;
+}
+
+#zoom-value {
+  width: 42px;
+  color: #eef2ff;
+  text-align: right;
+}
+
+.preview-viewport {
+  position: relative;
+  overflow: auto;
+  padding: 18px;
+  background:
+    linear-gradient(45deg, #171a20 25%, transparent 25%),
+    linear-gradient(-45deg, #171a20 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #171a20 75%),
+    linear-gradient(-45deg, transparent 75%, #171a20 75%),
+    #111319;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+  background-size: 20px 20px;
+}
+
+.preview-stage {
+  position: relative;
+  width: 1080px;
+  height: 675px;
+  margin: 0 auto;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 12px 45px rgba(0, 0, 0, 0.46);
+}
+
+#preview-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2160px;
+  height: 1350px;
+  border: 0;
+  transform: scale(0.5);
+  transform-origin: 0 0;
+}
+
+#toast {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 20;
+  max-width: 420px;
+  padding: 12px 16px;
+  border: 1px solid #4f5b72;
+  border-radius: 9px;
+  color: #fff;
+  background: rgba(27, 31, 42, 0.96);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.38);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition: 160ms ease;
+}
+
+#toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#toast.error {
+  border-color: #984850;
+  background: rgba(89, 27, 34, 0.97);
+}
+
+@media (max-width: 1050px) {
+  body {
+    grid-template-columns: minmax(360px, 46vw) 1fr;
+  }
+
+  .preview-toolbar {
+    gap: 8px;
+  }
+
+  .preview-toolbar label {
+    display: none;
+  }
+}
