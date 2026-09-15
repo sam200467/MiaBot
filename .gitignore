@@ -51,3 +51,6 @@ themes/**/previews/
 /themes/*/design/
 /themes/chart-info/experiments/legacy-layout/
 /themes/chart-info/experiments/jacket-layout/*-preview.png
+
+song-aliases-*.json
+song-aliases-*.json.*.tmp

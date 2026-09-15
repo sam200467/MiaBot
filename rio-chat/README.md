@@ -1,0 +1,61 @@
+# 梨绪聊天（v1.15.0）
+已接入Discord bot。DeepSeek官方模型deepseek-flash根据消息生成新回复，不随机抽取74条台词。
+本地启用状态以config.local.json为准，修改后重启bot生效。示例文件默认关闭且无密钥。
+
+## 启动
+使用项目根目录的「Takase Bot Discord.exe」（新构建），原来的v1.14.4 EXE没有聊天功能。
+EXE旁边必须保留rio-chat目录，包含config.local.json、persona.md、examples.json、expressions.json和emojis目录。
+如果移动EXE，一起移动rio-chat。密钥只在本地JSON中，不内嵌EXE；不要把config.local.json发给别人或放进Release。
+Windows界面沿用原有Discord账号、服务器、频道及HTTP代理配置。DeepSeek请求也使用该代理（如果配置）。
+启动日志应出现「梨绪聊天已启用」。资料/配置错误不会阻止原有斜杠功能，但聊天会关闭并显示固定错误提示。
+
+## 怎么聊
+在界面已配置的服务器和频道中直接 @bot 后输入消息，例如：
+- @bot 梨绪，你是不是又在吹自己超绝最强啦？
+- @bot 推荐几首好听的歌。
+- @bot 发第6张表情
+- @bot 清空对话
+
+默认仅匹配消息正文中的直接用户提及，不读取整个频道记录，不支持DM，不响应其他bot。
+客户端订阅GuildMessages；直接@的消息可使用Discord的消息内容例外，不主动申请MessageContent特权。
+回复通常3～5句；人物设定与会话上下文送到DeepSeek官方API，按API用量计费。
+
+## 会话与请求
+按服务器、频道、用户隔离；最近6轮，30分钟无活动过期；历史内容额外控制在约12000字符内。进程重启清空。
+「清空对话」仅清除当前会话；停止调侃偏好按服务器和用户保留到进程结束或用户明确重新允许。
+当前同一用户只同时处理一条请求；已有请求运行时会提示等待，不会排出顺序混乱的多条回答。
+聊天并发与分表队列独立。默认全局最多2个请求、同一会话成功回复后5秒请求间隔；这是API请求控制，不是图片冷却。
+超过限制会明确提示稍后再试。暂不自动重试付费请求。模型超时或返回无效JSON时显示简短失败提示。
+自然语言查分尚未接入；继续使用/song、/chart等原有斜杠命令。
+
+## 表情
+29个表情的文件白名单见expressions.json，视觉预览见emojis-preview.md。
+普通40%、情绪明确80%、认真解释2%；真实痛苦/停止调侃后自动配图0%。每条最多一张。
+没有图片时间/回复数冷却，也没有近期图片去重，可以连续发同一张。
+5/10按一个变体组计权，组内随机选择。
+用户指定编号或完整中文名称并明确请求图片时跳过随机；需要符合停止调侃/不适的语境约束。
+第16张不进入自动池，但可明确点名。图片权限不足时仅发文字。
+模型给出符合语境的候选ID，程序按白名单与概率决定；绝不接受模型给出的任意文件路径。
+图片选择可调整；含义与场景主要由模型判断，真实试聊中仍可能出现不合适的分类，可继续修订usage。
+
+## 文件
+- chat.cjs：配置校验、DeepSeek调用、Discord消息处理、会话与表情选择。
+- chat.test.cjs：使用模拟API的离线测试。
+- smoke.cjs：真实DeepSeek短对话测试，会消耗少量API额度，不发送Discord消息。
+- persona.md：角色提示词v0.2。
+- examples.json：19组原创风格示例；其中5组用于运行时引导，生成时不照抄。
+- quotes.json：74张用户剧情截图的工作译文与标记，不作为随机回复池。
+- profile-quotes.json：一张额外资料截图中的10条发言。
+- sources.md：来源和翻译边界。
+- config.example.json：公开模板；config.local.json：Git忽略的本地设置。
+- expressions.json：表情白名单与概率。
+
+## 验证和构建
+在项目根目录运行：
+~~~powershell
+node --test rio-chat/chat.test.cjs
+node rio-chat/smoke.cjs
+node build-discord-bot.js
+~~~
+构建包含聊天离线测试、既有核心自测及Windows资源/凭据库自测。
+本次已完成DeepSeek真实连通测试和模拟Discord事件测试；未使用真实Discord账号向频道发测试消息。
