@@ -1,5 +1,0 @@
-{
-  "main": "vault-bundle.cjs",
-  "output": "vault-sea.blob",
-  "disableExperimentalSEAWarning": true
-}

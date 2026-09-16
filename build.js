@@ -214,7 +214,7 @@ fs.rmSync(BLOB, { force: true });
 step("4/5 核心自测");
 execSync(`"${CORE}" --selftest`, { stdio: "inherit", cwd: DIR });
 
-// macOS 移植：build-macos.js 复用本脚本的注入/打包/SEA 链路，但跳过 Windows 专属的 csc GUI 编译
+// 无界面构建：复用本脚本的注入/打包/SEA 链路，但跳过 Windows 专属的 csc GUI 编译
 if (process.env.TAKASE_SKIP_WIN_GUI === "1") {
   console.log("（TAKASE_SKIP_WIN_GUI 已设置，跳过 WinForms GUI 编译）");
   process.exit(0);
