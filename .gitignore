@@ -54,3 +54,11 @@ themes/**/previews/
 
 song-aliases-*.json
 song-aliases-*.json.*.tmp
+
+# QQ 版：本地配置与数据（含 token 和账号绑定）
+qq/qq-config.json
+qq/data/
+qq/dist/
+qq/*.log
+qq/启动*.vbs
+qq/停止*.vbs
