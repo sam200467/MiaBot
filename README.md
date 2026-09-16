@@ -15,16 +15,14 @@ npm run build:bot
 
 启动程序后，在界面配置 Bot Token、Application ID、服务器 ID 和频道 ID；首次启动时这些 ID 留空，需要填写自己的配置。详细说明见 [Discord 使用说明](Takase%20Bot%20Discord%20使用说明.md)。
 
-macOS 构建见 [mac/README.md](mac/README.md)。
-
 ## 源码结构
 
+- `takase-core.cjs`：平台无关核心（曲库检索、定数计算、凭据库、分表渲染调用）。
 - `takase-discord-entry.mjs`：Discord 命令与任务处理。
 - `takase-discord-gui.cs`：Windows 设置与启动界面。
 - `takase-discord-vault.cs`：Windows DPAPI 凭据存储。
 - `app-template.js`、`build.js`：分表核心与构建。
 - `themes/`：图片渲染模板、素材与调试工具。
-- `mac/`：macOS 界面、钥匙串与打包脚本。
 
 ## 本地数据
 
