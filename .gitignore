@@ -62,3 +62,4 @@ qq/dist/
 qq/*.log
 qq/启动*.vbs
 qq/停止*.vbs
+rio-chat/search.local.json
