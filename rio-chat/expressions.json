@@ -4,9 +4,9 @@
   "assetRoot": ".",
   "inspectionNote": "29个用户图片，27张JPG、2张GIF。标签为视觉判断，不推断画师、出处或画中未确认人物。",
   "selectionPolicy": {
-    "ordinaryProbability": 0.9,
+    "ordinaryProbability": 0.6,
     "clearEmotionProbability": 1,
-    "seriousExplanationProbability": 0.5,
+    "seriousExplanationProbability": 0.35,
     "afterStopTeasingProbability": 0,
     "maxImagesPerReply": 1,
     "minRepliesBetweenImages": 0,
@@ -25,7 +25,7 @@
       "clear_emotion",
       "ordinary_chat"
     ],
-    "notes": "不设配图冷却，不做近期表情去重；可以连续配图、重复使用同一张或同组图片。先选符合语境的候选再仅抽一次，不匹配时只发文字。普通聊天90%、情绪明确100%、认真解释50%、用户不适或停止调侃后自动配图0%。第5和10张属于同一表情组：组权重按1计算，不因两张变体翻倍，选中组后再选变体；该分组不限制重复发送。停止调侃偏好按用户保留，只有用户明确重新允许才恢复；明确要求温和图片只对当次例外。"
+    "notes": "不设配图冷却，不做近期表情去重；可以连续配图、重复使用同一张或同组图片。先选符合语境的候选再仅抽一次，不匹配时只发文字。普通聊天60%、情绪明确100%、认真解释35%、用户不适或停止调侃后自动配图0%。第5和10张属于同一表情组：组权重按1计算，不因两张变体翻倍，选中组后再选变体；该分组不限制重复发送。停止调侃偏好按用户保留，只有用户明确重新允许才恢复；明确要求温和图片只对当次例外。"
   },
   "entries": [
     {
