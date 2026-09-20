@@ -1,0 +1,1296 @@
+{
+ "schemaVersion": 1,
+ "game": "ongeki",
+ "note": "原作 17 名主角的角色档案（人工策展）。来源优先级：SEGA 官方角色页 > wikiwiki > 萌娘百科。basics（学年/生年月日/星座/血液型/身長）与 profile.traits 直接来自 SEGA 官方角色页的 description；extras（属性/武器/游戏内档案问答）官方站没有，只有 wikiwiki，故整块标 inferred；extras 的中文是从 wikiwiki 的日文原文直译的短名词短语（不润色），来源 URL 保留供复核。confidence 按块记、按块内最弱的一项定级：confirmed＝SEGA 官方一手资料（单源即可）或非官方来源多源一致；inferred＝单一 wikiwiki/萌娘百科来源。**不存** aliases/songs/unit/cv——别名与曲目在 ongeki-characters.json，组合与 CV 运行时 join，避免第二个真相源。事件与剧情归 ongeki-story.json，本文件不重复。记录里含高瀬 梨緒本人（17 人之一），运行时由 self 排除注入：她的人设以 persona.md 为唯一真相源。",
+ "curatedAt": "2026-09-18",
+ "reviewedAt": null,
+ "confidenceLegend": {
+  "confirmed": "SEGA 官方一手资料，单源即可｜非官方来源需两个以上独立来源一致",
+  "inferred": "单一 wikiwiki/萌娘百科来源，或策展推断",
+  "blockRule": "块按块内最弱的一项定级。extras 里的 attribute/weapon 官方站与萌娘百科都没有、只有 wikiwiki 单源，所以整块恒为 inferred；游戏内问答即使被萌娘百科个人资料表印证，也随该块保持 inferred。",
+  "factReviewed": "null＝未人工过目｜{at,by}＝人工确认过。运行时 human > source > inferred",
+  "relationship": "每条关系独立记 confidence，规则同上；同一个 who 只出一条（同队的额外细节并进 unit_member 那条的 note，来源变弱时整条降级）"
+ },
+ "profiles": [
+  {
+   "id": "yuzu",
+   "name": "藤沢 柚子",
+   "charaId": "1020",
+   "basics": {
+    "grade": "高校2年生",
+    "birthday": "7月11日",
+    "zodiac": "巨蟹座",
+    "bloodType": "B型",
+    "height": "155cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1020/",
+     "https://zh.moegirl.org.cn/藤沢柚子"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "我行我素、天真烂漫的女生",
+     "天真到常被误认成小学生",
+     "时不时冒出偏离常识的发言，把周围人整无语",
+     "极爱甜食，随身带着装糖果的专用小包，每天搜罗怪味新品分给大家"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1020/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "星咲 あかり",
+     "type": "unit_member",
+     "note": "同属 ASTERISM",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "三角 葵",
+     "type": "unit_member",
+     "note": "同属 ASTERISM",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "LEAF",
+    "weapon": "手杖",
+    "likes": [
+     "便利店零食"
+    ],
+    "weakPoints": [
+     "整理收拾",
+     "一直待着不动"
+    ],
+    "hobbies": [
+     "做可爱的手帐"
+    ],
+    "skills": [
+     "抽奖手气好"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/藤沢 柚子",
+     "https://zh.moegirl.org.cn/藤沢柚子"
+    ]
+   }
+  },
+  {
+   "id": "akari",
+   "name": "星咲 あかり",
+   "charaId": "1010",
+   "basics": {
+    "grade": "高校2年生",
+    "birthday": "7月26日",
+    "zodiac": "狮子座",
+    "bloodType": "O型",
+    "height": "157cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1010/",
+     "https://zh.moegirl.org.cn/星咲明里"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "奏坂高中二年级，永远直率的努力家",
+     "失败了也不放弃的乐观性格；冲劲过剩时偶尔会犯点小迷糊",
+     "因为憧憬大会上见到的某位射手而开始玩音击",
+     "ASTERISM 的中心，靠天生的开朗带动大家"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1010/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "藤沢 柚子",
+     "type": "unit_member",
+     "note": "同属 ASTERISM",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "三角 葵",
+     "type": "unit_member",
+     "note": "同属 ASTERISM",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "FIRE",
+    "weapon": "弓",
+    "likes": [
+     "唱歌"
+    ],
+    "weakPoints": [
+     "做饭",
+     "抽鬼牌"
+    ],
+    "hobbies": [
+     "到处吃"
+    ],
+    "skills": [
+     "缝纫",
+     "倒立"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/星咲 あかり",
+     "https://zh.moegirl.org.cn/星咲明里"
+    ]
+   },
+   "note": "萌娘百科条目名：星咲明里"
+  },
+  {
+   "id": "aoi",
+   "name": "三角 葵",
+   "charaId": "1030",
+   "basics": {
+    "grade": "高校2年生",
+    "birthday": "7月16日",
+    "zodiac": "巨蟹座",
+    "bloodType": "A型",
+    "height": "161cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1030/",
+     "https://zh.moegirl.org.cn/三角葵"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "认真又成熟的常识人",
+     "平时冷静沉着，对亲近的朋友会露出犀利吐槽的一面",
+     "总被奔放的柚子牵着走，是操心的那一个",
+     "兴趣是收集角色周边，房间里堆满一点点攒起来的玩偶"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1030/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "星咲 あかり",
+     "type": "unit_member",
+     "note": "同属 ASTERISM",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "藤沢 柚子",
+     "type": "unit_member",
+     "note": "同属 ASTERISM；总被奔放的柚子牵着走，是操心的那一个",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "AQUA",
+    "weapon": "肩背键盘",
+    "likes": [
+     "咖啡",
+     "填字游戏"
+    ],
+    "weakPoints": [
+     "幽灵、妖怪"
+    ],
+    "hobbies": [
+     "收集角色周边"
+    ],
+    "skills": [
+     "速读",
+     "转笔"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/三角 葵",
+     "https://zh.moegirl.org.cn/三角葵"
+    ]
+   }
+  },
+  {
+   "id": "tsubaki",
+   "name": "藍原 椿",
+   "charaId": "1060",
+   "basics": {
+    "grade": "高校1年生",
+    "birthday": "12月31日",
+    "zodiac": "摩羯座",
+    "bloodType": "AB型",
+    "height": "153cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1060/",
+     "https://zh.moegirl.org.cn/蓝原椿"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "态度冷淡的别扭性格，安静的一年级",
+     "不擅长表露感情，常摆出爱理不理的样子，心里其实很重视朋友",
+     "有点 S 气质，时不时说些逗弄别人的话",
+     "那副让人发毛的视线似乎给她招来了不少隐藏粉丝"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1060/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "高瀬 梨緒",
+     "type": "unit_member",
+     "note": "同属 ⊿TRiEDGE",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "結城 莉玖",
+     "type": "unit_member",
+     "note": "同属 ⊿TRiEDGE；时不时逗弄不疑有他的莉玖",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "LEAF",
+    "weapon": "音箱",
+    "likes": [
+     "读书"
+    ],
+    "weakPoints": [
+     "人多的地方"
+    ],
+    "hobbies": [
+     "网上的视频",
+     "找稀奇的饮料"
+    ],
+    "skills": [
+     "斗嘴",
+     "逗猫棒"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/藍原 椿",
+     "https://zh.moegirl.org.cn/蓝原椿"
+    ]
+   },
+   "note": "萌娘百科条目名：蓝原椿"
+  },
+  {
+   "id": "rio",
+   "name": "高瀬 梨緒",
+   "charaId": "1040",
+   "basics": {
+    "grade": "高校2年生",
+    "birthday": "1月25日",
+    "zodiac": "水瓶座",
+    "bloodType": "A型",
+    "height": "157cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1040/",
+     "https://zh.moegirl.org.cn/高濑梨绪"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "自称「超绝最强」的争强好胜者",
+     "怎么也坦率不起来，带刺的态度是这性格的反面",
+     "有点爱面子，一被捧就立刻得意起来",
+     "单方面把明里当成竞争对手，什么事都要较劲"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1040/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "結城 莉玖",
+     "type": "unit_member",
+     "note": "同属 ⊿TRiEDGE",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "藍原 椿",
+     "type": "unit_member",
+     "note": "同属 ⊿TRiEDGE",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "星咲 あかり",
+     "type": "rival",
+     "note": "单方面把明里当成竞争对手，什么事都要跟她较劲（明里那一侧并没有对等的对抗意识）",
+     "basis": "官方説明「あかりを一方的にライバル視しており、何かにつけて張り合っている」",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/character/1040/"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "AQUA",
+    "weapon": "镰刀",
+    "likes": [
+     "比胜负",
+     "蜜瓜汽水"
+    ],
+    "weakPoints": [
+     "猫"
+    ],
+    "hobbies": [
+     "游泳",
+     "山地自行车"
+    ],
+    "skills": [
+     "抓娃娃"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/高瀬 梨緒",
+     "https://zh.moegirl.org.cn/高濑梨绪"
+    ]
+   },
+   "note": "萌娘百科条目名：高濑梨绪"
+  },
+  {
+   "id": "riku",
+   "name": "結城 莉玖",
+   "charaId": "1050",
+   "basics": {
+    "grade": "高校1年生",
+    "birthday": "5月5日",
+    "zodiac": "金牛座",
+    "bloodType": "B型",
+    "height": "149cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1050/"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "凭气势一路冲的吉他少女，口头禅是「がおー！」",
+     "不拘小节的男孩气元气少女",
+     "因为不疑有他的直性子，总被椿逗着玩",
+     "经常说错话，有点小迷糊；老把事物比作「摇滚」，本人是否真懂很可疑"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1050/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "高瀬 梨緒",
+     "type": "unit_member",
+     "note": "同属 ⊿TRiEDGE",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "藍原 椿",
+     "type": "unit_member",
+     "note": "同属 ⊿TRiEDGE；总被椿逗着玩",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "FIRE",
+    "weapon": "电吉他",
+    "likes": [
+     "摇滚的东西",
+     "咖喱饭"
+    ],
+    "weakPoints": [
+     "学习",
+     "烫的东西"
+    ],
+    "hobbies": [
+     "吉他"
+    ],
+    "skills": [
+     "闹钟响之前就醒"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/結城 莉玖"
+    ]
+   }
+  },
+  {
+   "id": "ayaka",
+   "name": "早乙女 彩華",
+   "charaId": "1080",
+   "basics": {
+    "grade": "高校3年生",
+    "birthday": "2月14日",
+    "zodiac": "水瓶座",
+    "bloodType": "O型",
+    "height": "163cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1080/",
+     "https://zh.moegirl.org.cn/早乙女彩华"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "擅长逗人的纯情辣妹",
+     "随性的外表和说话方式容易被误解，其实专一又可靠",
+     "像爽快的大姐姐，是大家信赖的商量对象",
+     "其实很纯情、不擅长聊恋爱话题；常有人来咨询恋爱，她自己先脑补过热，结果聊不下去"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1080/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "桜井 春菜",
+     "type": "unit_member",
+     "note": "同属 bitter flavor",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "AQUA",
+    "weapon": "双枪",
+    "likes": [
+     "时尚穿搭"
+    ],
+    "weakPoints": [
+     "被说教",
+     "不解风情的人"
+    ],
+    "hobbies": [
+     "健身",
+     "做饰品"
+    ],
+    "skills": [
+     "用嘴把樱桃梗打结"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/早乙女 彩華",
+     "https://zh.moegirl.org.cn/早乙女彩华"
+    ]
+   },
+   "note": "萌娘百科条目名：早乙女彩华"
+  },
+  {
+   "id": "haruna",
+   "name": "桜井 春菜",
+   "charaId": "1070",
+   "basics": {
+    "grade": "高校2年生",
+    "birthday": "6月12日",
+    "zodiac": "双子座",
+    "bloodType": "O型",
+    "height": "158cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1070/"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "温和柔软的女生",
+     "顾家又腼腆，但也有闹别扭、蔫下来的孩子气一面，是个天然",
+     "在「理想女友排行榜」（学生会调查）上长期名列前茅",
+     "最近迷上做点心，试吃试个不停，回过神来盘子已经空了；体重计是天敌"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1070/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "早乙女 彩華",
+     "type": "unit_member",
+     "note": "同属 bitter flavor",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "FIRE",
+    "weapon": "花束（法杖）",
+    "likes": [
+     "做饭",
+     "看剧"
+    ],
+    "weakPoints": [
+     "绕口令"
+    ],
+    "hobbies": [
+     "做点心",
+     "种香草"
+    ],
+    "skills": [
+     "插花"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/桜井 春菜"
+    ]
+   }
+  },
+  {
+   "id": "saki",
+   "name": "柏木 咲姫",
+   "charaId": "1100",
+   "basics": {
+    "grade": "高校3年生",
+    "birthday": "3月3日",
+    "zodiac": "双鱼座",
+    "bloodType": "A型",
+    "height": "166cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1100/",
+     "https://zh.moegirl.org.cn/柏木咲姬"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "兴趣是 cosplay 的优等生",
+     "品行端正、容姿端丽，如同高岭之花",
+     "银色长发得自德国人祖母，本人是四分之一混血；爱称「ヒメ」",
+     "其实是热爱漫画动画的隐藏 coser，自以为藏得很好，其实大家都知道；最近因深夜动画有点睡眠不足"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1100/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "井之原 小星",
+     "type": "unit_member",
+     "note": "同属 7EVENDAYS⇔HOLIDAYS",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "柏木 美亜",
+     "type": "family",
+     "note": "亲妹妹（官方原文：柏木咲姫は実の姉）",
+     "basis": "官方説明「柏木咲姫は実の姉」（记为美亜的妹妹那一侧）",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/character/1160/"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "AQUA",
+    "weapon": "骑士剑",
+    "likes": [
+     "努力这件事",
+     "年轮蛋糕"
+    ],
+    "weakPoints": [
+     "腿多的虫子"
+    ],
+    "hobbies": [
+     "cosplay"
+    ],
+    "skills": [
+     "英语会话",
+     "各种家务"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/柏木 咲姫",
+     "https://zh.moegirl.org.cn/柏木咲姬"
+    ]
+   },
+   "note": "萌娘百科条目名：柏木咲姬"
+  },
+  {
+   "id": "koboshi",
+   "name": "井之原 小星",
+   "charaId": "1090",
+   "basics": {
+    "grade": "高校1年生",
+    "birthday": "11月23日",
+    "zodiac": "射手座",
+    "bloodType": "O型",
+    "height": "152cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1110/",
+     "https://zh.moegirl.org.cn/井之原小星"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "脱力系的懒散游戏玩家",
+     "极度怕麻烦，兴趣有无落差极大；一有机会就想偷懒，平时总是一副犯困的样子；被子是恋人",
+     "喜欢游戏到随身带着掌机",
+     "放学后把零食和漫画带进占来的空教室，享受悠哉自适的懒散时光"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1110/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "柏木 咲姫",
+     "type": "unit_member",
+     "note": "同属 7EVENDAYS⇔HOLIDAYS；关系亲密，小星常拿「不会」当借口让咲姬照顾自己",
+     "basis": "官方名册同队；萌娘百科简介「与咲姬关系亲密，曾以不会为由骗妹抖咲姬为自己服务」",
+     "confidence": "inferred",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js",
+      "https://zh.moegirl.org.cn/井之原小星"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "LEAF",
+    "weapon": "游戏电脑",
+    "likes": [
+     "不麻烦的事"
+    ],
+    "weakPoints": [
+     "麻烦的事"
+    ],
+    "hobbies": [
+     "网游"
+    ],
+    "skills": [
+     "蒙眼下将棋",
+     "不会迷路"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/井之原 小星",
+     "https://zh.moegirl.org.cn/井之原小星"
+    ]
+   }
+  },
+  {
+   "id": "arisu",
+   "name": "珠洲島 有栖",
+   "charaId": "1130",
+   "basics": {
+    "grade": "高校1年生",
+    "birthday": "9月6日",
+    "zodiac": "处女座",
+    "bloodType": "AB型",
+    "height": "147cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1130/",
+     "https://zh.moegirl.org.cn/珠洲岛有栖"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "穿着玩偶装、有点古怪的少女",
+     "让人抓不住、软绵绵的不可思议系",
+     "感性独特，审美总是偏了那么一点；爱犬叫「かるび」和「ろーす」",
+     "被称为下任学园长的重要人物，据说背地里各种暗中活动"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1130/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "逢坂 茜",
+     "type": "unit_member",
+     "note": "同属 R.B.P.",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "九條 楓",
+     "type": "unit_member",
+     "note": "同属 R.B.P.",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "皇城 セツナ",
+     "type": "family",
+     "note": "姐妹（姓氏不同）",
+     "basis": "官方説明「苗字は異なるが、珠洲島有栖とは姉妹という間柄」（记为セツナ那侧）",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/character/1170/"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "AQUA",
+    "weapon": "水壶",
+    "likes": [
+     "玩偶",
+     "快餐"
+    ],
+    "weakPoints": [
+     "下雨",
+     "熬夜"
+    ],
+    "hobbies": [
+     "收藏玩偶装"
+    ],
+    "skills": [
+     "小提琴"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/珠洲島 有栖",
+     "https://zh.moegirl.org.cn/珠洲岛有栖"
+    ]
+   },
+   "note": "萌娘百科条目名：珠洲岛有栖"
+  },
+  {
+   "id": "akane",
+   "name": "逢坂 茜",
+   "charaId": "1120",
+   "basics": {
+    "grade": "高校3年生",
+    "birthday": "4月1日",
+    "zodiac": "白羊座",
+    "bloodType": "B型",
+    "height": "155cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1120/",
+     "https://zh.moegirl.org.cn/逢坂茜"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "破天荒的学生会长，人称「奏坂的赤色天灾」",
+     "想到就立刻行动的麻烦制造机",
+     "兴趣是征服世界，披风与秘密结社风的装潢都兴致勃勃",
+     "容易得意忘形，但关键时刻很可靠；常因得意忘形挨枫的说教"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1120/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "九條 楓",
+     "type": "unit_member",
+     "note": "同属 R.B.P.；得意忘形时挨她的说教",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "珠洲島 有栖",
+     "type": "unit_member",
+     "note": "同属 R.B.P.",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "FIRE",
+    "weapon": "火箭筒",
+    "likes": [
+     "出馊主意",
+     "高的地方"
+    ],
+    "weakPoints": [
+     "打针"
+    ],
+    "hobbies": [
+     "征服世界"
+    ],
+    "skills": [
+     "麻将",
+     "跑得快"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/逢坂 茜",
+     "https://zh.moegirl.org.cn/逢坂茜"
+    ]
+   }
+  },
+  {
+   "id": "kaede",
+   "name": "九條 楓",
+   "charaId": "1110",
+   "basics": {
+    "grade": "高校3年生",
+    "birthday": "10月1日",
+    "zodiac": "天秤座",
+    "bloodType": "A型",
+    "height": "167cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1090/",
+     "https://zh.moegirl.org.cn/九条枫"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "冷静沉着的严肃副会长",
+     "学生会参谋，讲究以最小的一手引出最大的效率",
+     "据说惹火她相当可怕，留下好几段被代代相传的传说",
+     "机械白痴到影响生活，因为「不知道什么时候会爆炸」而尽量避开机器；本人说坏掉的手机敲一敲就好"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1090/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "逢坂 茜",
+     "type": "unit_member",
+     "note": "同属 R.B.P.；茜得意忘形时会严厉地说教她",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "珠洲島 有栖",
+     "type": "unit_member",
+     "note": "同属 R.B.P.",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "LEAF",
+    "weapon": "刀",
+    "likes": [
+     "红豆面包"
+    ],
+    "weakPoints": [
+     "机械",
+     "打扮"
+    ],
+    "hobbies": [
+     "各种武道"
+    ],
+    "skills": [
+     "珠算",
+     "写一手好字"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/九條 楓",
+     "https://zh.moegirl.org.cn/九条枫"
+    ]
+   },
+   "note": "萌娘百科条目名：九条枫"
+  },
+  {
+   "id": "mia",
+   "name": "柏木 美亜",
+   "charaId": "1150",
+   "basics": {
+    "grade": "中学2年生",
+    "birthday": "8月8日",
+    "zodiac": "狮子座",
+    "bloodType": "O型",
+    "height": "148cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1160/",
+     "https://zh.moegirl.org.cn/柏木美亚"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "喜欢可爱女孩子的猫系女子",
+     "外表是楚楚可怜的少女，内里却是个大叔，各方面都很可惜；周围人也叹「明明长得这么好看」",
+     "把女孩子比作水果是她的毕生事业",
+     "学园情报通，初中自不必说，高中的八卦也门儿清；秘密笔记本上写满了查证过的情报"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1160/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "柏木 咲姫",
+     "type": "family",
+     "note": "亲姐姐",
+     "basis": "官方説明「柏木咲姫は実の姉」",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/character/1160/"
+     ]
+    },
+    {
+     "who": "日向 千夏",
+     "type": "unit_member",
+     "note": "同属 マーチング ポケッツ",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "東雲 つむぎ",
+     "type": "unit_member",
+     "note": "同属 マーチング ポケッツ",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "FIRE",
+    "weapon": "小号",
+    "likes": [
+     "可爱的女孩子",
+     "水果"
+    ],
+    "weakPoints": [
+     "姐姐"
+    ],
+    "hobbies": [
+     "观察女孩子",
+     "随手拍"
+    ],
+    "skills": [
+     "猜三围"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/柏木 美亜",
+     "https://zh.moegirl.org.cn/柏木美亚"
+    ]
+   },
+   "note": "萌娘百科条目名：柏木美亚"
+  },
+  {
+   "id": "chinatsu",
+   "name": "日向 千夏",
+   "charaId": "1140",
+   "basics": {
+    "grade": "中学2年生",
+    "birthday": "8月22日",
+    "zodiac": "狮子座",
+    "bloodType": "B型",
+    "height": "147cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1140/",
+     "https://zh.moegirl.org.cn/日向千夏"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "天真又调皮的中学生（初二）",
+     "好奇心旺盛，最坐不住",
+     "一感兴趣就不顾后果地冲上去，靠天生的笑容和开朗讨人喜欢",
+     "很黏人、身体接触多；被抱住据说像暖洋洋的太阳。憧憬的前辈是星咲明里"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1140/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "柏木 美亜",
+     "type": "unit_member",
+     "note": "同属 マーチング ポケッツ",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "東雲 つむぎ",
+     "type": "unit_member",
+     "note": "同属 マーチング ポケッツ",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "星咲 あかり",
+     "type": "senpai",
+     "note": "憧憬的前辈",
+     "basis": "官方説明「憧れの先輩は、星咲あかり」",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/character/1140/"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "LEAF",
+    "weapon": "指挥棒",
+    "likes": [
+     "汉堡肉",
+     "在外面玩"
+    ],
+    "weakPoints": [
+     "打雷"
+    ],
+    "hobbies": [
+     "看时代剧"
+    ],
+    "skills": [
+     "爬树",
+     "不怕生"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/日向 千夏",
+     "https://zh.moegirl.org.cn/日向千夏"
+    ]
+   }
+  },
+  {
+   "id": "tsumugi",
+   "name": "東雲 つむぎ",
+   "charaId": "1160",
+   "basics": {
+    "grade": "中学2年生",
+    "birthday": "10月27日",
+    "zodiac": "天蝎座",
+    "bloodType": "A型",
+    "height": "144cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1150/",
+     "https://zh.moegirl.org.cn/东云纺"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "憧憬大人、爱逞强的孩子",
+     "执着于「像个大人」，认真又懂礼",
+     "被当小孩对待会非常生气，却偏偏喜欢加满糖和奶的咖啡",
+     "戒心强，初次见面常常说话带刺；护身用的防犯警报器按用途带了好几个"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1150/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "柏木 美亜",
+     "type": "unit_member",
+     "note": "同属 マーチング ポケッツ",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    },
+    {
+     "who": "日向 千夏",
+     "type": "unit_member",
+     "note": "同属 マーチング ポケッツ",
+     "basis": "SEGA 官方角色名册同队",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/assets/js/character.bundle.js"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "AQUA",
+    "weapon": "行进鼓",
+    "likes": [
+     "松饼",
+     "电视节目"
+    ],
+    "weakPoints": [
+     "把人当小孩对待的人"
+    ],
+    "hobbies": [
+     "水族箱"
+    ],
+    "skills": [
+     "钢琴",
+     "做旅行计划"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/東雲 つむぎ",
+     "https://zh.moegirl.org.cn/东云纺"
+    ]
+   },
+   "note": "萌娘百科条目名：东云纺"
+  },
+  {
+   "id": "setsuna",
+   "name": "皇城 セツナ",
+   "charaId": "1170",
+   "basics": {
+    "grade": "高校3年生",
+    "birthday": "12月6日",
+    "zodiac": "射手座",
+    "bloodType": "AB型",
+    "height": "163cm",
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1170/",
+     "https://zh.moegirl.org.cn/皇城刹那"
+    ]
+   },
+   "profile": {
+    "traits": [
+     "受英才教育长大的精英少女",
+     "为达目的，觉得舍弃小事也是没办法的类型",
+     "受成长经历影响，浑身散发着威压、难以接近的气场",
+     "长期在海外留学，忧心奏坂学园的现状而回来；姓氏不同，但与珠洲岛有栖是姐妹"
+    ],
+    "factConfidence": "confirmed",
+    "factSources": [
+     "https://ongeki.sega.jp/character/1170/"
+    ]
+   },
+   "relationships": [
+    {
+     "who": "珠洲島 有栖",
+     "type": "family",
+     "note": "姐妹（姓氏不同）",
+     "basis": "官方説明「苗字は異なるが、珠洲島有栖とは姉妹という間柄」",
+     "confidence": "confirmed",
+     "factSources": [
+      "https://ongeki.sega.jp/character/1170/"
+     ]
+    }
+   ],
+   "factReviewed": null,
+   "extras": {
+    "attribute": "FIRE",
+    "weapon": "剑（4 把）",
+    "likes": [
+     "薄荷巧克力"
+    ],
+    "weakPoints": [
+     "空闲时间",
+     "看起来对身体不好的食物"
+    ],
+    "hobbies": [
+     "国际象棋"
+    ],
+    "skills": [
+     "骑马",
+     "小提琴"
+    ],
+    "factConfidence": "inferred",
+    "factSources": [
+     "https://wikiwiki.jp/gameongeki/皇城 セツナ",
+     "https://zh.moegirl.org.cn/皇城刹那"
+    ]
+   },
+   "note": "萌娘百科条目名：皇城刹那"
+  }
+ ]
+}

@@ -1,0 +1,600 @@
+{
+ "schemaVersion": 1,
+ "game": "maimai",
+ "note": "版本条目由 tools/gen-terms.cjs 从本地快照的 version 字段生成（名称逐字一致、曲目数来自快照）。俗称与组合称呼是人工补的，只收稳定可验证的；长尾口语不进这里，走会话 glossary。发行日期与世代先后尚未收录（需要来源，留给下一批）。",
+ "sources": [
+  "版本名与曲目数：本地曲库快照 rio-chat/knowledge/maimai.json 的 version 字段（水鱼 maimai DX music_data）",
+  "「X代」俗称：萌娘百科《Maimai系列》版本姓名框表 + B站专栏《【maimai】将牌/极牌/神牌怎么获得？》，逐代对照见 knowledge/maimai-version-aliases.review.md",
+  "真超檄：群内用户 2026-09-18 说明（maimai / maimai PLUS / GreeN / GreeN PLUS 的合称）",
+  "国服合并（熊华/爽煌/宙星）：贴吧玩家资料，标记 region:cn"
+ ],
+ "entries": [
+  {
+   "id": "maimai-version-maimai",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai",
+   "catalogVersions": [
+    "maimai"
+   ],
+   "songs": 186
+  },
+  {
+   "id": "maimai-version-maimai-plus",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai PLUS",
+   "catalogVersions": [
+    "maimai PLUS"
+   ],
+   "songs": 192
+  },
+  {
+   "id": "maimai-version-maimai-green",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai GreeN",
+   "catalogVersions": [
+    "maimai GreeN"
+   ],
+   "songs": 249,
+   "aliases": [
+    "超代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-green-plus",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai GreeN PLUS",
+   "catalogVersions": [
+    "maimai GreeN PLUS"
+   ],
+   "songs": 205,
+   "aliases": [
+    "檄代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-orange",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai ORANGE",
+   "catalogVersions": [
+    "maimai ORANGE"
+   ],
+   "songs": 125,
+   "aliases": [
+    "橙代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-murasaki-plus",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai MURASAKi PLUS",
+   "catalogVersions": [
+    "maimai MURASAKi PLUS"
+   ],
+   "songs": 161,
+   "aliases": [
+    "菫代",
+    "堇代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-orange-plus",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai ORANGE PLUS",
+   "catalogVersions": [
+    "maimai ORANGE PLUS"
+   ],
+   "songs": 117,
+   "aliases": [
+    "晓代",
+    "暁代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-murasaki",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai MURASAKi",
+   "catalogVersions": [
+    "maimai MURASAKi"
+   ],
+   "songs": 170,
+   "aliases": [
+    "紫代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-pink",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai PiNK",
+   "catalogVersions": [
+    "maimai PiNK"
+   ],
+   "songs": 135,
+   "aliases": [
+    "桃代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-pink-plus",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai PiNK PLUS",
+   "catalogVersions": [
+    "maimai PiNK PLUS"
+   ],
+   "songs": 134,
+   "aliases": [
+    "樱代",
+    "櫻代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-milk",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai MiLK",
+   "catalogVersions": [
+    "maimai MiLK"
+   ],
+   "songs": 177,
+   "aliases": [
+    "白代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-finale",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai FiNALE",
+   "catalogVersions": [
+    "maimai FiNALE"
+   ],
+   "songs": 199,
+   "aliases": [
+    "辉代",
+    "輝代"
+   ]
+  },
+  {
+   "id": "maimai-version-milk-plus",
+   "type": "version",
+   "game": "maimai",
+   "name": "MiLK PLUS",
+   "catalogVersions": [
+    "MiLK PLUS"
+   ],
+   "songs": 174,
+   "aliases": [
+    "雪代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-でらっくす-universe",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai でらっくす UNiVERSE",
+   "catalogVersions": [
+    "maimai でらっくす UNiVERSE"
+   ],
+   "songs": 508,
+   "aliases": [
+    "宙代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-でらっくす-festival",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai でらっくす FESTiVAL",
+   "catalogVersions": [
+    "maimai でらっくす FESTiVAL"
+   ],
+   "songs": 592,
+   "aliases": [
+    "祭代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-でらっくす-buddies",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai でらっくす BUDDiES",
+   "catalogVersions": [
+    "maimai でらっくす BUDDiES"
+   ],
+   "songs": 578,
+   "aliases": [
+    "双代",
+    "雙代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-でらっくす-prism",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai でらっくす PRiSM",
+   "catalogVersions": [
+    "maimai でらっくす PRiSM"
+   ],
+   "songs": 639
+  },
+  {
+   "id": "maimai-version-maimai-でらっくす-prism-plus",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai でらっくす PRiSM PLUS",
+   "catalogVersions": [
+    "maimai でらっくす PRiSM PLUS"
+   ],
+   "songs": 250
+  },
+  {
+   "id": "maimai-version-maimai-でらっくす",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai でらっくす",
+   "catalogVersions": [
+    "maimai でらっくす"
+   ],
+   "songs": 361,
+   "aliases": [
+    "熊代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-でらっくす-splash",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai でらっくす Splash",
+   "catalogVersions": [
+    "maimai でらっくす Splash"
+   ],
+   "songs": 385,
+   "aliases": [
+    "爽代"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-でらっくす-plus",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai でらっくす PLUS",
+   "aliases": [
+    "华代",
+    "華代"
+   ],
+   "catalogAvailable": false,
+   "catalogVersions": [],
+   "songs": 0,
+   "body": "官方版本名，但本地曲库快照里没有这一代的曲目数据（快照的 version 字段只覆盖到一部分代）。不能按它筛曲目，只能说清这个情况。",
+   "sources": [
+    "萌娘百科《Maimai系列》版本姓名框表（華極/煌極/星極/祝極/宴極）",
+    "本地快照 version 字段不含该值"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-でらっくす-splash-plus",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai でらっくす Splash PLUS",
+   "aliases": [
+    "煌代"
+   ],
+   "catalogAvailable": false,
+   "catalogVersions": [],
+   "songs": 0,
+   "body": "官方版本名，但本地曲库快照里没有这一代的曲目数据（快照的 version 字段只覆盖到一部分代）。不能按它筛曲目，只能说清这个情况。",
+   "sources": [
+    "萌娘百科《Maimai系列》版本姓名框表（華極/煌極/星極/祝極/宴極）",
+    "本地快照 version 字段不含该值"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-でらっくす-universe-plus",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai でらっくす UNiVERSE PLUS",
+   "aliases": [
+    "星代"
+   ],
+   "catalogAvailable": false,
+   "catalogVersions": [],
+   "songs": 0,
+   "body": "官方版本名，但本地曲库快照里没有这一代的曲目数据（快照的 version 字段只覆盖到一部分代）。不能按它筛曲目，只能说清这个情况。",
+   "sources": [
+    "萌娘百科《Maimai系列》版本姓名框表（華極/煌極/星極/祝極/宴極）",
+    "本地快照 version 字段不含该值"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-でらっくす-festival-plus",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai でらっくす FESTiVAL PLUS",
+   "aliases": [
+    "祝代"
+   ],
+   "catalogAvailable": false,
+   "catalogVersions": [],
+   "songs": 0,
+   "body": "官方版本名，但本地曲库快照里没有这一代的曲目数据（快照的 version 字段只覆盖到一部分代）。不能按它筛曲目，只能说清这个情况。",
+   "sources": [
+    "萌娘百科《Maimai系列》版本姓名框表（華極/煌極/星極/祝極/宴極）",
+    "本地快照 version 字段不含该值"
+   ]
+  },
+  {
+   "id": "maimai-version-maimai-でらっくす-buddies-plus",
+   "type": "version",
+   "game": "maimai",
+   "name": "maimai でらっくす BUDDiES PLUS",
+   "aliases": [
+    "宴代"
+   ],
+   "catalogAvailable": false,
+   "catalogVersions": [],
+   "songs": 0,
+   "body": "官方版本名，但本地曲库快照里没有这一代的曲目数据（快照的 version 字段只覆盖到一部分代）。不能按它筛曲目，只能说清这个情况。",
+   "sources": [
+    "萌娘百科《Maimai系列》版本姓名框表（華極/煌極/星極/祝極/宴極）",
+    "本地快照 version 字段不含该值"
+   ]
+  },
+  {
+   "id": "maimai-version-group-zhendai",
+   "type": "version_group",
+   "game": "maimai",
+   "name": "真代",
+   "aliases": [
+    "真代"
+   ],
+   "catalogVersions": [
+    "maimai",
+    "maimai PLUS"
+   ],
+   "body": "maimai 与 maimai PLUS 两代的合称（两代共用「真」系姓名框，且都没有将牌，社区常合并称呼）。单独说「真代」时指这两代。",
+   "sources": [
+    "萌娘百科姓名框（真極/真神/真舞舞）",
+    "B站专栏：真代（maimai、maimai PLUS）没有将牌"
+   ]
+  },
+  {
+   "id": "maimai-version-group-shinchoukyoku",
+   "type": "version_group",
+   "game": "maimai",
+   "name": "真超檄",
+   "zh": "真超檄",
+   "aliases": [
+    "真超檄代",
+    "真超檄框"
+   ],
+   "catalogVersions": [
+    "maimai",
+    "maimai PLUS",
+    "maimai GreeN",
+    "maimai GreeN PLUS"
+   ],
+   "body": "第一代到第四代的合称：真＝maimai 与 maimai PLUS，超＝maimai GreeN，檄＝maimai GreeN PLUS（三个字对四代）。玩家讨论版本时用这个词一次性指这四个版本。",
+   "sources": [
+    "群内用户 2026-09-18 说明",
+    "萌娘百科姓名框（超極/檄極 分属 GreeN / GreeN PLUS）"
+   ]
+  },
+  {
+   "id": "maimai-version-group-cn-xionghua",
+   "type": "version_group",
+   "game": "maimai",
+   "region": "cn",
+   "name": "熊华",
+   "aliases": [
+    "熊華"
+   ],
+   "catalogVersions": [
+    "maimai でらっくす"
+   ],
+   "members": [
+    "maimai でらっくす",
+    "maimai でらっくす PLUS"
+   ],
+   "body": "国服把「熊代」（でらっくす）与「华代」（でらっくす PLUS）合并成一代更新，两代牌子在合并期结束后一起发。所以国服玩家说这个词时覆盖两代；但单独的「熊代」仍只指 でらっくす。本地快照只有前一 bite 的数据。",
+   "sources": [
+    "贴吧玩家资料：国服熊华、爽煌、宙星合并入一代更新"
+   ]
+  },
+  {
+   "id": "maimai-version-group-cn-shuanghuang",
+   "type": "version_group",
+   "game": "maimai",
+   "region": "cn",
+   "name": "爽煌",
+   "catalogVersions": [
+    "maimai でらっくす Splash"
+   ],
+   "members": [
+    "maimai でらっくす Splash",
+    "maimai でらっくす Splash PLUS"
+   ],
+   "body": "国服把「爽代」（Splash）与「煌代」（Splash PLUS）合并成一代更新；单独的「爽代」仍只指 Splash。本地快照只有 Splash 的数据。",
+   "sources": [
+    "贴吧玩家资料：国服合并"
+   ]
+  },
+  {
+   "id": "maimai-version-group-cn-Zhouxing",
+   "type": "version_group",
+   "game": "maimai",
+   "region": "cn",
+   "name": "宙星",
+   "catalogVersions": [
+    "maimai でらっくす UNiVERSE"
+   ],
+   "members": [
+    "maimai でらっくす UNiVERSE",
+    "maimai でらっくす UNiVERSE PLUS"
+   ],
+   "body": "国服把「宙代」（UNiVERSE）与「星代」（UNiVERSE PLUS）合并成一代更新；单独的「宙代」仍只指 UNiVERSE。本地快照只有 UNiVERSE 的数据。",
+   "sources": [
+    "贴吧玩家资料：国服合并"
+   ]
+  },
+  {
+   "id": "maimai-version-group-old",
+   "type": "version_group",
+   "game": "maimai",
+   "name": "旧框",
+   "aliases": [
+    "旧框体",
+    "老框"
+   ],
+   "catalogVersions": [
+    "maimai",
+    "maimai PLUS",
+    "maimai GreeN",
+    "maimai GreeN PLUS",
+    "maimai ORANGE",
+    "maimai MURASAKi PLUS",
+    "maimai ORANGE PLUS",
+    "maimai MURASAKi",
+    "maimai PiNK",
+    "maimai PiNK PLUS",
+    "maimai MiLK",
+    "maimai FiNALE",
+    "MiLK PLUS"
+   ],
+   "body": "舞萌 DX 之前的那条线（maimai 到 FiNALE），与「DX 框」相对。旧框机台与 DX 机台在本地曲库里是同一份快照的不同 version 值。",
+   "sources": [
+    "版本名派生：本地快照里不含「でらっくす」字样的 version 值"
+   ]
+  },
+  {
+   "id": "maimai-version-group-dx",
+   "type": "version_group",
+   "game": "maimai",
+   "name": "DX框",
+   "aliases": [
+    "でらっくす框",
+    "舞萌DX框"
+   ],
+   "catalogVersions": [
+    "maimai でらっくす UNiVERSE",
+    "maimai でらっくす FESTiVAL",
+    "maimai でらっくす BUDDiES",
+    "maimai でらっくす PRiSM",
+    "maimai でらっくす PRiSM PLUS",
+    "maimai でらっくす",
+    "maimai でらっくす Splash"
+   ],
+   "body": "舞萌 DX 这条线（maimai でらっくす 系列），与「旧框」相对。注意「DX代」在社区里多指整条 DX 线，不专指初代，所以它挂在这个组合上、不挂在 でらっくす 那一条上。",
+   "sources": [
+    "版本名派生：本地快照里含「でらっくす」的 version 值",
+    "2026-09-18 决定：DX代 不作为初代 DX 的强别名"
+   ]
+  },
+  {
+   "id": "maimai-difficulty-mas",
+   "type": "difficulty",
+   "game": "maimai",
+   "name": "MASTER",
+   "zh": "紫谱",
+   "aliases": [
+    "紫谱",
+    "紫譜",
+    "MAS"
+   ],
+   "body": "曲库 difficulty 字段是 MAS；玩家口中的「紫谱」。",
+   "sources": [
+    "本项目 constrainQuery 已有口径（紫谱=MAS）",
+    "本地快照 difficulty 枚举：BAS/ADV/EXP/MAS/REM"
+   ]
+  },
+  {
+   "id": "maimai-difficulty-exp",
+   "type": "difficulty",
+   "game": "maimai",
+   "name": "EXPERT",
+   "zh": "红谱",
+   "aliases": [
+    "红谱",
+    "紅譜",
+    "EXP"
+   ],
+   "body": "曲库 difficulty 字段是 EXP；玩家口中的「红谱」。",
+   "sources": [
+    "本项目 constrainQuery 已有口径（红谱=EXP）"
+   ]
+  },
+  {
+   "id": "maimai-difficulty-adv",
+   "type": "difficulty",
+   "game": "maimai",
+   "name": "ADVANCED",
+   "zh": "黄谱",
+   "aliases": [
+    "黄谱",
+    "黃譜",
+    "ADV"
+   ],
+   "body": "曲库 difficulty 字段是 ADV。",
+   "sources": [
+    "本地快照 difficulty 枚举"
+   ]
+  },
+  {
+   "id": "maimai-difficulty-bas",
+   "type": "difficulty",
+   "game": "maimai",
+   "name": "BASIC",
+   "zh": "绿谱",
+   "aliases": [
+    "绿谱",
+    "綠譜",
+    "BAS"
+   ],
+   "body": "曲库 difficulty 字段是 BAS。",
+   "sources": [
+    "本地快照 difficulty 枚举"
+   ]
+  },
+  {
+   "id": "maimai-difficulty-rem",
+   "type": "difficulty",
+   "game": "maimai",
+   "name": "Re:MASTER",
+   "aliases": [
+    "Re:MASTER",
+    "remaster",
+    "REM"
+   ],
+   "body": "曲库 difficulty 字段是 REM。（它的颜色俗称尚未收录，宁可缺也不猜。）",
+   "sources": [
+    "本地快照 difficulty 枚举"
+   ]
+  },
+  {
+   "id": "maimai-mechanic-rating",
+   "type": "mechanic",
+   "game": "maimai",
+   "name": "DX Rating 与 B50",
+   "aliases": [
+    "DX Rating",
+    "dx rating",
+    "B50",
+    "b50",
+    "rating"
+   ],
+   "body": "舞萌 DX 的 rating 由 Best 50 张谱面（B50）的贡献值加总得出，单张贡献 = 定数 × 达成率系数（本项目用的是已核对的 SSS+ 上限公式 floor(定数×1.005×22.4)）。所以「上分」看的是定数够不够、以及能不能打出高达成率，与曲子的手感评价是两回事。地区版本更新会改变曲目归属，定数与 B50 都要以当前版本为准。",
+   "sources": [
+    "https://gamerch.com/maimai/533647（本项目 research-policy.cjs 的 ratingEvidence 引用并核对过）",
+    "本项目程序计算：rio-chat/research-policy.cjs 的 ratingEvidence()"
+   ]
+  }
+ ]
+}

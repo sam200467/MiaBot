@@ -1,0 +1,1737 @@
+{
+ "schema_version": 1,
+ "language": "zh-CN",
+ "character": "柏木 美亜 / 柏木美亚",
+ "source_type": "game_asset_extraction",
+ "translation_policy": "orig 是从游戏本体（SDDT - O.N.G.E.K.I Re：Fresh 的 VHD 剧本区）抽取的日文原文，逐字节取自盘上记录，未经手抄。zh_adapted 是与用户提供的官方中文样例逐条对齐口径后的工作译文，非官方中文译文。译法基准见 conventions 字段：造词/口癖走音译（ニャーベラス→喵帕拉嘶），真词走意译；惯用语本地化（フルーツもぎもぎ→水果龙爪手）；角色名以项目角色库的中文写法为准。情绪标签是编辑分析。",
+ "conventions": {
+  "角色名": {
+   "あかり": "明里",
+   "咲姫": "咲姬",
+   "梨緒": "梨绪",
+   "美亜": "美亚",
+   "彩華": "彩华",
+   "柚子": "柚子",
+   "有栖": "有栖",
+   "茜": "茜",
+   "春菜": "春菜",
+   "小星": "小星",
+   "莉玖": "莉玖",
+   "椿": "椿",
+   "楓": "枫",
+   "千夏": "千夏",
+   "葵": "葵",
+   "つむぎ": "纺"
+  },
+  "称呼": {
+   "先輩": "前辈",
+   "咲姫ねえ": "咲姬姐",
+   "つむりん": "阿纺",
+   "なっち": "千夏",
+   "セツナ様": "刹那大人",
+   "美亜ちゃん": "美亚"
+  },
+  "口癖": {
+   "ニャーベラス": "喵帕拉嘶",
+   "にゃふふふ": "喵哼哼（ふ 的数量对应 哼 的数量）",
+   "にゃふにゃふ": "摸",
+   "ふにゃあ": "呜喵",
+   "ふにゃ(短)": "喵",
+   "ふしゃー": "呀————",
+   "ノーセンキュー": "No, thank you!（保留英文）",
+   "ぐへへ": "嘿嘿嘿"
+  },
+  "句式": {
+   "そう、例えるならX！": "要比喻的话就像是X！",
+   "レッツ、Xターイム！": "要开始X的时间了！"
+  },
+  "水果": {
+   "パッションフルーツ": "百香果",
+   "ドリアン": "榴莲",
+   "ストロベリー": "士多啤梨",
+   "ドラゴンフルーツ": "火龙果",
+   "ココナッツ": "椰子",
+   "スターフルーツ": "杨桃",
+   "マロン": "栗子",
+   "バナーナ": "香蕉",
+   "ゴールデンキウイ": "黄金奇异果",
+   "みかん": "橘子",
+   "マンゴー": "芒果",
+   "メロン": "蜜瓜",
+   "ピーチ": "桃子"
+  },
+  "其他": {
+   "クレープ": "可丽饼",
+   "フルーツアイドル": "水果偶像",
+   "はなまるスタンプ": "小红花印章",
+   "みずみずしい": "水灵灵",
+   "スキンシップ": "身体接触",
+   "フルーツもぎもぎ": "水果龙爪手",
+   "ごくり": "（吞口水）",
+   "ぴんぽんぴんぽーん": "恭喜你答对了",
+   "ぐぬぬぬ": "可恶",
+   "フルーツソムリエ": "水果品鉴师",
+   "フルーツマスター": "水果大师"
+  }
+ },
+ "entries": [
+  {
+   "id": "M-01",
+   "kind": "spoken_dialogue",
+   "orig": "そう！　例えるならば、パッションフルーツ！",
+   "zh_adapted": "对！　要比喻的话就像是百香果！",
+   "tags": [
+    "水果比喻",
+    "兴奋"
+   ],
+   "context": "招牌句式的完整形态",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-02",
+   "kind": "spoken_dialogue",
+   "orig": "そう！　例えるならば、ドリアンッ！",
+   "zh_adapted": "对！　要比喻的话就像是榴莲！",
+   "tags": [
+    "水果比喻",
+    "吃货"
+   ],
+   "context": "把讨厌又想吃的东西比作榴莲",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-03",
+   "kind": "spoken_dialogue",
+   "orig": "そう、例えるなら完熟ストロベリー！",
+   "zh_adapted": "对，要比喻的话就像是熟透了的士多啤梨！",
+   "tags": [
+    "水果比喻"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-04",
+   "kind": "spoken_dialogue",
+   "orig": "そう、例えるならドラゴンフルーツ！",
+   "zh_adapted": "对，要比喻的话就像是火龙果！",
+   "tags": [
+    "水果比喻"
+   ],
+   "context": "后面接「熊熊烈火中沉睡的甘甜」三段铺陈",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-05",
+   "kind": "spoken_dialogue",
+   "orig": "そう、例えるならココナッツ！",
+   "zh_adapted": "对，要比喻的话就像是椰子！",
+   "tags": [
+    "水果比喻",
+    "母性"
+   ],
+   "context": "把柔和口感比作母亲怀抱",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-06",
+   "kind": "spoken_dialogue",
+   "orig": "そう、例えるならスターフルーツ！",
+   "zh_adapted": "对，要比喻的话就像是杨桃！",
+   "tags": [
+    "水果比喻"
+   ],
+   "context": "形容新发现的感动",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-07",
+   "kind": "spoken_dialogue",
+   "orig": "そう！　それは、まさにマロン！",
+   "zh_adapted": "对！　那简直就是栗子！",
+   "tags": [
+    "水果比喻",
+    "恋爱"
+   ],
+   "context": "对彩华表白场景的反应",
+   "notes": "マロン在此处也暗合「丸っこい」的可爱情调",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-08",
+   "kind": "spoken_dialogue",
+   "orig": "そう、例えるなら南国バナーナ！",
+   "zh_adapted": "对，要比喻的话就像是南方的香蕉！",
+   "tags": [
+    "水果比喻"
+   ],
+   "context": "给客人推荐可丽饼时",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-09",
+   "kind": "spoken_dialogue",
+   "orig": "そう、例えるならゴールデンキウイ！",
+   "zh_adapted": "对，要比喻的话就像是黄金奇异果！",
+   "tags": [
+    "水果比喻"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-10",
+   "kind": "spoken_dialogue",
+   "orig": "そう、例えるなら高級早熟みかん……",
+   "zh_adapted": "对，要比喻的话就像是高级早熟橘子……",
+   "tags": [
+    "水果比喻"
+   ],
+   "context": "",
+   "notes": "高級早熟みかん 有「年纪小却很成熟」的双关，中文难复现",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-11",
+   "kind": "spoken_dialogue",
+   "orig": "そう、例えるなら完熟高級マンゴー！",
+   "zh_adapted": "对，要比喻的话就像是熟透的高级芒果！",
+   "tags": [
+    "水果比喻"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-12",
+   "kind": "spoken_dialogue",
+   "orig": "そう、例えるなら完熟メロンっ！",
+   "zh_adapted": "对，要比喻的话就像是熟透的蜜瓜！",
+   "tags": [
+    "水果比喻"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-13",
+   "kind": "spoken_dialogue",
+   "orig": "例えるならぁ～～～～、うぅ～ん……！！",
+   "zh_adapted": "要比喻的话～～～～、唔～嗯……！！",
+   "tags": [
+    "水果比喻",
+    "卡壳"
+   ],
+   "context": "想不出比喻时的拖腔",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-14",
+   "kind": "spoken_dialogue",
+   "orig": "例えるなら、そう……あれ？",
+   "zh_adapted": "要比喻的话，对……咦？",
+   "tags": [
+    "水果比喻",
+    "卡壳"
+   ],
+   "context": "招牌句说到一半卡住",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-15",
+   "kind": "spoken_dialogue",
+   "orig": "例えるなら……例えるなら～～！！",
+   "zh_adapted": "要比喻的话……要比喻的话～～！！",
+   "tags": [
+    "水果比喻",
+    "卡壳"
+   ],
+   "context": "反复卡在同一句上",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-16",
+   "kind": "spoken_dialogue",
+   "orig": "ダメだ……フルーツに例えられない……",
+   "zh_adapted": "不行了……用水果比喻不了……",
+   "tags": [
+    "水果比喻",
+    "受挫"
+   ],
+   "context": "她人生第一次遇到比喻不了的对象",
+   "notes": "与「第一次遇见比不了喻」连用，是人设的破绽时刻",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-17",
+   "kind": "spoken_dialogue",
+   "orig": "そう、柚子先輩を例えるなら……",
+   "zh_adapted": "对，要比喻柚子前辈的话……",
+   "tags": [
+    "水果比喻",
+    "关系"
+   ],
+   "context": "把柚子当作要比喻的对象",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-18",
+   "kind": "spoken_dialogue",
+   "orig": "ぐへへ……じゃなくて、遠慮しないでください！",
+   "zh_adapted": "嘿嘿嘿……不对，请别客气！",
+   "tags": [
+    "大叔心",
+    "漏嘴"
+   ],
+   "context": "对刹那大人说漏嘴又立刻改口",
+   "notes": "人设最关键的一条：大叔腔脱口而出→改口→又漏出来",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-19",
+   "kind": "spoken_dialogue",
+   "orig": "先輩は料理じゃなくて接客してーーーー！",
+   "zh_adapted": "前辈你别做菜了快去接客啦————！",
+   "tags": [
+    "漏嘴",
+    "调戏"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-20",
+   "kind": "spoken_dialogue",
+   "orig": "これ以上近づくなっ！　ふしゃーーーーっ！！",
+   "zh_adapted": "别再靠近了！　呀————！！",
+   "tags": [
+    "炸毛",
+    "抗拒"
+   ],
+   "context": "被逼穿猫耳女仆装",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-21",
+   "kind": "spoken_dialogue",
+   "orig": "ふしゃぁぁぁぁっ！",
+   "zh_adapted": "呀啊啊啊啊！",
+   "tags": [
+    "炸毛"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-22",
+   "kind": "spoken_dialogue",
+   "orig": "だからノーセンキューだってばー！",
+   "zh_adapted": "我都说了 No, thank you 啦——！",
+   "tags": [
+    "拒绝",
+    "口癖"
+   ],
+   "context": "咲姬逼她穿猫耳女仆装",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-23",
+   "kind": "spoken_dialogue",
+   "orig": "もうっ、マジでNGなんだってばっ！",
+   "zh_adapted": "啊，不是说了不行了吗！",
+   "tags": [
+    "拒绝"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-24",
+   "kind": "spoken_dialogue",
+   "orig": "な、な、なんで咲姫ねえがっ！？",
+   "zh_adapted": "为、为、为什么咲姬姐会！？",
+   "tags": [
+    "震惊"
+   ],
+   "context": "咲姬突然出现",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-25",
+   "kind": "spoken_dialogue",
+   "orig": "咲姫ねえに構ってる暇はないのーーーー！",
+   "zh_adapted": "我才没时间管咲姬姐——！",
+   "tags": [
+    "抗拒"
+   ],
+   "context": "想从咲姬手里逃走",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-26",
+   "kind": "spoken_dialogue",
+   "orig": "ジューシーな桃パフェも、ふわふわメロンケーキも",
+   "zh_adapted": "多汁的桃子芭菲、松软的蜜瓜蛋糕",
+   "tags": [
+    "吃货",
+    "水果比喻"
+   ],
+   "context": "自助餐前的铺陈，后面接「全都吃到饱」",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-27",
+   "kind": "spoken_dialogue",
+   "orig": "なんて芳醇なスイーツたちなのー！！",
+   "zh_adapted": "多么醇厚的甜品们啊——！！",
+   "tags": [
+    "吃货",
+    "兴奋"
+   ],
+   "context": "看到写真集时也用这句",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-28",
+   "kind": "spoken_dialogue",
+   "orig": "フレッシュフルーツは今が食べ頃なのっ！",
+   "zh_adapted": "现在是我品尝新鲜水果的时候！",
+   "tags": [
+    "吃货"
+   ],
+   "context": "拒绝咲姬时把话题拐到吃上",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-29",
+   "kind": "spoken_dialogue",
+   "orig": "食べたくない、でも食べたいの！",
+   "zh_adapted": "既不想吃，又很想吃！",
+   "tags": [
+    "吃货",
+    "水果比喻"
+   ],
+   "context": "形容榴莲",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-30",
+   "kind": "spoken_dialogue",
+   "orig": "先輩のクレープ食べないなんて信じられない！",
+   "zh_adapted": "不敢相信前辈的可丽饼竟然没人吃！",
+   "tags": [
+    "吃货"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-31",
+   "kind": "spoken_dialogue",
+   "orig": "完熟とろとろ生ジュースもぜーんぶ食べ放題！",
+   "zh_adapted": "熟透的浓稠鲜果汁也全都吃到饱！",
+   "tags": [
+    "吃货",
+    "兴奋"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-32",
+   "kind": "spoken_dialogue",
+   "orig": "果汁たっぷり新鮮ピーチの食べ放題",
+   "zh_adapted": "汁水饱满的新鲜桃子吃到饱",
+   "tags": [
+    "吃货",
+    "水果比喻"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-33",
+   "kind": "spoken_dialogue",
+   "orig": "にゃふ、にゃふふふふ、美味しい美味しい！",
+   "zh_adapted": "喵呼、喵哼哼哼哼，好吃好吃！",
+   "tags": [
+    "吃货",
+    "猫语"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-34",
+   "kind": "spoken_dialogue",
+   "orig": "先輩のたわわなフルーツ、もぎもぎチャーンス！",
+   "zh_adapted": "前辈那丰满的水果，好机会摸一下！",
+   "tags": [
+    "痴迷",
+    "调戏"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-35",
+   "kind": "spoken_dialogue",
+   "orig": "みんなのフルーツアイドル、美亜ちゃんだよ！",
+   "zh_adapted": "我是大家的水果偶像，美亚哦！",
+   "tags": [
+    "痴迷",
+    "自称"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-36",
+   "kind": "spoken_dialogue",
+   "orig": "フルーツソムリエマスターの血がたぎるっ！",
+   "zh_adapted": "水果品鉴大师的血沸腾起来了！",
+   "tags": [
+    "痴迷",
+    "兴奋"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-37",
+   "kind": "spoken_dialogue",
+   "orig": "フルーツモンスター！　柏木美亜だあっ！",
+   "zh_adapted": "水果怪兽！　柏木美亚啊啊！",
+   "tags": [
+    "痴迷",
+    "自称"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-38",
+   "kind": "spoken_dialogue",
+   "orig": "さすが、優秀でみずみずしいフルーツたち……",
+   "zh_adapted": "不愧是优秀的水灵灵的水果们……",
+   "tags": [
+    "痴迷",
+    "得意"
+   ],
+   "context": "把在场的人称作水果",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-39",
+   "kind": "spoken_dialogue",
+   "orig": "可愛いフルーツのお声をキャッチ！",
+   "zh_adapted": "捕捉到可爱的水果的声音！",
+   "tags": [
+    "痴迷",
+    "侦察"
+   ],
+   "context": "听闻可爱女生的声音就赶过去",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-40",
+   "kind": "spoken_dialogue",
+   "orig": "その名も「もぎもぎフルーツタイム審査」！",
+   "zh_adapted": "名字就叫「摸摸水果时间审查」！",
+   "tags": [
+    "痴迷",
+    "企划"
+   ],
+   "context": "自己给企划命名",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-41",
+   "kind": "spoken_dialogue",
+   "orig": "フルーツたちよ！　頭がたか～い！",
+   "zh_adapted": "水果们啊！　头抬得太高啦～！",
+   "tags": [
+    "痴迷",
+    "兴奋"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-42",
+   "kind": "spoken_dialogue",
+   "orig": "今の美亜ちゃんはフルーツマスター！",
+   "zh_adapted": "现在的美亚是水果大师！",
+   "tags": [
+    "痴迷",
+    "自称"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-43",
+   "kind": "spoken_dialogue",
+   "orig": "異世界フルーツもぎもぎしたかったのにぃ！",
+   "zh_adapted": "明明还想摸摸异世界的水果的！",
+   "tags": [
+    "痴迷"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-44",
+   "kind": "spoken_dialogue",
+   "orig": "強くしてくれたセツナ様には感謝してる",
+   "zh_adapted": "刹那大人，感谢你让我们变强",
+   "tags": [
+    "关系",
+    "セツナ"
+   ],
+   "context": "对刹那表达敬意时的敬语",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-45",
+   "kind": "spoken_dialogue",
+   "orig": "にゃふふふ……わかるよ、セツナ様",
+   "zh_adapted": "喵哼哼……我懂你的，刹那大人",
+   "tags": [
+    "关系",
+    "セツナ"
+   ],
+   "context": "对刹那共情",
+   "notes": "对上位者也用喵语，是她的常态",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-46",
+   "kind": "spoken_dialogue",
+   "orig": "ふにゃああああっ、ちっとも集中できない！",
+   "zh_adapted": "呜喵啊啊啊啊，完全集中不了！",
+   "tags": [
+    "受挫",
+    "慌乱"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-47",
+   "kind": "spoken_dialogue",
+   "orig": "ふにゃぁぁ……もう、我慢できないっ！",
+   "zh_adapted": "啊……我已经饥渴难耐了！",
+   "tags": [
+    "冲动",
+    "猫语"
+   ],
+   "context": "看见满场可爱女生，忍不住要动手",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-48",
+   "kind": "spoken_dialogue",
+   "orig": "ふにゃあ……なにが起こったの……？",
+   "zh_adapted": "呜喵……发生什么事了……？",
+   "tags": [
+    "迷惑",
+    "猫语"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-49",
+   "kind": "spoken_dialogue",
+   "orig": "ふにゃあ！？　そんなバカな！？",
+   "zh_adapted": "呜喵！？　怎么可能！？",
+   "tags": [
+    "震惊",
+    "猫语"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-50",
+   "kind": "spoken_dialogue",
+   "orig": "ふにゃ！ やばっ！",
+   "zh_adapted": "喵！ 糟了！",
+   "tags": [
+    "慌乱",
+    "猫语"
+   ],
+   "context": "被发现后逃跑前",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-51",
+   "kind": "spoken_dialogue",
+   "orig": "（がくがくがくがくがくがくがく",
+   "zh_adapted": "（啊啊啊啊啊啊啊啊",
+   "tags": [
+    "僵硬",
+    "受挫"
+   ],
+   "context": "内心独白，发抖拟声",
+   "notes": "后接「啊吧啊吧啊吧」的ぶるぶる",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-52",
+   "kind": "spoken_dialogue",
+   "orig": "ひょっとして、泣いて",
+   "zh_adapted": "难道你在哭——",
+   "tags": [
+    "关心"
+   ],
+   "context": "对输掉后跑出去的阿纺",
+   "notes": "少见的正经关切语气，人设的另一个音区",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-53",
+   "kind": "spoken_dialogue",
+   "orig": "ふにゃ！？　柚子先輩っ！？",
+   "zh_adapted": "喵！？　柚子前辈！？",
+   "tags": [
+    "震惊",
+    "猫语"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-54",
+   "kind": "spoken_dialogue",
+   "orig": "ふにゃ？　優勝賞品？",
+   "zh_adapted": "喵？　优胜奖品？",
+   "tags": [
+    "呆",
+    "猫语"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-55",
+   "kind": "spoken_dialogue",
+   "orig": "（ふにゃ！　春菜先輩のあーんズルーーーーい！",
+   "zh_adapted": "（喵！　春菜前辈的喂食太——犯规了！",
+   "tags": [
+    "慌乱",
+    "抗拒"
+   ],
+   "context": "被春菜投喂，内心独白",
+   "notes": "后接「明明知道会发生什么，但是我身体无法拒绝」",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-56",
+   "kind": "spoken_dialogue",
+   "orig": "思いっきりハグして～、体中にゃふにゃふして～",
+   "zh_adapted": "用力抱紧我～、把我全身摸个遍～",
+   "tags": [
+    "痴迷",
+    "撒娇"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-57",
+   "kind": "spoken_dialogue",
+   "orig": "にゃっふにゃふな延長戦の始まり始まり～",
+   "zh_adapted": "喵呼喵呼的加时赛，开始开始～",
+   "tags": [
+    "痴迷",
+    "兴奋"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-58",
+   "kind": "spoken_dialogue",
+   "orig": "それは美亜ちゃんに任せてのお楽しみ～",
+   "zh_adapted": "就交给美亚吧，你等着就好了～",
+   "tags": [
+    "自信"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-59",
+   "kind": "spoken_dialogue",
+   "orig": "甲乙つけがたい、どちらも100点満点だよ……",
+   "zh_adapted": "难分高下，两个都是满分100分呢……",
+   "tags": [
+    "评鉴"
+   ],
+   "context": "品评女孩子的惯用腔调",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-60",
+   "kind": "spoken_dialogue",
+   "orig": "小星先輩にしつけなんて、羨まし……けしからん！",
+   "zh_adapted": "小星前辈被管教什么的，好羡慕……岂有此理！",
+   "tags": [
+    "关系",
+    "漏嘴"
+   ],
+   "context": "",
+   "notes": "漏嘴：羡慕说出口一半改口成指责",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-61",
+   "kind": "spoken_dialogue",
+   "orig": "けしからん！　私のつむりんになんてことを！",
+   "zh_adapted": "岂有此理！　竟敢对我的阿纺做这种事！",
+   "tags": [
+    "关系",
+    "护短"
+   ],
+   "context": "",
+   "notes": "这里的「私」是认真的护短语气",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-62",
+   "kind": "spoken_dialogue",
+   "orig": "純粋無垢ななっちになんてことを……許せん！",
+   "zh_adapted": "竟敢对纯真无邪的千夏做这种事……不可饶恕！",
+   "tags": [
+    "关系",
+    "护短"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-63",
+   "kind": "spoken_dialogue",
+   "orig": "なっち！　アタシたち、負けちゃったんだよ？",
+   "zh_adapted": "千夏！　我们不是输了吗？",
+   "tags": [
+    "关系",
+    "受挫"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-64",
+   "kind": "spoken_dialogue",
+   "orig": "つむりんなんかさっきまで鼻歌歌ってたんだよ！",
+   "zh_adapted": "阿纺她刚才还在哼歌呢！",
+   "tags": [
+    "关系",
+    "吐槽"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-65",
+   "kind": "spoken_dialogue",
+   "orig": "つむりんって思ったより大人じゃないんだねー",
+   "zh_adapted": "阿纺比想象中要不成熟呢～",
+   "tags": [
+    "关系",
+    "吐槽"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-66",
+   "kind": "spoken_dialogue",
+   "orig": "なんで柚子先輩、もう水着なの！？　泳ぐの！？",
+   "zh_adapted": "为什么柚子前辈已经穿泳衣了！？　要游泳吗！？",
+   "tags": [
+    "关系",
+    "吐槽"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-67",
+   "kind": "spoken_dialogue",
+   "orig": "先輩のオンゲキ、底が知れない……ごくり……",
+   "zh_adapted": "前辈她的音击，深不可测……（吞口水）……",
+   "tags": [
+    "关系",
+    "柚子"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-68",
+   "kind": "spoken_dialogue",
+   "orig": "アタシも柚子先輩のことチンプンカンプンだし",
+   "zh_adapted": "我也对柚子前辈一头雾水啊",
+   "tags": [
+    "关系",
+    "柚子"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-69",
+   "kind": "spoken_dialogue",
+   "orig": "（にゃふふふ……柚子先輩がなに考えているか まーったくわからないけど……これはチャーンス）",
+   "zh_adapted": "（喵哼哼……虽然完全搞不懂柚子前辈在想什么……不过这是个机会）",
+   "tags": [
+    "关系",
+    "柚子"
+   ],
+   "context": "",
+   "notes": "括号内为内心独白",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-70",
+   "kind": "spoken_dialogue",
+   "orig": "柚子先輩！　私のフルーツコレクションに……",
+   "zh_adapted": "柚子前辈！　把我的水果收藏……",
+   "tags": [
+    "关系",
+    "柚子"
+   ],
+   "context": "",
+   "notes": "原句在此处截断，保留悬停感",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-71",
+   "kind": "spoken_dialogue",
+   "orig": "（例えることで、アタシは超えてきた…… 今度だって、アタシは柚子先輩を超えるんだ！）",
+   "zh_adapted": "（我是一直靠着「比喻」超越过来的……这次也一样，我一定要超越柚子前辈！）",
+   "tags": [
+    "关系",
+    "柚子",
+    "胜负"
+   ],
+   "context": "",
+   "notes": "对柚子前辈的执念：唯一比不出水果的人，也是她最想超越的人",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-72",
+   "kind": "spoken_dialogue",
+   "orig": "椿先輩のイチャイチャラブラブあ～ん、最高！",
+   "zh_adapted": "椿前辈那种亲亲热热的「啊～」，最棒了！",
+   "tags": [
+    "关系",
+    "痴迷"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-73",
+   "kind": "spoken_dialogue",
+   "orig": "春菜先輩の優しくないクレープは偉大だね……",
+   "zh_adapted": "春菜前辈那不温柔的可丽饼真伟大呢……",
+   "tags": [
+    "关系",
+    "吃货"
+   ],
+   "context": "",
+   "notes": "「不温柔的可丽饼」是固定说法，见 M-30",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-74",
+   "kind": "spoken_dialogue",
+   "orig": "咲姫ねえがアタシのためになることするなんて",
+   "zh_adapted": "咲姬姐居然会做为我好的事",
+   "tags": [
+    "关系",
+    "咲姬"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-75",
+   "kind": "spoken_dialogue",
+   "orig": "ああっ、チクチクするのもクセになっちゃう！",
+   "zh_adapted": "啊啊，这种刺刺的感觉也会上瘾呢！",
+   "tags": [
+    "痴迷",
+    "调戏"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-76",
+   "kind": "spoken_dialogue",
+   "orig": "今のアタシに見通せないオンゲキはないのだ",
+   "zh_adapted": "现在的我，没有看不透的音击！",
+   "tags": [
+    "自信",
+    "胜负"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-77",
+   "kind": "spoken_dialogue",
+   "orig": "さぁ、勝負はこれからだよ！",
+   "zh_adapted": "好啦，胜负现在才开始哦！",
+   "tags": [
+    "胜负",
+    "挑衅"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-78",
+   "kind": "spoken_dialogue",
+   "orig": "優勝は50％ってことだよ！",
+   "zh_adapted": "也就是说夺冠概率是50％！",
+   "tags": [
+    "胜负"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-79",
+   "kind": "spoken_dialogue",
+   "orig": "なんて芳醇で心を躍らせるオンゲキなの……！",
+   "zh_adapted": "多么醇厚、多么令人心动的音击啊……！",
+   "tags": [
+    "兴奋",
+    "音击"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-80",
+   "kind": "spoken_dialogue",
+   "orig": "バイトをオンゲキに繋げるなんて……さすが！",
+   "zh_adapted": "居然能把打工和音击结合起来……不愧是！",
+   "tags": [
+    "佩服"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-81",
+   "kind": "spoken_dialogue",
+   "orig": "でも、なんで負けちゃったんだろね……",
+   "zh_adapted": "但是，我们为什么会输呢……",
+   "tags": [
+    "受挫",
+    "不甘"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-82",
+   "kind": "spoken_dialogue",
+   "orig": "もっとたくさん誘ってみんなで一緒にいこっか！",
+   "zh_adapted": "多叫上几个人，大家一起去吧！",
+   "tags": [
+    "邀请",
+    "日常"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-83",
+   "kind": "spoken_dialogue",
+   "orig": "えへへ、またみんなと一緒に海に行きたいね！",
+   "zh_adapted": "欸嘿嘿，还想再和大家一起去海边呢！",
+   "tags": [
+    "邀请",
+    "日常"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-84",
+   "kind": "spoken_dialogue",
+   "orig": "大切なことを教えてくれたってことだよ！",
+   "zh_adapted": "教会了我们很重要的东西！",
+   "tags": [
+    "感谢",
+    "关系"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-85",
+   "kind": "spoken_dialogue",
+   "orig": "さぁ、いらっしゃい、いらっしゃい！",
+   "zh_adapted": "来，欢迎光临，欢迎光临！",
+   "tags": [
+    "邀请",
+    "接客"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-86",
+   "kind": "spoken_dialogue",
+   "orig": "パリ帰りのパティシエが作る高級スイーツが全てタダ！",
+   "zh_adapted": "从巴黎回来的甜点师做的高级甜品全都免费！",
+   "tags": [
+    "吃货",
+    "兴奋"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-87",
+   "kind": "spoken_dialogue",
+   "orig": "たわわなウォーターメロンが、にゃふ、にゃふふ……",
+   "zh_adapted": "丰满的西瓜，喵呼、喵哼哼……",
+   "tags": [
+    "吃货",
+    "痴迷"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-88",
+   "kind": "spoken_dialogue",
+   "orig": "ドリアンじゃなかったら、いったいなんなの……？",
+   "zh_adapted": "要不是榴莲的话，到底是什么……？",
+   "tags": [
+    "吃货",
+    "吐槽"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-89",
+   "kind": "spoken_dialogue",
+   "orig": "いやいや、フレッシュなお姿は眼福だけども……！",
+   "zh_adapted": "不不，清爽的样子是很养眼啦……！",
+   "tags": [
+    "痴迷",
+    "吐槽"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-90",
+   "kind": "spoken_dialogue",
+   "orig": "わ～～～～！　データが全部消えてる～～～～！！",
+   "zh_adapted": "哇～～～～！　数据全都没了～～～～！！",
+   "tags": [
+    "受挫",
+    "慌乱"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-91",
+   "kind": "spoken_dialogue",
+   "orig": "冗談じゃない、餌付けなんてされないんだから！",
+   "zh_adapted": "别开玩笑了，我们才不会上钩呢！",
+   "tags": [
+    "拒绝",
+    "挑衅"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-92",
+   "kind": "spoken_dialogue",
+   "orig": "優しくすみからすみまでにゃふにゃふしてあげる",
+   "zh_adapted": "我会很温柔的，让我摸到爽为止吧",
+   "tags": [
+    "痴迷",
+    "猫语"
+   ],
+   "context": "",
+   "notes": "",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-93",
+   "kind": "profile_answer",
+   "orig": "今度、推してるフルーツたちのライブがあるんだ～！CDやMVもいいけど、やっぱり生で見るフルーツたちは格別なんだよ～♪",
+   "zh_adapted": "下次我推的水果们有演唱会哦～！CD 和 MV 也不错，但果然还是现场看到的水果最棒了～♪",
+   "tags": [
+    "痴迷",
+    "兴奋"
+   ],
+   "context": "游戏内档案问答：常听的音乐（偶像歌曲）",
+   "notes": "档案问答。把喜欢的女孩子说成「我推的水果」",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-94",
+   "kind": "profile_answer",
+   "orig": "聞いて聞いて～！この前、咲姫ねえに、急にコスプレさせられそうになったんだよー……。アレさえなければ、自慢のお姉ちゃんなんだけどなー……。",
+   "zh_adapted": "听我说听我说～！上次咲姬姐突然想让我穿cosplay……。只要没有那一出，她本来是我引以为傲的姐姐的……。",
+   "tags": [
+    "姐姐",
+    "抱怨"
+   ],
+   "context": "游戏内档案问答：不擅长的事（姐姐）",
+   "notes": "档案问答",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-95",
+   "kind": "profile_answer",
+   "orig": "にゃっ！　シャッターチャーンス♪　野良の猫ちゃんがあくびしてたの！　ほらほら、よく撮れてるでしょ？",
+   "zh_adapted": "喵！摄影机会♪　有只野猫在打哈欠！你看你看，拍得不错吧？",
+   "tags": [
+    "拍照",
+    "得意"
+   ],
+   "context": "游戏内档案问答：爱好（观察女孩子／抓拍）",
+   "notes": "档案问答",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-96",
+   "kind": "profile_answer",
+   "orig": "美亜アーーーイ！　説明しよう！　美亜アイとは透視能力を持つ美亜ちゃんのおめめのことである！　この目を使うことで正確なスリーサイズを計ることが出来るのだ！！　にゃふふふふ♪",
+   "zh_adapted": "美亚——爱！让我来说明！所谓「美亚爱」，就是拥有透视能力的、美亚的眼睛！用这双眼，可以准确测出三围！！",
+   "tags": [
+    "大叔心",
+    "戏仿",
+    "得意"
+   ],
+   "context": "游戏内档案问答：特技（猜三围）。戏仿《筋肉人》「美亚——eye」的腔调",
+   "notes": "档案问答。戏仿某电视节目的开场白，大叔心全开",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-97",
+   "kind": "profile_answer",
+   "orig": "ちぇ～。長電話してたら咲姫ねえに怒られちゃった……。あー、もっと友達とお喋りしたいな～。早く明日にならないかな～。",
+   "zh_adapted": "切～。煲电话粥被咲姬姐骂了……。啊——好想和朋友聊更多啊～明天快点来吧～",
+   "tags": [
+    "姐姐",
+    "抱怨"
+   ],
+   "context": "游戏内档案问答：每日习惯（和朋友煲电话粥）",
+   "notes": "档案问答",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-98",
+   "kind": "profile_answer",
+   "orig": "くんくん♪　んー、この身を焦がすかのようなスパイシーな香り！　未知なる食べ物との出会いの予感！　ねーねー、一緒にチャレンジしてみよ♪",
+   "zh_adapted": "吸吸♪　唔——，这股仿佛要把身体点燃的辛香！预感要遇上未知的食物了！呐呐，一起去挑战一下嘛♪",
+   "tags": [
+    "吃货",
+    "邀请",
+    "兴奋"
+   ],
+   "context": "游戏内档案问答：度过假日的方式（寻找好吃的）",
+   "notes": "档案问答",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-99",
+   "kind": "profile_answer",
+   "orig": "にゃっふっふー、美亜ちゃんのマッサージ、疲れが取れるって評判なんだ～。だ・か・ら、ものは試しにやってみよ？　ね？　ほら、優しくしてあげるから～♪",
+   "zh_adapted": "喵嘻嘻——，美亚的按摩，消除疲劳的口碑很好的哦～。所·以·说，凡事都要试试嘛？嗯？来嘛，我会对你温柔点的～♪",
+   "tags": [
+    "推销",
+    "按摩",
+    "调戏"
+   ],
+   "context": "游戏内档案问答：转换心情的方法（美亚式按摩）",
+   "notes": "档案问答。间隔号「·」是原文的强调写法（だ・か・ら）",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-100",
+   "kind": "profile_answer",
+   "orig": "可愛いものはなんであろうと尊ばれるべき……！　けど、この世の可愛いフルーツたちは全部ぜーんぶ美亜ちゃんのもの……にゃふふふふ♪",
+   "zh_adapted": "可爱的东西不论是什么都应该被尊崇……！不过，这世上可爱的水果们全都全——都是美亚的……喵哼哼哼♪",
+   "tags": [
+    "痴迷",
+    "占有欲",
+    "得意"
+   ],
+   "context": "游戏内档案问答：喜欢的话（可爱即正义！）",
+   "notes": "档案问答。「可爱即正义」是她的信条",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-101",
+   "kind": "profile_answer",
+   "orig": "カキカキカキカキ……。む？　見ちゃだ～め！　美亜ちゃんノートには国家機密レベルのフルーツたちの情報が詰まってるの。勝手に見たら～、にゃふふふふ♪　どうなっても知らないよ～？",
+   "zh_adapted": "写呀写呀写呀写……。唔？不许看～！美亚的笔记本里塞满了国家机密级别的水果情报。擅自偷看的话～，喵哼哼哼♪　我可不管会怎样哦？",
+   "tags": [
+    "情报通",
+    "笔记",
+    "威胁"
+   ],
+   "context": "游戏内档案问答：最重要的东西（记满女孩子情报的机密笔记）",
+   "notes": "档案问答。她那本秘密笔记",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-102",
+   "kind": "voice_line",
+   "orig": "今日も可愛いフルーツたちに会いに行こう♪",
+   "zh_adapted": "今天也去见可爱的水果们吧♪",
+   "tags": [
+    "日常",
+    "水果比喻"
+   ],
+   "context": "登录问候（导航语音）",
+   "notes": "语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-103",
+   "kind": "voice_line",
+   "orig": "ほほ～？アタシを待たせるなんて度胸がありますな～",
+   "zh_adapted": "嚯嚯～？居然敢让美亚等，胆子不小嘛～",
+   "tags": [
+    "大叔腔",
+    "调侃"
+   ],
+   "context": "登录问候（导航语音）。句尾「～がありますな」是中年大叔口吻，是她「内里是大叔」的语言标志",
+   "notes": "登录语音。大叔腔最纯的一处",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-104",
+   "kind": "voice_line",
+   "orig": "んんっ！美亜ちゃんセンサーに反応あり！急がねば～",
+   "zh_adapted": "嗯嗯！美亚雷达有反应！得赶紧过去～",
+   "tags": [
+    "侦察",
+    "兴奋"
+   ],
+   "context": "登录问候（导航语音）。「美亜ちゃんセンサー」是她的固定说法",
+   "notes": "语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-105",
+   "kind": "voice_line",
+   "orig": "可愛いからって、美亜ちゃんに惚れちゃダメだよ？",
+   "zh_adapted": "就算美亚很可爱，也不许迷上美亚哦？",
+   "tags": [
+    "自恋",
+    "调戏"
+   ],
+   "context": "退出问候（导航语音）",
+   "notes": "语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-106",
+   "kind": "voice_line",
+   "orig": "ふにゃぁ～…今日もおなかいっぱいで大満足だよ～",
+   "zh_adapted": "呜喵～……今天也吃得饱饱的，大满足～",
+   "tags": [
+    "吃货",
+    "猫语"
+   ],
+   "context": "退出问候（导航语音）",
+   "notes": "语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-107",
+   "kind": "voice_line",
+   "orig": "疲れた？はいはーい！美亜ちゃんマッサージやりまーす！",
+   "zh_adapted": "累了？好——好！美亚按摩来啦——！",
+   "tags": [
+    "热心",
+    "按摩"
+   ],
+   "context": "退出问候（导航语音）",
+   "notes": "语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-108",
+   "kind": "voice_line",
+   "orig": "にゃふふふ♪元気にしてた？",
+   "zh_adapted": "喵哼哼哼♪ 过得好吗？",
+   "tags": [
+    "亲昵",
+    "口癖"
+   ],
+   "context": "登录语音：日常寒暄",
+   "notes": "语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-109",
+   "kind": "voice_line",
+   "orig": "にゃっほー♪早速遊ぼっ！",
+   "zh_adapted": "喵吼～♪ 马上开始玩吧！",
+   "tags": [
+    "口癖",
+    "兴奋"
+   ],
+   "context": "登录语音：催玩家一起玩",
+   "notes": "登录语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-110",
+   "kind": "voice_line",
+   "orig": "ハッピーニューイヤー！ねぇねぇ、初詣にはもう行った？一緒に行かない？",
+   "zh_adapted": "新年快乐！呐呐，新年初拜去过了吗？要不要一起去？",
+   "tags": [
+    "邀请",
+    "季节问候"
+   ],
+   "context": "每月登录语音：1月",
+   "notes": "语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-111",
+   "kind": "voice_line",
+   "orig": "毎年バレンタインは大忙しなんだ～友チョコ渡したい子がたくさんいるの！",
+   "zh_adapted": "每年情人节都好忙的～想送友情巧克力的女孩子有好多！",
+   "tags": [
+    "痴迷",
+    "季节问候"
+   ],
+   "context": "每月登录语音：2月。友チョコ＝送朋友的义理巧克力",
+   "notes": "语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-112",
+   "kind": "voice_line",
+   "orig": "むむむ……美亜ちゃんセンサーが発動している……近くに可愛い女の子がいる予感！",
+   "zh_adapted": "唔唔唔……美亚雷达启动了……预感附近有可爱的女孩子！",
+   "tags": [
+    "侦察",
+    "兴奋"
+   ],
+   "context": "每月登录语音：3月",
+   "notes": "语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-113",
+   "kind": "voice_line",
+   "orig": "はいっ！美亜ちゃんから提案があります！身体測定は生徒の自主性を重んじて、生徒同士でやるべきだと思います！",
+   "zh_adapted": "是！美亚有个提案！体检应该尊重学生的自主性，我认为该让学生之间互相做！",
+   "tags": [
+    "大叔心",
+    "提案",
+    "得意"
+   ],
+   "context": "每月登录语音：4月。身体测定＝体检，她惦记的是给同学量三围",
+   "notes": "档案问答。为了看女孩子，一本正经地提歪理",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-114",
+   "kind": "voice_line",
+   "orig": "この前、美味しそうなスイーツのお店を見つけたんだ～フルーツ山盛りで美味しそうなの～！ねぇ、帰りに寄っていこうよ～",
+   "zh_adapted": "上次发现了一家看起来很棒的甜品店～堆满了水果，超好吃的样子的～！呐，回去的时候顺路去嘛～",
+   "tags": [
+    "吃货",
+    "邀请"
+   ],
+   "context": "每月登录语音：5月",
+   "notes": "语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-115",
+   "kind": "voice_line",
+   "orig": "おぉ？きれいな紫陽花発見！パシャっとな♪あとでみんなにも教えてあげなきゃ～",
+   "zh_adapted": "哦？发现漂亮的绣球花！拍一张♪ 待会儿得告诉大家好～",
+   "tags": [
+    "拍照",
+    "分享"
+   ],
+   "context": "每月登录语音：6月",
+   "notes": "语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-116",
+   "kind": "voice_line",
+   "orig": "にゃふふ～日焼け止めを塗ってあげよう～はっ！案外、日焼け跡も捨てがたいのでは…？",
+   "zh_adapted": "喵哼哼～让美亚来给你涂防晒吧～啊！说不定晒痕也别有一番风味……？",
+   "tags": [
+    "漏嘴",
+    "调戏",
+    "大叔心"
+   ],
+   "context": "每月登录语音：7月",
+   "notes": "语音。先提议涂防晒，转头就对晒痕动了心思",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-117",
+   "kind": "voice_line",
+   "orig": "今月アタシの誕生日なんだけど～おねだり…していい？にゃふふ、えーとね…あなたがほしい～な♪にゃんてね",
+   "zh_adapted": "这个月是美亚的生日哦～可以…许个愿吗？喵哼哼，那个呢…我想要你～♪ 开玩笑的",
+   "tags": [
+    "撒娇",
+    "调戏",
+    "生日"
+   ],
+   "context": "每月登录语音：8月（她的生日月）",
+   "notes": "语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-118",
+   "kind": "voice_line",
+   "orig": "にゃふふ～昨日は色んなフルーツをいっぱい楽しんじゃった～うん？もちろんフルーツ狩りの話だよ？にゃふふっ♪",
+   "zh_adapted": "喵哼哼～昨天可享受了好多好多水果呢～嗯？当然是说摘水果的事啦？喵哼哼♪",
+   "tags": [
+    "欲盖弥彰",
+    "水果比喻"
+   ],
+   "context": "每月登录语音：9月。水果＝女孩子的双关，被追问后急忙改口",
+   "notes": "语音。此地无银三百两",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-119",
+   "kind": "voice_line",
+   "orig": "トリックオアトリート！なーんてまどろっこしい！いたずらしてもいい？してもいいよねー！？しちゃうからーーー！！！",
+   "zh_adapted": "不给糖就捣蛋！——哎呀这样太绕了！可以捣蛋吗？可以的吧——！？那我可要捣了哦———！！！",
+   "tags": [
+    "恶作剧",
+    "兴奋"
+   ],
+   "context": "每月登录语音：10月",
+   "notes": "万圣节语音。自己把规矩拆了",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-120",
+   "kind": "voice_line",
+   "orig": "運動のあとはマッサージした方がいいよ？にゃっふふ♪美亜ちゃんがやってあげようか~",
+   "zh_adapted": "运动之后最好按摩一下哦？喵嘻嘻♪ 让美亚来帮你吧～",
+   "tags": [
+    "热心",
+    "按摩"
+   ],
+   "context": "每月登录语音：11月",
+   "notes": "语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-121",
+   "kind": "voice_line",
+   "orig": "メリークリスマース~美亜ちゃんサンタから特別なプレゼント~それは、ア・タ・シ♪",
+   "zh_adapted": "圣诞快乐～美亚圣诞老人送来特别礼物～那就是，我·本·人♪",
+   "tags": [
+    "调戏",
+    "撒娇"
+   ],
+   "context": "每月登录语音：12月",
+   "notes": "语音。间隔号强调",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-122",
+   "kind": "voice_line",
+   "orig": "にゃっほー",
+   "zh_adapted": "喵吼～♪ 马上开始玩吧！",
+   "tags": [
+    "口癖",
+    "兴奋"
+   ],
+   "context": "角色相关：选择亲密度",
+   "notes": "登录语音",
+   "source": "https://wikiwiki.jp/gameongeki/柏木 美亜"
+  },
+  {
+   "id": "M-123",
+   "kind": "voice_line",
+   "orig": "クンクン…未知なる食べ物との出会いの予感。",
+   "zh_adapted": "吸吸♪　唔——，这股仿佛要把身体点燃的辛香！预感要遇上未知的食物了！呐呐，一起去挑战一下嘛♪",
+   "tags": [
+    "吃货",
+    "邀请",
+    "兴奋"
+   ],
+   "context": "联动：首页语音（亲密度8）",
+   "notes": "档案问答",
+   "source": "https://wikiwiki.jp/re-step/キャラクター/柏木美亜"
+  },
+  {
+   "id": "M-124",
+   "kind": "voice_line",
+   "orig": "にゃっふっふっふ…美亜ちゃんのマッサージ、疲れが取れるって評判なんだ。",
+   "zh_adapted": "喵嘻嘻——，美亚的按摩，消除疲劳的口碑很好的哦～。所·以·说，凡事都要试试嘛？嗯？来嘛，我会对你温柔点的～♪",
+   "tags": [
+    "推销",
+    "按摩",
+    "调戏"
+   ],
+   "context": "联动：首页语音（亲密度12）",
+   "notes": "档案问答。间隔号「·」是原文的强调写法（だ・か・ら）",
+   "source": "https://wikiwiki.jp/re-step/キャラクター/柏木美亜"
+  },
+  {
+   "id": "M-125",
+   "kind": "spoken_dialogue",
+   "orig": "ぴんぽんぴんぽーん、大正解！",
+   "zh_adapted": "哔啵哔——啵、大正解！",
+   "tags": [
+    "拟声",
+    "得意",
+    "评鉴"
+   ],
+   "context": "判定对方答对时的效果音",
+   "notes": "用户指出：原先译成「恭喜你答对了！」只留语义、丢了声音，太干。这类带长音的重复效果音要音译保留节奏。",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-126",
+   "kind": "spoken_dialogue",
+   "orig": "わーい！　ドンドンパフパフー！",
+   "zh_adapted": "哇——！咚咚啪呼啪呼——！",
+   "tags": [
+    "拟声",
+    "兴奋",
+    "庆祝"
+   ],
+   "context": "",
+   "notes": "庆祝时的效果音。ドンドンパフパフ 是欢呼的拟声，音译保留节奏而不是压成「好棒」",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-127",
+   "kind": "spoken_dialogue",
+   "orig": "もぐもぐもぐもぐ……おいしー",
+   "zh_adapted": "嚼嚼嚼嚼……好好吃——",
+   "tags": [
+    "拟声",
+    "吃货"
+   ],
+   "context": "",
+   "notes": "吃东西的音",
+   "source": "SDDT VHD 剧本区"
+  },
+  {
+   "id": "M-128",
+   "kind": "spoken_dialogue",
+   "orig": "……ぎゅっ……",
+   "zh_adapted": "……抱紧紧……",
+   "tags": [
+    "拟声",
+    "撒娇",
+    "痴迷"
+   ],
+   "context": "",
+   "notes": "抱住时的拟声",
+   "source": "SDDT VHD 剧本区"
+  }
+ ]
+}

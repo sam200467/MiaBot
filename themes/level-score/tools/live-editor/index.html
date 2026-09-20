@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>等级成绩长图 CSS 实时调试器</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <aside class="editor-pane">
+    <header>
+      <div>
+        <h1>等级成绩长图 CSS 调试器</h1>
+        <p>左侧修改，右侧即时预览；Ctrl+S 保存。</p>
+      </div>
+      <span id="save-state" class="state saved">已保存</span>
+    </header>
+
+    <section class="toolbar">
+      <label>
+        测试数据
+        <select id="sample">
+          <option value="full">LV.14 满页（70 张）</option>
+          <option value="last">LV.14 末页（11 张）</option>
+        </select>
+      </label>
+      <label>
+        跳到规则
+        <select id="rule-jump">
+          <option value="">请选择</option>
+          <option value=".hero {">顶部信息区</option>
+          <option value=".level-mark {">LEVEL 等级框</option>
+          <option value=".hero-copy {">标题与页码</option>
+          <option value=".player {">玩家资料框</option>
+          <option value=".summary {">四项统计</option>
+          <option value=".sort-note {">排序说明</option>
+          <option value=".chart-grid {">7 列谱面网格</option>
+          <option value=".chart-card {">谱面卡片</option>
+          <option value=".jacket {">曲绘尺寸</option>
+          <option value=".difficulty {">难度标记</option>
+          <option value=".achievement {">AB / FC / FB 徽章</option>
+          <option value=".score {">分数文字</option>
+          <option value=".title {">曲名文字</option>
+          <option value=".meta {">定数与评级</option>
+          <option value="footer {">页脚</option>
+        </select>
+      </label>
+    </section>
+
+    <textarea id="css-editor" spellcheck="false" aria-label="theme.css 编辑器"></textarea>
+
+    <footer>
+      <span id="cursor-position">第 1 行，第 1 列</span>
+      <div class="actions">
+        <button id="reload" type="button" class="secondary">放弃未保存修改</button>
+        <button id="save" type="button" class="primary">保存到 theme.css</button>
+      </div>
+    </footer>
+  </aside>
+
+  <main class="preview-pane">
+    <div class="preview-toolbar">
+      <strong id="preview-size">1440 × 2981 实时预览</strong>
+      <span id="preview-state">正在载入……</span>
+      <label>
+        缩放
+        <input id="zoom" type="range" min="10" max="100" step="1" value="25">
+        <output id="zoom-value">25%</output>
+      </label>
+      <button id="fit" type="button" class="secondary">适应窗口</button>
+      <button id="refresh-preview" type="button" class="secondary">刷新预览</button>
+      <button id="export-preview" type="button" class="primary">导出 PNG</button>
+    </div>
+    <div id="preview-viewport" class="preview-viewport">
+      <div id="preview-stage" class="preview-stage">
+        <iframe id="preview-frame" title="等级成绩长图实时预览"></iframe>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="editor.js"></script>
+</body>
+</html>

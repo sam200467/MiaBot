@@ -1,0 +1,52 @@
+{
+  "_说明": "QQ 官方机器人开放平台（美亚）。复制成 config.local.json 再填 appId / clientSecret。",
+  "_凭据来源": "https://q.qq.com 开放平台 → 开发设置。AppSecret 等同机器人密码，不要提交、不要贴群里。",
+  "_沙箱": "sandbox=true 时走 sandbox.api.sgroup.qq.com，只有沙箱成员能触发；正式上线前用沙箱验，上线后改 false。",
+
+  "appId": "",
+  "clientSecret": "",
+  "sandbox": true,
+
+  "_安全": "allowedGroupIds 是 group_openid 白名单（不是群号）。换 AppID 或换沙箱都会变，所以留空时拒绝启动 —— 免得误入陌生群。填之前先用 probe-official.cjs 把 openid 打出来。",
+  "allowedGroupIds": [],
+  "allowPrivateChat": true,
+
+  "_数据": "workDir 存放运行期文件（临时图片等）",
+  "workDir": "./data",
+
+  "_指令": "指令层要用出图核心和凭据库。三个路径都必须存在，缺一个**启动就报错**——不要让它降级成纯聊天再让每条指令各失败一次。相对路径按 qq-official/ 解析。两个 exe 和梨绪共用同一批（都指仓库根目录）：ongeki-core.exe 由 node build.js 产出，takase-discord-vault.exe 在仓库里。",
+  "corePath": "../ongeki-core.exe",
+  "vaultHelperPath": "../takase-discord-vault.exe",
+  "vaultPath": "./data/bindings.dat",
+  "outputDir": "./data/output",
+
+  "_别名库": "别名库可以和梨绪共用（社区词汇不该按 bot 分叉），也可以各存各的。⚠ 要共用，aliasDir 和 aliasScope **两个都得一样** —— 文件名是 song-aliases-<scope>.json，只改一个会得到两个并排的文件，看着像配好了其实各写各的。⚠ **更要紧的前提：两边都得是带锁的版本。** song-alias-store 的事务+文件锁是后加的，梨绪跑的那个打包版本里可能还是老实现 —— 一个加锁一个不加锁等于没加，老那边会拿内存旧副本覆盖整个文件、把另一边的改动抹掉。共用之前先重跑 node qq/build-qq-bot.js 重建梨绪。详见 README 的 3b。⚠ 共用只在本机同时跑着两个 bot 时才有意义，部署包拷到别的机器后共用自然失效。",
+  "aliasDir": "./data",
+  "aliasScope": "qq",
+
+  "_botOpenid_已废弃": "别填。2026-09-19 实测：mentions 里的 id 与 READY 给的 botId **不是一套 id 空间**（openid vs 数字号），拿它比对永远不会命中。现在靠平台给的 mentions[].is_you 判「@ 的是不是美亚自己」，不需要这个键。",
+  "botOpenid": "",
+
+  "_删除别名": "只有这里的 openid 能用 /删除别名 和 /驳回别名候选，不看群角色，也不能通过 @美亚 触发（这两个能力压根不在工具清单里）。留空 = 谁都不能删（失败往安全方向倒）。⚠ openid 换 AppID 或换环境就会变，跟 allowedGroupIds 同理，换环境后要重新探。",
+  "aliasDeleteOpenids": [],
+
+  "_逃生阀": "acceptBareGroupCommands=true 会让群里**不带 @** 的 /指令 也执行。默认 false：开了全量群消息之后，群里**别的 bot** 被 @ 的指令也会送到这儿来（实测收到过另一只 bot 的 /login），放行就是抢答别人的指令。",
+  "acceptBareGroupCommands": false,
+
+  "_出图冷却": "Mia 同一用户、同一种图片生成之间的冷却时间（毫秒）。默认 2000；只影响 MiaBot，不影响梨绪和 Discord 版。",
+  "generateCooldownMs": 2000,
+
+  "_被动凭据": "延迟发出的内容改用「该目标最新一条消息」的 msg_id 当被动凭据，引用仍指向原始请求。群窗口只有 5 分钟，而分表/牌子的生成上限是 6～10 分钟，不借新凭据的话等图出来就发不出去了。2026-09-19 probe 实测平台接受这种搭配。⚠ 它不是万能补丁：那之后没人在群里说话就仍然没有新鲜凭据可用。",
+  "reuseLatestPassiveCredential": true,
+
+  "_限流": "官方有正式频控且失败代价不是封号，所以比 NapCat 版宽松；熔断保留，用于识别平台侧异常。不填用 official-transport.cjs 的默认值。",
+  "minSendIntervalMs": 500,
+  "jitterMs": 200,
+  "perTargetIntervalMs": 1000,
+  "perTargetPerHour": 60,
+  "dailyCap": 3000,
+  "duplicateWindowMs": 60000,
+
+  "_聊天": "角色资源目录；留空则用同目录上一级的 mia-chat",
+  "characterDir": ""
+}

@@ -1,0 +1,27 @@
+{
+  "name": "miabot",
+  "private": true,
+  "scripts": {
+    "start": "node qq-official/mia-entry.cjs",
+    "pretest": "node tools/prepare-test-config.cjs",
+    "test": "node --test --test-timeout=90000 test-takase-core.cjs test-song-alias-store.cjs qq-official/test-official-transport.cjs qq-official/test-mia-entry.cjs qq-official/test-mia-commands.cjs qq-official/test-mia-command-panel.cjs rio-chat/chat.test.cjs rio-chat/knowledge.test.cjs rio-chat/research-policy.test.cjs rio-chat/search.test.cjs",
+    "posttest": "node tools/cleanup-test-config.cjs",
+    "build:core": "node build.js",
+    "build:windows": "node build.js",
+    "preview:completion": "node themes/completion-search/tools/render-preview.js",
+    "css:completion": "node themes/completion-search/tools/live-css-editor.js",
+    "preview:level": "node themes/level-score/tools/render-preview.js",
+    "preview:chartinfo": "node themes/chart-info/tools/render-preview.js",
+    "css:chartinfo": "node themes/chart-info/tools/live-css-editor.js",
+    "css:level": "node themes/level-score/tools/live-css-editor.js"
+  },
+  "dependencies": {
+    "https-proxy-agent": "^7.0.6",
+    "opencc-js": "1.4.2",
+    "undici": "^6.28.0",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.9"
+  }
+}

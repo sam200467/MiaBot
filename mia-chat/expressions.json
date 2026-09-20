@@ -1,0 +1,356 @@
+{
+ "schemaVersion": 1,
+ "status": "美亚表情集（用户提供）。分类由目视检查得出。",
+ "assetRoot": "emojis/",
+ "inspectionNote": "GIF 只看了静态帧，动画过程未逐帧确认。若某张的实际动态与 label 不符，改 label/usage 即可。",
+ "selectionPolicy": {
+  "ordinaryProbability": 0.6,
+  "clearEmotionProbability": 1,
+  "seriousExplanationProbability": 0,
+  "afterStopTeasingProbability": 0,
+  "maxImagesPerReply": 1,
+  "minRepliesBetweenImages": 0,
+  "minSecondsBetweenImages": 0,
+  "excludeLastImageCount": 0,
+  "historyScope": [
+   "guildId",
+   "channelId"
+  ],
+  "explicitImageRequest": "用户明确要某图时跳过随机；仍检查文件、语境和总请求限流；若表达不适则不发冲突图片。",
+  "noMatch": "text_only",
+  "priority": [
+   "user_discomfort_or_stop_teasing",
+   "explicit_image_request",
+   "clear_emotion",
+   "ordinary_chat"
+  ],
+  "notes": "美亚是纯聊天角色，没有「认真解释资料」的场景，so seriousExplanationProbability=0（引擎在 explanation 场景会额外要求图带 neutral/relaxed，这里直接不给）。爱心眼一族（phone/ecstatic/side）共用 variantGroup=heart_eyes，避免这类图占掉三成权重。未设配图冷却与去重，可连续配图、可重复。用户不适或要求停止调侃后 automatic 配图 0%（afterStopTeasingProbability=0），只有用户明确重新允许才恢复。"
+ },
+ "entries": [
+  {
+   "id": "gentle_smile",
+   "previewNumber": 1,
+   "label": "温和微笑",
+   "file": "emojis/01_温和微笑.jpg",
+   "width": 280,
+   "height": 234,
+   "bytes": 16082,
+   "animated": false,
+   "emotions": [
+    "neutral",
+    "happy"
+   ],
+   "usage": "平静应答、普通闲聊。默认脸，不确定用哪张时用这张。",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "inspection": "目视检查"
+  },
+  {
+   "id": "grabby_hands",
+   "previewNumber": 2,
+   "label": "伸手想摸",
+   "file": "emojis/02_伸手想摸.gif",
+   "width": 404,
+   "height": 400,
+   "bytes": 517967,
+   "animated": true,
+   "emotions": [
+    "affection",
+    "excited"
+   ],
+   "usage": "看见可爱的女孩子、想伸手去摸的时候。她的招牌动作，是「もぎもぎ」的可视化。",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "inspection": "目视检查（静态帧；未逐帧查看动画）"
+  },
+  {
+   "id": "sparkle_wink",
+   "previewNumber": 3,
+   "label": "闪亮眨眼",
+   "file": "emojis/03_闪亮眨眼.gif",
+   "width": 508,
+   "height": 512,
+   "bytes": 173172,
+   "animated": true,
+   "emotions": [
+    "proud",
+    "confident"
+   ],
+   "usage": "得意、自我宣传、宣布自己的头衔（水果偶像／水果品鉴大师）时。",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "inspection": "目视检查（静态帧；未逐帧查看动画）"
+  },
+  {
+   "id": "blissful_float",
+   "previewNumber": 4,
+   "label": "惬意漂浮",
+   "file": "emojis/04_惬意漂浮.jpg",
+   "width": 886,
+   "height": 856,
+   "bytes": 75682,
+   "animated": false,
+   "emotions": [
+    "relaxed",
+    "happy"
+   ],
+   "usage": "满足、惬意、被夸得飘起来了。适合心情好的收尾。",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "inspection": "目视检查"
+  },
+  {
+   "id": "phone_heart_eyes",
+   "previewNumber": 5,
+   "label": "看手机冒爱心",
+   "file": "emojis/05_看手机冒爱心.jpg",
+   "width": 346,
+   "height": 373,
+   "bytes": 26093,
+   "animated": false,
+   "emotions": [
+    "affection",
+    "excited"
+   ],
+   "usage": "正在收集情报／听到可爱女孩子的消息时。配「情报通」的场合。",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "variantGroup": "heart_eyes",
+   "inspection": "目视检查"
+  },
+  {
+   "id": "craving_tears",
+   "previewNumber": 6,
+   "label": "渴望到流泪",
+   "file": "emojis/06_渴望到流泪.jpg",
+   "width": 390,
+   "height": 371,
+   "bytes": 30000,
+   "animated": false,
+   "emotions": [
+    "affection",
+    "dismay"
+   ],
+   "usage": "想要却得不到、馋到不行。比同组的爱心眼更夸张，别用于普通开心。",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "inspection": "目视检查"
+  },
+  {
+   "id": "taunt_tongue",
+   "previewNumber": 7,
+   "label": "挑衅吐舌",
+   "file": "emojis/07_挑衅吐舌.jpg",
+   "width": 184,
+   "height": 156,
+   "bytes": 10984,
+   "animated": false,
+   "emotions": [
+    "taunt",
+    "playful"
+   ],
+   "usage": "不服、挑衅、被拆台后嘴硬。**不要用于真的生气或用户表达不适时。**",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "inspection": "目视检查"
+  },
+  {
+   "id": "ecstatic_love",
+   "previewNumber": 8,
+   "label": "狂喜爱心眼",
+   "file": "emojis/08_狂喜爱心眼.jpg",
+   "width": 190,
+   "height": 183,
+   "bytes": 13615,
+   "animated": false,
+   "emotions": [
+    "excited",
+    "affection"
+   ],
+   "usage": "极度兴奋、看见超可爱的人。强度最高的一张，留给情绪顶点。",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "variantGroup": "heart_eyes",
+   "inspection": "目视检查"
+  },
+  {
+   "id": "peek_doorway",
+   "previewNumber": 9,
+   "label": "门后偷窥",
+   "file": "emojis/09_门后偷窥.jpg",
+   "width": 114,
+   "height": 114,
+   "bytes": 4093,
+   "animated": false,
+   "emotions": [
+    "playful",
+    "surprised"
+   ],
+   "usage": "偷偷观察、潜伏、被发现在偷看。配原作里「謎の影」那个梗。",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "inspection": "目视检查"
+  },
+  {
+   "id": "peek_box",
+   "previewNumber": 10,
+   "label": "纸箱潜伏",
+   "file": "emojis/10_纸箱潜伏.gif",
+   "width": 269,
+   "height": 321,
+   "bytes": 144785,
+   "animated": true,
+   "emotions": [
+    "playful",
+    "happy"
+   ],
+   "usage": "躲在箱子里偷看。比门后那张更怂、更好笑，适合被当场抓包。",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "inspection": "目视检查（静态帧；未逐帧查看动画）"
+  },
+  {
+   "id": "wailing",
+   "previewNumber": 11,
+   "label": "嚎啕大哭",
+   "file": "emojis/11_嚎啕大哭.jpg",
+   "width": 219,
+   "height": 212,
+   "bytes": 16810,
+   "animated": false,
+   "emotions": [
+    "crying",
+    "defeat"
+   ],
+   "usage": "受挫、崩溃、输掉之后。**这是她少见的情绪低音区**，不要和炸毛混用。",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "inspection": "目视检查"
+  },
+  {
+   "id": "dizzy",
+   "previewNumber": 12,
+   "label": "晕头转向",
+   "file": "emojis/12_晕头转向.jpg",
+   "width": 146,
+   "height": 146,
+   "bytes": 8724,
+   "animated": false,
+   "emotions": [
+    "confused",
+    "stunned"
+   ],
+   "usage": "听不懂、被绕晕、信息过载。",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "inspection": "目视检查"
+  },
+  {
+   "id": "drooling",
+   "previewNumber": 13,
+   "label": "垂涎三尺",
+   "file": "emojis/13_垂涎三尺.jpg",
+   "width": 158,
+   "height": 190,
+   "bytes": 11710,
+   "animated": false,
+   "emotions": [
+    "affection"
+   ],
+   "usage": "大叔心外露、看呆了。**只用于她自己失态，不要对着聊天对象用。**",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "inspection": "目视检查"
+  },
+  {
+   "id": "meme_muzzle",
+   "previewNumber": 14,
+   "label": "搞怪表情包",
+   "file": "emojis/14_搞怪表情包.jpg",
+   "width": 250,
+   "height": 232,
+   "bytes": 13184,
+   "animated": false,
+   "emotions": [
+    "playful",
+    "awkward"
+   ],
+   "usage": "自嘲、搞怪、气氛需要放松一下。风格和其他图差异大，少用。",
+   "autoEligible": true,
+   "requiresMatchingContext": true,
+   "weight": 1,
+   "inspection": "目视检查"
+  },
+  {
+   "id": "side_heart_eyes",
+   "previewNumber": 15,
+   "label": "侧脸心动",
+   "file": "emojis/15_侧脸心动.jpg",
+   "width": 131,
+   "height": 143,
+   "bytes": 7921,
+   "animated": false,
+   "emotions": [
+    "affection",
+    "happy"
+   ],
+   "usage": "心动、看入迷。比狂喜那张安静一些。",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "variantGroup": "heart_eyes",
+   "inspection": "目视检查"
+  },
+  {
+   "id": "flustered_cover",
+   "previewNumber": 16,
+   "label": "捂嘴慌乱",
+   "file": "emojis/16_捂嘴慌乱.jpg",
+   "width": 1080,
+   "height": 1080,
+   "bytes": 156964,
+   "animated": false,
+   "emotions": [
+    "flustered",
+    "embarrassed"
+   ],
+   "usage": "说漏嘴之后、被当场拆穿、紧张。**她的「漏嘴改口」就配这张。**",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "inspection": "目视检查"
+  },
+  {
+   "id": "dazed_drool",
+   "previewNumber": 17,
+   "label": "呆滞失神",
+   "file": "emojis/17_呆滞失神.jpg",
+   "width": 286,
+   "height": 300,
+   "bytes": 21918,
+   "animated": false,
+   "emotions": [
+    "stunned",
+    "confused"
+   ],
+   "usage": "脑子过载、发呆、一时反应不过来。比晕头转向那张更「空」。",
+   "autoEligible": true,
+   "requiresMatchingContext": false,
+   "weight": 1,
+   "inspection": "目视检查"
+  }
+ ]
+}

@@ -1,0 +1,712 @@
+{
+ "schemaVersion": 1,
+ "game": "chunithm",
+ "note": "版本条目由 tools/gen-terms.cjs 从本地快照的 version 字段生成（名称逐字一致、曲目数来自快照）。俗称与组合称呼是人工补的，只收稳定可验证的；长尾口语不进这里，走会话 glossary。发行日期与世代先后尚未收录（需要来源，留给下一批）。",
+ "sources": [
+  "版本名与曲目数：本地曲库快照 rio-chat/knowledge/chunithm.json 的 version 字段（水鱼 chunithmprober music_data）",
+  "难度俗称、解禁、定数、地图、课题曲、WE：萌娘百科《CHUNITHM》与 chunithm.fandom 游戏简介（逐条见各条目 sources）",
+  "国服年份命名：百度百科「中二节奏」"
+ ],
+ "entries": [
+  {
+   "id": "chunithm-version-chunithm",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM",
+   "catalogVersions": [
+    "CHUNITHM"
+   ],
+   "songs": 414
+  },
+  {
+   "id": "chunithm-version-chunithm-air",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM AIR",
+   "catalogVersions": [
+    "CHUNITHM AIR"
+   ],
+   "songs": 314,
+   "requiresGameAliases": [
+    "AIR"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-plus",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM PLUS",
+   "catalogVersions": [
+    "CHUNITHM PLUS"
+   ],
+   "songs": 206
+  },
+  {
+   "id": "chunithm-version-chunithm-air-plus",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM AIR PLUS",
+   "catalogVersions": [
+    "CHUNITHM AIR PLUS"
+   ],
+   "songs": 304,
+   "aliases": [
+    "AIR PLUS",
+    "AIR+"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-star-plus",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM STAR PLUS",
+   "catalogVersions": [
+    "CHUNITHM STAR PLUS"
+   ],
+   "songs": 304,
+   "aliases": [
+    "STAR PLUS",
+    "STAR+"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-amazon-plus",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM AMAZON PLUS",
+   "catalogVersions": [
+    "CHUNITHM AMAZON PLUS"
+   ],
+   "songs": 293,
+   "aliases": [
+    "AMAZON PLUS",
+    "AMAZON+"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-crystal-plus",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM CRYSTAL PLUS",
+   "catalogVersions": [
+    "CHUNITHM CRYSTAL PLUS"
+   ],
+   "songs": 321,
+   "aliases": [
+    "CRYSTAL PLUS",
+    "CRYSTAL+"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-star",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM STAR",
+   "catalogVersions": [
+    "CHUNITHM STAR"
+   ],
+   "songs": 312,
+   "requiresGameAliases": [
+    "STAR"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-sun",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM SUN",
+   "catalogVersions": [
+    "CHUNITHM SUN"
+   ],
+   "songs": 414,
+   "requiresGameAliases": [
+    "SUN"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-crystal",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM CRYSTAL",
+   "catalogVersions": [
+    "CHUNITHM CRYSTAL"
+   ],
+   "songs": 315,
+   "aliases": [
+    "CRYSTAL"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-new",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM NEW",
+   "catalogVersions": [
+    "CHUNITHM NEW"
+   ],
+   "songs": 459,
+   "requiresGameAliases": [
+    "NEW",
+    "NEW!!"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-amazon",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM AMAZON",
+   "catalogVersions": [
+    "CHUNITHM AMAZON"
+   ],
+   "songs": 260,
+   "aliases": [
+    "AMAZON"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-paradise",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM PARADISE",
+   "catalogVersions": [
+    "CHUNITHM PARADISE"
+   ],
+   "songs": 259,
+   "aliases": [
+    "PARADISE"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-paradise-lost",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM PARADISE LOST",
+   "catalogVersions": [
+    "CHUNITHM PARADISE LOST"
+   ],
+   "songs": 275,
+   "aliases": [
+    "PARADISE LOST"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-new-plus",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM NEW PLUS",
+   "catalogVersions": [
+    "CHUNITHM NEW PLUS"
+   ],
+   "songs": 406,
+   "aliases": [
+    "NEW PLUS",
+    "NEW+"
+   ]
+  },
+  {
+   "id": "chunithm-version-中二节奏-new",
+   "type": "version",
+   "game": "chunithm",
+   "name": "中二节奏 NEW",
+   "catalogVersions": [
+    "中二节奏 NEW"
+   ],
+   "songs": 78,
+   "aliases": [
+    "中二节奏NEW"
+   ],
+   "mappingConfirmed": false,
+   "body": "中国大陆版（华立代理）按年份命名。**与日版哪一代对应没有权威对照**，所以不做映射：可以认识这个名字，但涉及日版版本筛选时必须说明对应关系未确认。"
+  },
+  {
+   "id": "chunithm-version-中二节奏-2024",
+   "type": "version",
+   "game": "chunithm",
+   "name": "中二节奏 2024",
+   "catalogVersions": [
+    "中二节奏 2024"
+   ],
+   "songs": 86,
+   "aliases": [
+    "中二节奏2024"
+   ],
+   "mappingConfirmed": false,
+   "body": "中国大陆版（华立代理）按年份命名。**与日版哪一代对应没有权威对照**，所以不做映射：可以认识这个名字，但涉及日版版本筛选时必须说明对应关系未确认。"
+  },
+  {
+   "id": "chunithm-version-chunithm-sun-plus",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM SUN PLUS",
+   "catalogVersions": [
+    "CHUNITHM SUN PLUS"
+   ],
+   "songs": 376,
+   "aliases": [
+    "SUN PLUS",
+    "SUN+"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-luminous",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM LUMINOUS",
+   "catalogVersions": [
+    "CHUNITHM LUMINOUS"
+   ],
+   "songs": 384,
+   "aliases": [
+    "LUMINOUS"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-luminous-plus",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM LUMINOUS PLUS",
+   "catalogVersions": [
+    "CHUNITHM LUMINOUS PLUS"
+   ],
+   "songs": 307,
+   "aliases": [
+    "LUMINOUS PLUS",
+    "LUMINOUS+"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-verse",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM VERSE",
+   "catalogVersions": [
+    "CHUNITHM VERSE"
+   ],
+   "songs": 398,
+   "aliases": [
+    "VERSE"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-x-verse",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM X-VERSE",
+   "catalogVersions": [
+    "CHUNITHM X-VERSE"
+   ],
+   "songs": 134,
+   "aliases": [
+    "X-VERSE"
+   ]
+  },
+  {
+   "id": "chunithm-version-中二节奏-2025",
+   "type": "version",
+   "game": "chunithm",
+   "name": "中二节奏 2025",
+   "catalogVersions": [
+    "中二节奏 2025"
+   ],
+   "songs": 6,
+   "aliases": [
+    "中二节奏2025"
+   ],
+   "mappingConfirmed": false,
+   "body": "中国大陆版（华立代理）按年份命名。**与日版哪一代对应没有权威对照**，所以不做映射：可以认识这个名字，但涉及日版版本筛选时必须说明对应关系未确认。"
+  },
+  {
+   "id": "chunithm-version-chunithm-x-verse-x",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM X-VERSE-X",
+   "aliases": [
+    "X-VERSE-X"
+   ],
+   "catalogAvailable": false,
+   "catalogVersions": [],
+   "songs": 0,
+   "body": "官方版本名，但本地曲库快照里没有这一代的曲目数据。不能按它筛曲目，只能说清这个情况。",
+   "sources": [
+    "萌娘百科《CHUNITHM》/ chunithm.fandom（版本时间线）",
+    "本地快照 version 字段不含该值"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-mate",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM Mate",
+   "aliases": [],
+   "requiresGameAliases": [
+    "Mate"
+   ],
+   "catalogAvailable": false,
+   "catalogVersions": [],
+   "songs": 0,
+   "body": "官方版本名，但本地曲库快照里没有这一代的曲目数据。不能按它筛曲目，只能说清这个情况。",
+   "sources": [
+    "萌娘百科《CHUNITHM》/ chunithm.fandom（版本时间线）",
+    "本地快照 version 字段不含该值"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-superstar",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM SUPERSTAR",
+   "aliases": [
+    "SUPERSTAR"
+   ],
+   "catalogAvailable": false,
+   "catalogVersions": [],
+   "songs": 0,
+   "body": "官方版本名，但本地曲库快照里没有这一代的曲目数据。不能按它筛曲目，只能说清这个情况。",
+   "sources": [
+    "萌娘百科《CHUNITHM》/ chunithm.fandom（版本时间线）",
+    "本地快照 version 字段不含该值"
+   ]
+  },
+  {
+   "id": "chunithm-version-chunithm-superstar-plus",
+   "type": "version",
+   "game": "chunithm",
+   "name": "CHUNITHM SUPERSTAR PLUS",
+   "aliases": [
+    "SUPERSTAR PLUS",
+    "SUPERSTAR+"
+   ],
+   "catalogAvailable": false,
+   "catalogVersions": [],
+   "songs": 0,
+   "body": "官方版本名，但本地曲库快照里没有这一代的曲目数据。不能按它筛曲目，只能说清这个情况。",
+   "sources": [
+    "萌娘百科《CHUNITHM》/ chunithm.fandom（版本时间线）",
+    "本地快照 version 字段不含该值"
+   ]
+  },
+  {
+   "id": "chunithm-version-中二节奏-2026",
+   "type": "version",
+   "game": "chunithm",
+   "name": "中二节奏 2026",
+   "aliases": [
+    "中二节奏2026"
+   ],
+   "catalogAvailable": false,
+   "catalogVersions": [],
+   "songs": 0,
+   "body": "官方版本名，但本地曲库快照里没有这一代的曲目数据。不能按它筛曲目，只能说清这个情况。",
+   "sources": [
+    "萌娘百科《CHUNITHM》/ chunithm.fandom（版本时间线）",
+    "本地快照 version 字段不含该值"
+   ]
+  },
+  {
+   "id": "chunithm-version-group-silver",
+   "type": "version_group",
+   "game": "chunithm",
+   "name": "银框体",
+   "aliases": [
+    "银框",
+    "銀框体"
+   ],
+   "catalogVersions": [
+    "CHUNITHM",
+    "CHUNITHM AIR",
+    "CHUNITHM PLUS",
+    "CHUNITHM AIR PLUS",
+    "CHUNITHM STAR PLUS",
+    "CHUNITHM AMAZON PLUS",
+    "CHUNITHM CRYSTAL PLUS",
+    "CHUNITHM STAR",
+    "CHUNITHM CRYSTAL",
+    "CHUNITHM AMAZON",
+    "CHUNITHM PARADISE",
+    "CHUNITHM PARADISE LOST"
+   ],
+   "body": "PARADISE LOST 及以前的旧框体世代（2023-02-01 停止在线服务），与「金框体」相对。",
+   "sources": [
+    "萌娘百科《CHUNITHM》",
+    "chunithm.fandom 游戏简介"
+   ]
+  },
+  {
+   "id": "chunithm-version-group-gold",
+   "type": "version_group",
+   "game": "chunithm",
+   "name": "金框体",
+   "aliases": [
+    "金框",
+    "新框体"
+   ],
+   "catalogVersions": [
+    "CHUNITHM SUN",
+    "CHUNITHM NEW",
+    "CHUNITHM NEW PLUS",
+    "中二节奏 NEW",
+    "CHUNITHM SUN PLUS",
+    "CHUNITHM LUMINOUS",
+    "CHUNITHM LUMINOUS PLUS",
+    "CHUNITHM VERSE",
+    "CHUNITHM X-VERSE"
+   ],
+   "body": "NEW 起的新框体世代（支持 120fps），与「银框体」相对。",
+   "sources": [
+    "萌娘百科《CHUNITHM》",
+    "chunithm.fandom 游戏简介"
+   ]
+  },
+  {
+   "id": "chunithm-difficulty-bas",
+   "type": "difficulty",
+   "game": "chunithm",
+   "name": "BASIC",
+   "zh": "绿谱",
+   "aliases": [
+    "绿谱",
+    "綠譜",
+    "BAS"
+   ],
+   "body": "曲库 difficulty 字段是 BAS。",
+   "sources": [
+    "萌娘百科《CHUNITHM》：五档通常分别称为绿谱、黄谱、红谱、紫谱与黑谱"
+   ]
+  },
+  {
+   "id": "chunithm-difficulty-adv",
+   "type": "difficulty",
+   "game": "chunithm",
+   "name": "ADVANCED",
+   "zh": "黄谱",
+   "aliases": [
+    "黄谱",
+    "黃譜",
+    "ADV"
+   ],
+   "body": "曲库 difficulty 字段是 ADV。",
+   "sources": [
+    "同上"
+   ]
+  },
+  {
+   "id": "chunithm-difficulty-mas",
+   "type": "difficulty",
+   "game": "chunithm",
+   "name": "MASTER",
+   "zh": "紫谱",
+   "aliases": [
+    "紫谱",
+    "紫譜",
+    "MAS"
+   ],
+   "body": "曲库 difficulty 字段是 MAS。",
+   "sources": [
+    "本项目 toolRule：红谱=EXP、紫谱=MAS",
+    "萌娘百科《CHUNITHM》难度俗称"
+   ]
+  },
+  {
+   "id": "chunithm-difficulty-exp",
+   "type": "difficulty",
+   "game": "chunithm",
+   "name": "EXPERT",
+   "zh": "红谱",
+   "aliases": [
+    "红谱",
+    "紅譜",
+    "EXP"
+   ],
+   "body": "曲库 difficulty 字段是 EXP。",
+   "sources": [
+    "本项目 toolRule",
+    "萌娘百科《CHUNITHM》难度俗称"
+   ]
+  },
+  {
+   "id": "chunithm-difficulty-ult",
+   "type": "difficulty",
+   "game": "chunithm",
+   "name": "ULTIMA",
+   "zh": "黑谱",
+   "aliases": [
+    "黑谱",
+    "黑譜",
+    "ULTIMA",
+    "ULT"
+   ],
+   "body": "曲库 difficulty 字段是 ULT；玩家口中的「黑谱」。只有部分乐曲有，也可能后续追加；MASTER 以上才会出现 FLICK 与向下的 AIR 箭头。",
+   "sources": [
+    "萌娘百科《CHUNITHM》：五档俗称绿/黄/红/紫/黑谱",
+    "chunithm.fandom 游戏简介"
+   ]
+  },
+  {
+   "id": "chunithm-mechanic-constant",
+   "type": "mechanic",
+   "game": "chunithm",
+   "name": "定数",
+   "aliases": [
+    "定数",
+    "定數"
+   ],
+   "body": "显示等级（如 14+）背后的小数值就是定数，用于单曲 Rating 计算。等级范围 1~15+，7 级起同一数字分两档；定数大致落在「等级 +0.0~+0.9」，7 级以上不低于 +0.5 的划进「+」档，7~9 级只有 +0.0 与 +0.5 两种。档位切法是：14＝14.0~14.4、14+＝14.5~14.9、15＝15.0~15.4（这三行是从本地曲库的 level/constant 分布量出来的）。社区老帖里的定数常停在几个版本之前，当前值以本地快照为准。",
+   "asOf": "最高定数 15.7 为 2026-09-18 查证时的社区资料说法（来源未标日期），会随后续版本变化",
+   "claims": [
+    {
+     "text": "当前最高定数为 15.7（15+ 的 MASTER 谱），如《Forsaken Tale》《The Metaverse》等",
+     "sources": [
+      "萌娘百科《CHUNITHM》",
+      "B站《中二节奏小tips》"
+     ]
+    }
+   ],
+   "sources": [
+    "本项目 research-policy.cjs 的「定数口径」段落（从本地快照分布量出）",
+    "萌娘百科《CHUNITHM》",
+    "B站《中二节奏小tips》"
+   ]
+  },
+  {
+   "id": "chunithm-mechanic-rating",
+   "type": "mechanic",
+   "game": "chunithm",
+   "name": "Rating 与参与谱面",
+   "aliases": [
+    "Rating",
+    "rating",
+    "レート"
+   ],
+   "body": "单曲 Rating 由定数与成绩决定：SSS+ 可达「谱面定数 +2.15」，SSS 为 +2.0，S 为定数本身。总 Rating 只取**当前版本常规谱面里最高的 20 个**参与——旧曲后来追加的 ULTIMA 谱也算在内，而 **WORLD'S END 谱面不参与**。",
+   "sources": [
+    "萌娘百科《CHUNITHM》",
+    "chunithm.fandom 游戏简介"
+   ]
+  },
+  {
+   "id": "chunithm-mechanic-worldsend",
+   "type": "mechanic",
+   "game": "chunithm",
+   "name": "WORLD'S END",
+   "aliases": [
+    "WORLD'S END",
+    "WORLDS END",
+    "WE谱",
+    "WE"
+   ],
+   "body": "CHUNITHM PLUS 起加入的特殊谱面类别（海外版在 SUPERSTAR PLUS 加入），性质类似 maimai 的宴谱、オンゲキ 的 LUNATIC，属于非常规谱面。需要 WORLD'S END 票券才能游玩（联机时每人一张）；难度用 ☆1~5 标记，星越多可能越难；**不参与 Rating**。PARADISE LOST 时期曾移除，NEW 重新加入。谱面属性以单个汉字或符号表示（光、避、止、时、速、戻、敷、跳、弹、半、两、割、狂、歌、布、觉、翔、改、藏、招、舞、击、分、嘘、谜、！、？等）；其中「避」含 Damage Note，碰到判 MISS、避开才判 J-CRITICAL。部分 WE 为 CLASS 认定限定，可能不出现在 WE 分类里。",
+   "sources": [
+    "萌娘百科《CHUNITHM》",
+    "remywiki：CHUNITHM:WORLD'S END",
+    "chunithm.fandom 歌曲清单/WORLD'S END"
+   ]
+  },
+  {
+   "id": "chunithm-mechanic-unlock",
+   "type": "mechanic",
+   "game": "chunithm",
+   "name": "解禁",
+   "aliases": [
+    "解禁",
+    "解锁",
+    "解鎖"
+   ],
+   "body": "MASTER 与 ULTIMA 通常需要解禁才能游玩。",
+   "disputed": true,
+   "claims": [
+    {
+     "text": "在对应曲目的 EXPERT 或 MASTER 取得 S 及以上评级即可解锁（NEW 起的规则）",
+     "sources": [
+      "萌娘百科《CHUNITHM》修订记录"
+     ],
+     "appliesTo": "NEW 起"
+    },
+    {
+     "text": "旧规则写作 EXPERT/MASTER 达 SS 解锁",
+     "sources": [
+      "chunithm.fandom 游戏简介"
+     ],
+     "appliesTo": "NEW 以前"
+    },
+    {
+     "text": "另有玩家说法称红谱与紫谱都要 SS 才能解锁",
+     "sources": [
+      "B站《中二节奏小tips》"
+     ],
+     "appliesTo": "玩家经验，非官方口径"
+    }
+   ],
+   "sources": [
+    "萌娘百科《CHUNITHM》",
+    "chunithm.fandom 游戏简介",
+    "B站《中二节奏小tips》"
+   ]
+  },
+  {
+   "id": "chunithm-mechanic-map",
+   "type": "mechanic",
+   "game": "chunithm",
+   "name": "地图与跑图",
+   "aliases": [
+    "跑图",
+    "地图",
+    "GAUGE"
+   ],
+   "body": "游玩获得的 GAUGE 换算成地图格数推进。难度影响格数：EXPERT 每曲 +7，MASTER / ULTIMA / WORLD'S END 每曲 +9；CLASS 通关 +3、任一曲 FC +4、AJ +5。每张地图有「地图加成」，满足特定条件（指定乐曲、活动/分类/版本乐曲、等级或难度、角色、技能等）可额外获得格数。地图与加成会随版本调整（复刻、加长、删格、改奖励位置）。",
+   "asOf": "格数口径为 2026-09-18 查证时的资料说法，会随版本调整",
+   "sources": [
+    "萌娘百科《CHUNITHM》",
+    "B站《中二节奏小tips》"
+   ]
+  },
+  {
+   "id": "chunithm-mechanic-course",
+   "type": "mechanic",
+   "game": "chunithm",
+   "name": "课题曲",
+   "aliases": [
+    "课题曲",
+    "課題曲"
+   ],
+   "body": "部分地图格设有课题曲：到达地图终点时必须通关该课题曲才能完成地图、领取奖励；通关后解禁该曲并获得对应角色与技能点。卡住时剩余格数会存入「ストック」（库存），通关后自动使用。课题曲不能登录「我的最爱」。",
+   "disputed": true,
+   "claims": [
+    {
+     "text": "库存上限 500 格",
+     "sources": [
+      "萌娘百科《CHUNITHM》"
+     ],
+     "appliesTo": "较新资料"
+    },
+    {
+     "text": "库存上限 99 格",
+     "sources": [
+      "chunithm.fandom 游戏简介"
+     ],
+     "appliesTo": "旧资料"
+    }
+   ],
+   "sources": [
+    "萌娘百科《CHUNITHM》",
+    "chunithm.fandom 游戏简介"
+   ]
+  },
+  {
+   "id": "chunithm-mechanic-score",
+   "type": "mechanic",
+   "game": "chunithm",
+   "name": "评价与达标",
+   "aliases": [
+    "AJ",
+    "AJC",
+    "FC",
+    "ALL JUSTICE"
+   ],
+   "body": "达标口径：FC＝FULL COMBO（全连）、AJ＝ALL JUSTICE、AJC＝全 JUSTICE CRITICAL。通关评价分 CLEAR / HARD / BRAVE / ABSOLUTE / CATASTROPHY。段位认定（クラス認定 / CLASS 认定）通关可获徽章、缎带。",
+   "sources": [
+    "萌娘百科《CHUNITHM》",
+    "chunithm.fandom 游戏简介"
+   ]
+  }
+ ]
+}

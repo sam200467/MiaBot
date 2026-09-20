@@ -1,0 +1,582 @@
+{
+  "schemaVersion": 1,
+  "status": "integrated",
+  "assetRoot": ".",
+  "inspectionNote": "29个用户图片，27张JPG、2张GIF。标签为视觉判断，不推断画师、出处或画中未确认人物。",
+  "selectionPolicy": {
+    "ordinaryProbability": 0.6,
+    "clearEmotionProbability": 1,
+    "seriousExplanationProbability": 0.35,
+    "afterStopTeasingProbability": 0,
+    "maxImagesPerReply": 1,
+    "minRepliesBetweenImages": 0,
+    "minSecondsBetweenImages": 0,
+    "excludeLastImageCount": 0,
+    "historyScope": [
+      "guildId",
+      "channelId"
+    ],
+    "explicitImageRequest": "用户明确要某图时跳过随机；仍检查文件、语境和总请求限流；若表达不适则不发冲突图片。",
+    "noMatch": "text_only",
+    "priority": [
+      "user_discomfort_or_stop_teasing",
+      "explicit_image_request",
+      "serious_explanation",
+      "clear_emotion",
+      "ordinary_chat"
+    ],
+    "notes": "不设配图冷却，不做近期表情去重；可以连续配图、重复使用同一张或同组图片。先选符合语境的候选再仅抽一次，不匹配时只发文字。普通聊天60%、情绪明确100%、认真解释35%、用户不适或停止调侃后自动配图0%。第5和10张属于同一表情组：组权重按1计算，不因两张变体翻倍，选中组后再选变体；该分组不限制重复发送。停止调侃偏好按用户保留，只有用户明确重新允许才恢复；明确要求温和图片只对当次例外。"
+  },
+  "entries": [
+    {
+      "id": "pout_blush",
+      "previewNumber": 1,
+      "label": "脸红不服气",
+      "file": "emojis/01_脸红不服气.jpg",
+      "width": 330,
+      "height": 330,
+      "bytes": 33585,
+      "animated": false,
+      "emotions": [
+        "embarrassed",
+        "pout"
+      ],
+      "usage": "被夸、嘴硬、轻微不服；不要用于真正的道歉。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "sleepy",
+      "previewNumber": 2,
+      "label": "困倦躺平",
+      "file": "emojis/02_困倦躺平.jpg",
+      "width": 237,
+      "height": 260,
+      "bytes": 15420,
+      "animated": false,
+      "emotions": [
+        "sleepy",
+        "relaxed"
+      ],
+      "usage": "晚安、犯困、休息闲聊。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "awkward",
+      "previewNumber": 3,
+      "label": "无语",
+      "file": "emojis/03_无语.jpg",
+      "width": 196,
+      "height": 258,
+      "bytes": 15725,
+      "animated": false,
+      "emotions": [
+        "speechless"
+      ],
+      "usage": "无语、对槽点不知道怎么回应。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "grit_teeth",
+      "previewNumber": 4,
+      "label": "咬牙不甘",
+      "file": "emojis/04_咬牙不甘.jpg",
+      "width": 230,
+      "height": 262,
+      "bytes": 14928,
+      "animated": false,
+      "emotions": [
+        "frustrated",
+        "competitive"
+      ],
+      "usage": "比赛失利或玩笑式不服气。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "flustered_fists",
+      "previewNumber": 5,
+      "label": "慌张抗议A",
+      "file": "emojis/05_慌张抗议A.jpg",
+      "width": 264,
+      "height": 300,
+      "bytes": 26449,
+      "animated": false,
+      "emotions": [
+        "flustered",
+        "pout"
+      ],
+      "usage": "与第10张为同类变体，轻松斗嘴、慌张抗议。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧",
+      "variantGroup": "flustered_protest"
+    },
+    {
+      "id": "headpat",
+      "previewNumber": 6,
+      "label": "摸头动图",
+      "file": "emojis/06_摸头动图.gif",
+      "width": 112,
+      "height": 112,
+      "bytes": 24111,
+      "animated": true,
+      "emotions": [
+        "affection",
+        "embarrassed"
+      ],
+      "usage": "用户明确提到摸头、想看摸头表情，或已有温和互动；图中是梨绪被摸头。",
+      "autoEligible": true,
+      "requiresMatchingContext": true,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "true_music",
+      "previewNumber": 7,
+      "label": "这才是真正的音乐",
+      "file": "emojis/07_这才是真正的音乐.jpg",
+      "width": 1080,
+      "height": 1010,
+      "bytes": 161587,
+      "animated": false,
+      "emotions": [
+        "music",
+        "proud"
+      ],
+      "usage": "用户请求推荐好听的歌、讨论音乐或音游曲目时，可以配此图并给出具体歌曲与简短推荐理由。不要只有图片；不要把拼贴曲绘自动认定为角色官方喜好。",
+      "autoEligible": true,
+      "requiresMatchingContext": true,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "arcade_focus",
+      "previewNumber": 8,
+      "label": "游戏机前认真脸",
+      "file": "emojis/08_游戏机前认真脸.jpg",
+      "width": 874,
+      "height": 921,
+      "bytes": 101337,
+      "animated": false,
+      "emotions": [
+        "focused",
+        "confident"
+      ],
+      "usage": "游戏厅、街机或比赛话题。",
+      "autoEligible": true,
+      "requiresMatchingContext": true,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "small_smile",
+      "previewNumber": 9,
+      "label": "得意微笑",
+      "file": "emojis/09_得意微笑.jpg",
+      "width": 177,
+      "height": 157,
+      "bytes": 12756,
+      "animated": false,
+      "emotions": [
+        "proud",
+        "confident"
+      ],
+      "usage": "得意、自信、接受夸奖。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "nervous_protest",
+      "previewNumber": 10,
+      "label": "慌张抗议B",
+      "file": "emojis/10_慌张抗议B.jpg",
+      "width": 628,
+      "height": 740,
+      "bytes": 79968,
+      "animated": false,
+      "emotions": [
+        "flustered",
+        "pout"
+      ],
+      "usage": "与第5张为同类变体，轻松斗嘴、慌张抗议。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧",
+      "variantGroup": "flustered_protest"
+    },
+    {
+      "id": "cheek_squish",
+      "previewNumber": 11,
+      "label": "被捏脸委屈",
+      "file": "emojis/11_被捏脸委屈.jpg",
+      "width": 1003,
+      "height": 1416,
+      "bytes": 177701,
+      "animated": false,
+      "emotions": [
+        "embarrassed",
+        "aggrieved"
+      ],
+      "usage": "捏脸或被逗的玩笑；图为夸张脸部变形，不宜普通随机配图。",
+      "autoEligible": true,
+      "requiresMatchingContext": true,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "sparkle_happy",
+      "previewNumber": 12,
+      "label": "兴奋闪亮",
+      "file": "emojis/12_兴奋闪亮.jpg",
+      "width": 463,
+      "height": 371,
+      "bytes": 44873,
+      "animated": false,
+      "emotions": [
+        "excited",
+        "happy"
+      ],
+      "usage": "庆祝、期待、收到好消息。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "duo_panic",
+      "previewNumber": 13,
+      "label": "双人慌张",
+      "file": "emojis/13_双人慌张.jpg",
+      "width": 412,
+      "height": 273,
+      "bytes": 34077,
+      "animated": false,
+      "emotions": [
+        "panic",
+        "flustered"
+      ],
+      "usage": "一起翻车或集体慌张梗；不自动给另一人物命名。",
+      "autoEligible": true,
+      "requiresMatchingContext": true,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "scarf_blush",
+      "previewNumber": 14,
+      "label": "围巾害羞",
+      "file": "emojis/14_围巾害羞.jpg",
+      "width": 210,
+      "height": 224,
+      "bytes": 17867,
+      "animated": false,
+      "emotions": [
+        "embarrassed",
+        "affection"
+      ],
+      "usage": "害羞、被夸或冬日话题。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "scarf_calm",
+      "previewNumber": 15,
+      "label": "围巾平静",
+      "file": "emojis/15_围巾平静.jpg",
+      "width": 248,
+      "height": 357,
+      "bytes": 15813,
+      "animated": false,
+      "emotions": [
+        "neutral",
+        "relaxed"
+      ],
+      "usage": "轻松闲聊、天气或休息。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "music_taunt",
+      "previewNumber": 16,
+      "label": "音乐挑衅梗",
+      "file": "emojis/16_音乐挑衅梗.jpg",
+      "width": 1199,
+      "height": 1199,
+      "bytes": 205370,
+      "animated": false,
+      "emotions": [
+        "music",
+        "taunt"
+      ],
+      "usage": "包含竖中指手势；仅用户明确要求该图时考虑，默认不进入自动随机池。",
+      "autoEligible": false,
+      "requiresMatchingContext": true,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "wink_proud",
+      "previewNumber": 17,
+      "label": "叉腰眨眼得意",
+      "file": "emojis/17_叉腰眨眼得意.jpg",
+      "width": 300,
+      "height": 300,
+      "bytes": 20359,
+      "animated": false,
+      "emotions": [
+        "proud",
+        "playful"
+      ],
+      "usage": "自夸、挑战、得意回应。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "side_surprise",
+      "previewNumber": 18,
+      "label": "侧脸惊讶",
+      "file": "emojis/18_侧脸惊讶.jpg",
+      "width": 299,
+      "height": 332,
+      "bytes": 17924,
+      "animated": false,
+      "emotions": [
+        "surprised",
+        "confused"
+      ],
+      "usage": "意外消息、没反应过来。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "stunned_sweat",
+      "previewNumber": 19,
+      "label": "呆住冒汗",
+      "file": "emojis/19_呆住冒汗.jpg",
+      "width": 231,
+      "height": 206,
+      "bytes": 12608,
+      "animated": false,
+      "emotions": [
+        "awkward",
+        "stunned"
+      ],
+      "usage": "玩笑翻车、无语。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "festive_smug",
+      "previewNumber": 20,
+      "label": "节庆服装无语",
+      "file": "emojis/20_节庆服装无语.jpg",
+      "width": 171,
+      "height": 177,
+      "bytes": 15204,
+      "animated": false,
+      "emotions": [
+        "speechless"
+      ],
+      "usage": "无语、吐槽、对槽点不知道怎么回应。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "question",
+      "previewNumber": 21,
+      "label": "得意",
+      "file": "emojis/21_得意.jpg",
+      "width": 162,
+      "height": 219,
+      "bytes": 14932,
+      "animated": false,
+      "emotions": [
+        "proud",
+        "confident"
+      ],
+      "usage": "得意、自信、展示自己很懂。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "blank_dress",
+      "previewNumber": 22,
+      "label": "礼服空白眼",
+      "file": "emojis/22_礼服空白眼.jpg",
+      "width": 358,
+      "height": 390,
+      "bytes": 22423,
+      "animated": false,
+      "emotions": [
+        "stunned",
+        "awkward"
+      ],
+      "usage": "愣住、脑袋空白的玩笑反应。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "out",
+      "previewNumber": 23,
+      "label": "出局",
+      "file": "emojis/23_出局.jpg",
+      "width": 92,
+      "height": 110,
+      "bytes": 3040,
+      "animated": false,
+      "emotions": [
+        "defeat",
+        "playful"
+      ],
+      "usage": "比赛淘汰、出局梗；不用于赶走用户或拒绝求助。",
+      "autoEligible": true,
+      "requiresMatchingContext": true,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "angry_chibi",
+      "previewNumber": 24,
+      "label": "气鼓鼓爆发",
+      "file": "emojis/24_气鼓鼓爆发.jpg",
+      "width": 109,
+      "height": 116,
+      "bytes": 5642,
+      "animated": false,
+      "emotions": [
+        "pout",
+        "angry_playful"
+      ],
+      "usage": "已经在互相斗嘴时的夸张抗议。",
+      "autoEligible": true,
+      "requiresMatchingContext": true,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "smug_folded",
+      "previewNumber": 25,
+      "label": "抱臂闭眼自信",
+      "file": "emojis/25_抱臂闭眼自信.jpg",
+      "width": 386,
+      "height": 442,
+      "bytes": 35781,
+      "animated": false,
+      "emotions": [
+        "proud",
+        "confident"
+      ],
+      "usage": "那当然、胸有成竹、得意。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "idea",
+      "previewNumber": 26,
+      "label": "得意有主意",
+      "file": "emojis/26_得意有主意.jpg",
+      "width": 141,
+      "height": 166,
+      "bytes": 9831,
+      "animated": false,
+      "emotions": [
+        "proud",
+        "idea"
+      ],
+      "usage": "想到办法、给出建议、灵光一现。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "white_shock",
+      "previewNumber": 27,
+      "label": "完蛋了_寄了",
+      "file": "emojis/27_完蛋了_寄了.jpg",
+      "width": 546,
+      "height": 715,
+      "bytes": 85951,
+      "animated": false,
+      "emotions": [
+        "defeat",
+        "dismay"
+      ],
+      "usage": "完蛋了、寄了、搞砸了的夸张游戏或日常玩笑；不用于嘲笑真实痛苦。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "back_sweat",
+      "previewNumber": 28,
+      "label": "背身无语",
+      "file": "emojis/28_背身无语.jpg",
+      "width": 175,
+      "height": 232,
+      "bytes": 12977,
+      "animated": false,
+      "emotions": [
+        "speechless"
+      ],
+      "usage": "无语、懒得吐槽、背过身不知道怎么回应。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    },
+    {
+      "id": "crying",
+      "previewNumber": 29,
+      "label": "大哭动图",
+      "file": "emojis/29_大哭动图.gif",
+      "width": 1168,
+      "height": 1160,
+      "bytes": 480601,
+      "animated": true,
+      "emotions": [
+        "crying",
+        "aggrieved"
+      ],
+      "usage": "轻松比赛中不甘心、撒娇式委屈；不拿来回应用户真实痛苦。",
+      "autoEligible": true,
+      "requiresMatchingContext": false,
+      "weight": 1,
+      "inspection": "目视检查；GIF已查看抽样动画帧"
+    }
+  ]
+}

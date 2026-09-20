@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>单曲模板 CSS 实时调试器</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <aside class="editor-pane">
+    <header>
+      <div>
+        <h1>单曲模板 CSS 调试器</h1>
+        <p>左侧修改，右侧即时预览；Ctrl+S 保存。</p>
+      </div>
+      <span id="save-state" class="state saved">已保存</span>
+    </header>
+
+    <section class="toolbar">
+      <label>
+        测试数据
+        <select id="sample">
+          <option value="normal">普通歌曲</option>
+          <option value="lunatic">仅 Lunatic</option>
+          <option value="long">超长文本</option>
+        </select>
+      </label>
+      <label>
+        跳到规则
+        <select id="rule-jump">
+          <option value="">请选择</option>
+          <option value=".song-title {\n  top:">标题字号/纵坐标</option>
+          <option value=".song-title {\n  left:">标题横坐标/宽度</option>
+          <option value=".artist {\n  left:">作曲家位置</option>
+          <option value=".status {">Status</option>
+          <option value=".meta {">Version 等信息</option>
+          <option value=".boss-meta {">Boss 通用样式</option>
+          <option value=".boss-level {">Boss Lv 栏</option>
+          <option value=".attribute {">属性栏</option>
+          <option value=".chart-rows {">五行整体位置</option>
+          <option value=".chart-row {">成绩行字号/网格</option>
+          <option value=".chart-row .designer {">谱师</option>
+        </select>
+      </label>
+    </section>
+
+    <textarea id="css-editor" spellcheck="false" aria-label="theme.css 编辑器"></textarea>
+
+    <footer>
+      <span id="cursor-position">第 1 行，第 1 列</span>
+      <div class="actions">
+        <button id="reload" type="button" class="secondary">放弃未保存修改</button>
+        <button id="save" type="button" class="primary">保存到 theme.css</button>
+      </div>
+    </footer>
+  </aside>
+
+  <main class="preview-pane">
+    <div class="preview-toolbar">
+      <strong>实时预览</strong>
+      <span id="preview-state">正在载入……</span>
+      <label>
+        缩放
+        <input id="zoom" type="range" min="20" max="100" step="1" value="50">
+        <output id="zoom-value">50%</output>
+      </label>
+      <button id="fit" type="button" class="secondary">适应窗口</button>
+      <button id="refresh-preview" type="button" class="secondary">刷新预览</button>
+    </div>
+    <div id="preview-viewport" class="preview-viewport">
+      <div id="preview-stage" class="preview-stage">
+        <iframe id="preview-frame" title="单曲模板实时预览"></iframe>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="editor.js"></script>
+</body>
+</html>
