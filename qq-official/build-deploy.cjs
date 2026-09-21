@@ -89,7 +89,9 @@ for (const file of [
   // 面板那条「命令表和描述必须一一对应」是防漂移的唯一防线，进闸门才有意义
   path.join(HERE, "test-mia-command-panel.cjs"),
   // 美亚的入口 bundle 里有 chat.cjs，引擎契约坏了这边一样会挂
-  path.join(ROOT, "chat-core/chat.test.cjs"),
+  path.join(ROOT, "chat-core/knowledge.test.cjs"),
+  path.join(ROOT, "chat-core/research-policy.test.cjs"),
+  path.join(ROOT, "chat-core/search.test.cjs"),
 ]) {
   execFileSync(process.execPath, ["--test", "--test-timeout=60000", file], { cwd: ROOT, stdio: "inherit" });
 }

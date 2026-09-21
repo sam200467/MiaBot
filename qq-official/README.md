@@ -15,11 +15,8 @@ qq-official/
 └── config.local.json        **含 AppSecret，已 gitignore**
 ```
 
-和 `qq/`（NapCat 版）是**并列的两个前端**，共用 `chat-core/chat.cjs` 引擎和 `mia-core.cjs` 的
-能力层，互不影响。指令文案、队列、绑定会话各写一份 —— 原因见 `mia-commands.cjs` 顶部的注释。
-
-> 下文的梨绪（`qq/`）是另一条产品线，**不随本仓库分发** —— 提到它只是为了说明两边的边界；
-> 涉及它的命令和路径在本仓库里跑不了，跳过即可。
+聊天使用 `chat-core/chat.cjs` 引擎，查询使用 `mia-core.cjs` 能力层。
+传输层、指令文案、队列和绑定会话由本目录负责。MiaBot 可独立部署。
 
 ## 两条入口
 
@@ -36,7 +33,7 @@ qq-official/
 判据按事件分 —— `GROUP_AT_MESSAGE_CREATE` 本身就意味着 @ 过；全量消息要真 @ 到美亚
 （需要配 `botOpenid`，没配就只认前者）。逃生阀 `acceptBareGroupCommands` 默认关。
 
-## 三条平台硬约束（决定了它和梨绪不一样）
+## 三条平台硬约束
 
 1. **主动消息不可用**（`40034105`）。所以**不存在「群里发指令、机器人私聊你」**。
    绑定改为原地走群聊流程；QQ 官方机器人撤回接口当前不可靠，邮箱和密码由用户按提示
@@ -87,31 +84,17 @@ qq-official/
 
 - `corePath` / `vaultHelperPath` —— 出图核心和凭据库。**文件不存在就拒绝启动**，
   这是有意的：否则每条指令会在运行期各失败一次，症状分散到没法查。
-  这两个文件被 `.gitignore` 忽略（超过 GitHub 单文件上限），得自己准备。
-- `vaultPath` —— 美亚**自己的**绑定库（按 openid 存，和梨绪那份不通用）。
+  这两个文件是被 `.gitignore` 忽略的构建产物，需从源码生成。
+- `vaultPath` —— 美亚**自己的**绑定库（按 QQ 开放平台 openid 存储）。
 
-### 3b. 共用别名库的前置条件（⚠ 别跳过）
+### 3b. 别名库与多实例共享
 
-`aliasDir` + `aliasScope` 要和梨绪一致才能共用 —— **两个都得一样**，
-只改一个会得到两个并排的文件，看着像配好了其实各写各的。默认值已经配好了这一点。
+默认 `aliasDir: "./data"`、`aliasScope: "qq"`，使用 MiaBot 自己的数据目录。
+`qq` 是既有存储作用域，文件名为 `song-aliases-qq.json`，改名会让已有别名不可见。
 
-但还有一条更要紧的：**两个 bot 必须都是带锁的版本。**
-
-`song-alias-store.cjs` 的事务 + 文件锁是这轮才加的。梨绪跑的是打包好的
-`qq/dist/takase-qq-bundle.cjs` / `qq/takase-qq-core.exe`，里面**还是加锁之前的实现** ——
-一个加锁、一个不加锁，等于没加：不加锁那边仍然会拿启动时的内存副本覆盖整个文件，
-把美亚刚加的别名抹掉。
-
-所以在共用生效之前，**必须重跑一次 `node qq/build-qq-bot.js` 让梨绪也吃到这个修复**。
-（那个脚本会重建 exe，属于发布动作，自己判断时机。）
-
-⚠ 而重跑它需要仓库根目录有 `ongeki-core.exe` —— `build-qq-bot.js` 会把它作为资源嵌进
-GUI exe，但没做存在性检查，缺了会在 csc 那一步以看不懂的方式失败。
-根目录现在**没有**这个文件（它被 `.gitignore` 忽略）。`qq/qq-config.json` 里的
-`corePath` 也指着同一个不存在的路径。
-
-在梨绪重建之前，**把 `aliasDir` 指回美亚自己的目录**（`./data`）更安全 ——
-各存各的只是别名分叉，不会丢数据。
+若与同机其他实例共享，`aliasDir` 解析后的绝对路径和 `aliasScope` 必须都相同。
+所有写入者都必须使用带事务和文件锁的 `song-alias-store.cjs`；旧版无锁写入者
+可能覆盖其他实例的修改。无法确认时保持独立目录。
 
 ### 4. 拿 group_openid
 
@@ -225,8 +208,7 @@ node test-song-alias-store.cjs                               # 别名库（含�
 node --test --test-timeout=45000 qq-official/test-official-transport.cjs   # 传输层
 node --test --test-timeout=45000 qq-official/test-mia-entry.cjs            # 入口（含指令/聊天两条路）
 node --test --test-timeout=45000 qq-official/test-mia-commands.cjs         # 指令层（不起网关）
-node --test --test-timeout=60000 qq/test-qq-entry.cjs                      # 梨绪不能退化
-node --test --test-timeout=45000 chat-core/chat.test.cjs                    # 引擎
+node --test --test-timeout=45000 chat-core/knowledge.test.cjs chat-core/research-policy.test.cjs chat-core/search.test.cjs  # 引擎
 ```
 
 **全部走 mock，不需要真实凭据、不花 API 费用。**
@@ -324,41 +306,16 @@ node qq-official/mia-command-panel.cjs --delete <panel_id>
 删除白名单是 `config.local.json` 的 `aliasDeleteOpenids`（openid 数组，空 = 谁都不能删）。
 ⚠ openid 换 AppID 或换环境就会变，换环境后要重新探。
 
-> 梨绪（`qq/`）那边**没有跟着改** —— 它有自己的一份命令表，候选流程仍在。
-> 要一起简化说一声，改的是另一份文件。
+## 运行数据与升级
 
-## ⚠ 界面版美亚的数据放在哪（踩过一次，别再踩）
+独立部署的默认数据目录为 `qq-official/data/`：账号绑定在 `bindings.dat`，
+别名在 `song-aliases-qq.json`，临时图片在 `output/`。实际位置以
+`config.local.json` 的 `workDir`、`outputDir`、`vaultPath`、`aliasDir` 为准。
 
-界面的 `EnsureMia()`（`takase-qq-gui.cs`）在**换包时会 `Directory.Delete(runtime/mia, true)`
-整个删掉重解**：
-
-```csharp
-if(File.Exists(mark) && File.ReadAllText(mark).Trim()==hash) return;  // 包没变就不动
-if(Directory.Exists(mia)) Directory.Delete(mia,true);                 // 包变了 → 全删
-```
-
-所以**凡是会被写入的数据都不能放在 `runtime/mia/` 里面**。
-
-路径写过一次 `../data`，展开是 `runtime/mia/data` —— 正好在那一刀里。
-症状是**每重新构建一次 exe，美亚的账号绑定就没了，得重绑**，
-而人只会以为是自己的操作问题，查不到「重建」这个原因上。
-
-现在它们统一放在 `root/data/mia`（`%LOCALAPPDATA%/TakaseQqBot/data/mia`）——
-从 `runtime/mia/qq-official/` 往上三级就是 root，`root/data` 是梨绪的数据目录，
-界面只创建、从不删除：
-
-| 键 | 值 | 展开 |
-|---|---|---|
-| `workDir` | `../../../data/mia` | `root/data/mia` |
-| `outputDir` | `../../../data/mia/output` | 同上 |
-| `vaultPath` | `../../../data/mia/bindings.dat` | 同上（绑定在 `workDir` 下，目录会先被建出来） |
-| `aliasDir` | `../../../data/mia`（或共用时 `../../../data`） | 同上 |
-
-`make-mia-zip.cjs` 里有条自检专门守这个不变量：**这四个键必须以 `../../../data/` 开头**，
-改回去会当场报错并说明原因。
-
-> 和它相对的是两个 exe：它们**应该**放在 `runtime/`（`../../`），
-> 因为 `EnsureRuntime()` 每次启动都按哈希比对、需要时会重新解压覆盖。
+升级时保留真实配置与运行数据；重新打包使用独立输出目录，再迁移配置和数据，
+不要用构建脚本覆盖正在运行的部署目录。已有启动器使用外部数据目录时，保留原路径。
+凭据库使用 Windows DPAPI CurrentUser，加密兼容标识也须保留；见
+[`NAMING.md`](../NAMING.md)。
 
 ### 账号绑定存在哪个 id 下
 
@@ -370,7 +327,7 @@ if(Directory.Exists(mia)) Directory.Delete(mia,true);                 // 包变�
 > 字面意思是按群切分的；但实测私聊和群共用同一个值，说明至少不是严格按群。
 > 只有一个群可测，等你进了第二个群再确认。
 
-改 `chat-core/chat.cjs` 或 `mia-core.cjs` 时两边都会受影响，所以上面那两组测试都要跑。
+改 `chat-core/chat.cjs` 或 `mia-core.cjs` 后运行 `npm test`，验证聊天与指令两条路径。
 # 歌曲搜索
 
 `/搜索歌曲 サド`：搜索本地音击曲库，不用绑定账号。支持部分曲名、别名、Bot ID（如 `id870`）、假名与全半角归一化，以及少量拼写错误的候选提示。

@@ -1,4 +1,4 @@
-# Takase Bot 主题目录
+# MiaBot 主题目录
 
 主题按“输出类型”组织，共用资源单独存放，避免 B50 分表与单曲成绩图互相混杂。
 
@@ -13,7 +13,7 @@ themes/
 │  ├─ examples/              示例数据
 │  ├─ previews/              历次视觉预览图
 │  └─ tools/                 本地预览工具
-├─ song-detail/              Discord 单曲全难度成绩图
+├─ song-detail/              单曲全难度成绩图
    ├─ assets/                运行时底图
    ├─ renderer/              正式 HTML / CSS / JS 渲染器
    ├─ design/                PSD 与参考图
@@ -21,7 +21,7 @@ themes/
    ├─ previews/              浏览器实渲染验收图
    ├─ tools/                 本地预览工具
 │  └─ README.md              交互、字段与显示规则
-├─ chart-info/               Discord 单谱面分数线、容错与白金分分析图
+├─ chart-info/               单谱面分数线、容错与白金分分析图
 │  ├─ renderer/              1600×1100 正式渲染器
 │  ├─ examples/              VIIIbit Explorer MASTER 公式样例
 │  ├─ previews/              浏览器实渲染验收图

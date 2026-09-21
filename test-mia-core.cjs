@@ -174,7 +174,7 @@ assert.match(core.safeError(new Error("联系 someone@example.com")), /邮箱已
   // 这几样以前只有 #命令 走得到。现在闲聊也要能解析，所以用**真实的存储**跑 ——
   // 免得出现「模型跟用户说加好了、其实一个字没写进去」这种从回复上完全看不出的错。
   const { SongAliasStore } = require("./song-alias-store.cjs");
-  const aliasDir = fs.mkdtempSync(path.join(os.tmpdir(), "takase-alias-"));
+  const aliasDir = fs.mkdtempSync(path.join(os.tmpdir(), "mia-alias-"));
   core.setAliasStore(new SongAliasStore(path.join(aliasDir, "aliases.json"), core.normalizeSongQuery));
   const run = (name, query) => core.resolveCapability({}, "free", name, query, () => {}, null);
 
@@ -209,7 +209,7 @@ assert.match(core.safeError(new Error("联系 someone@example.com")), /邮箱已
 
   // ── 候选别名库：只记不生效 ────────────────────────────────────────
   const { SongAliasCandidateStore } = require("./song-alias-store.cjs");
-  const candidateFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "takase-candidate-")), "candidates.json");
+  const candidateFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "mia-candidate-")), "candidates.json");
   const candidates = new SongAliasCandidateStore(candidateFile, core.normalizeSongQuery);
   core.setAliasCandidateStore(candidates);
   assert.equal(candidates.add({ alias: "电管", title: "Dengeki Tube", game: "chunithm", proposedBy: "10002" }).added, true);

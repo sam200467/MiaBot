@@ -68,7 +68,7 @@ Key 用 Windows DPAPI 当前用户加密保存到 `chat-core/search.local.json`�
 
 已知取舍：难度评价只认「简单／好打／偏难 + 谱面或等级或游戏名或真曲名」，以及攻略档词表里的说法；「推荐几个能稳定出分的」「这个谱面有什么坑」这类没命中的体感问法不再自动检索，改由兜底网在模型表示拿不准时补——要把它们也算进攻略档，在 `research-policy.cjs` 的 `strategy` 里加词即可（代价是「我今天出分了」这类自夸也会触发检索）。
 
-离线：`node --test chat-core/search.test.cjs chat-core/knowledge.test.cjs chat-core/chat.test.cjs`。
+离线：`node --test chat-core/search.test.cjs chat-core/knowledge.test.cjs chat-core/research-policy.test.cjs`。
 
 2026-09-17（第五组：中间步骤静默 + 引用回复）：检索轮原先要发两条消息——先是「我去翻一下资料」，再是正式答复。两条都占 QQ 侧每群每小时的发送配额（`perGroupPerHour` 默认 20），一次检索问答就等于花掉 10 次配额里的一次；而这句提示解决的问题（群里刷过去几十条之后，用户不确定这条在答谁）其实有个更省的办法：**引用原消息**。
 

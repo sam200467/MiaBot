@@ -96,8 +96,8 @@ async function runWeb(search,query,options={}){
   return value;
  }catch(e){
   // 失败原因被抹平后无法分辨是代理断了、Key 失效还是端点变了，排查时用
-  // TAKASE_SEARCH_DEBUG=1 打开。只打错误类型和消息，并同样抹掉密钥。
-  if(process.env.TAKASE_SEARCH_DEBUG){
+  // MIA_SEARCH_DEBUG=1 打开；兼容旧部署的环境变量。日志仍会抹掉密钥。
+  if(process.env.MIA_SEARCH_DEBUG ?? process.env.TAKASE_SEARCH_DEBUG){
    const detail=String(e?.name||'Error')+': '+String(e?.message||'');
    console.error('[search] '+[search.apiKey,...(options.secrets||[])].filter(Boolean).reduce((text,secret)=>text.split(secret).join('[REDACTED]'),detail));
   }

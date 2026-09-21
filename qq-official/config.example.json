@@ -14,7 +14,7 @@
   "_数据": "workDir 存放运行期文件（临时图片等）",
   "workDir": "./data",
 
-  "_指令": "指令层要用出图核心和凭据库。三个路径都必须存在，缺一个**启动就报错**——不要让它降级成纯聊天再让每条指令各失败一次。相对路径按 qq-official/ 解析。两个 exe 和梨绪共用同一批（都指仓库根目录）：ongeki-core.exe 由 node build.js 产出，mia-vault.exe 在仓库里。",
+  "_指令": "corePath 和 vaultHelperPath 必须指向已构建的程序，否则启动时报错。相对路径按 qq-official/ 解析。ongeki-core.exe 由 npm run build:core 生成，mia-vault.exe 由根目录 mia-vault.cs 编译；二进制不随源码仓库分发。vaultPath 是绑定数据的存储位置，首次运行时创建。",
   "corePath": "../ongeki-core.exe",
   "vaultHelperPath": "../mia-vault.exe",
   "vaultPath": "./data/bindings.dat",
@@ -29,7 +29,7 @@
     "publicBaseUrl": "http://127.0.0.1:47831"
   },
 
-  "_别名库": "别名库可以和梨绪共用（社区词汇不该按 bot 分叉），也可以各存各的。⚠ 要共用，aliasDir 和 aliasScope **两个都得一样** —— 文件名是 song-aliases-<scope>.json，只改一个会得到两个并排的文件，看着像配好了其实各写各的。⚠ **更要紧的前提：两边都得是带锁的版本。** song-alias-store 的事务+文件锁是后加的，梨绪跑的那个打包版本里可能还是老实现 —— 一个加锁一个不加锁等于没加，老那边会拿内存旧副本覆盖整个文件、把另一边的改动抹掉。共用之前先重跑 node qq/build-qq-bot.js 重建梨绪。详见 README 的 3b。⚠ 共用只在本机同时跑着两个 bot 时才有意义，部署包拷到别的机器后共用自然失效。",
+  "_别名库": "默认使用 MiaBot 自己的 ./data。若与同机的其他实例共用，aliasDir 的绝对路径和 aliasScope 必须同时一致，且所有写入者都必须使用带事务和文件锁的 song-alias-store.cjs；否则可能覆盖彼此的修改。文件名 song-aliases-<scope>.json 不变，避免已有别名失效。详见 README 的 3b。",
   "aliasDir": "./data",
   "aliasScope": "qq",
 
@@ -42,7 +42,7 @@
   "_逃生阀": "acceptBareGroupCommands=true 会让群里**不带 @** 的 /指令 也执行。默认 false：开了全量群消息之后，群里**别的 bot** 被 @ 的指令也会送到这儿来（实测收到过另一只 bot 的 /login），放行就是抢答别人的指令。",
   "acceptBareGroupCommands": false,
 
-  "_出图冷却": "Mia 同一用户、同一种图片生成之间的冷却时间（毫秒）。默认 2000；只影响 MiaBot，不影响梨绪和 Discord 版。",
+  "_出图冷却": "MiaBot 同一用户、同一种图片生成之间的冷却时间（毫秒）。默认 2000。",
   "generateCooldownMs": 2000,
 
   "_被动凭据": "延迟发出的内容改用「该目标最新一条消息」的 msg_id 当被动凭据，引用仍指向原始请求。群窗口只有 5 分钟，而分表/牌子的生成上限是 6～10 分钟，不借新凭据的话等图出来就发不出去了。2026-09-19 probe 实测平台接受这种搭配。⚠ 它不是万能补丁：那之后没人在群里说话就仍然没有新鲜凭据可用。",

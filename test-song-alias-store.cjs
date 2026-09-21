@@ -11,7 +11,7 @@ const { Converter } = require('opencc-js');
 const { SongAliasStore,SongAliasCandidateStore } = require('./song-alias-store.cjs');
 const simplify = Converter({from:'tw',to:'cn'});
 const normalize = value => simplify(value.normalize('NFKC').trim().toLowerCase());
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'takase-alias-test-'));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mia-alias-test-'));
 const file = path.join(dir,'aliases.json');
 try {
  const store = new SongAliasStore(file,normalize);

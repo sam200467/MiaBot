@@ -1,7 +1,7 @@
 // Fictional preview data. No player records.
 window.__THEME_DATA__ = {
   "generatedAt": "2026-01-01T12:00:00.000Z",
-  "generatorName": "Takase bot demo",
+  "generatorName": "MiaBot",
   "profile": {
     "playerName": "DEMO PLAYER",
     "level": 1,

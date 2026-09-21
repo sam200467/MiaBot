@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 # Resolve the Windows module explicitly even when launched under PowerShell 7.
 Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1') -ErrorAction Stop
 $configPath = Join-Path $PSScriptRoot 'search.local.json'
-if ($SelfTest) { $configPath = Join-Path $env:TEMP 'takase-search-setup-fixture.json' }
+if ($SelfTest) { $configPath = Join-Path $env:TEMP 'mia-search-setup-fixture.json' }
 if ($Read) {
     try {
         $readStage = 'config'
@@ -39,7 +39,7 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 $form = New-Object System.Windows.Forms.Form
-$form.Text = 'Takase Bot - Kimi Search Setup'
+$form.Text = 'MiaBot - Kimi Search Setup'
 $form.Size = New-Object System.Drawing.Size(590,280)
 $form.StartPosition = 'CenterScreen'
 $form.TopMost = $true

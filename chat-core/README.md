@@ -40,13 +40,12 @@
 
 ## 测试
 
-引擎测试需要一份**角色夹具**（`persona.md`、`examples.json`、`expressions.json`、
-`config.example.json`）。没有夹具时 `chat.test.cjs` 会整体跳过而不是报错，所以在只
-分发引擎的仓库里它不阻塞构建。
+离线测试使用 mock 模型，不需要真实密钥；`npm test` 会准备 MiaBot 的角色测试配置
+和占位素材，并在成功结束后清理临时文件。
 
 ```bash
-node --test chat-core/knowledge.test.cjs      # 离线，不需要密钥
-node --test chat-core/chat.test.cjs           # 需要角色夹具，否则跳过
+npm test
+node --test chat-core/knowledge.test.cjs chat-core/research-policy.test.cjs chat-core/search.test.cjs
 ```
 
 联网检索的配置与排障见 [`SEARCH.md`](SEARCH.md)；冒烟脚本（`*-smoke.cjs`、

@@ -239,7 +239,7 @@ function buildPreviewData() {
   const mapAll = (items) => items.map((item) => mapRatingItem(item, catalogIndex));
   return {
     generatedAt: new Date().toISOString(),
-    generatorName: "Takase bot",
+    generatorName: "MiaBot",
     profile: {
       // 这里只是离线视觉预览。正式接入时由 /api/game/ongeki/profile 的真实字段覆盖。
       playerName: "DEMO PLAYER",

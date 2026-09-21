@@ -1,7 +1,7 @@
 // Fictional preview scores.
 window.__THEME_DATA__ = {
   generatedAt: "2026-08-27T12:00:00.000Z",
-  generatorName: "Takase bot",
+  generatorName: "MiaBot",
   profile: { playerName: "DEMO PLAYER" },
   song: {
     songId: 870,

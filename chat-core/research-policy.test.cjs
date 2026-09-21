@@ -402,7 +402,7 @@ test('剧情分类只看结构，不认具体事件名',()=>{
 
 test('Windows key reader survives an inherited incompatible PowerShell module path',{skip:process.platform!=='win32'},()=>{
  const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{execFileSync}=require('node:child_process');
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'takase-key-test-'));
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'mia-key-test-'));
  const key='offline-fixture-key';
  const env={...process.env};for(const n of Object.keys(env))if(n.toLowerCase()==='psmodulepath')delete env[n];
  const protectedKey=execFileSync('powershell.exe',['-NoProfile','-Command',"ConvertTo-SecureString 'offline-fixture-key' -AsPlainText -Force | ConvertFrom-SecureString"],{encoding:'utf8',env,windowsHide:true}).trim();

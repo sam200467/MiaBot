@@ -28,8 +28,7 @@ const CONTEXT_TTL_MS = 10 * 60 * 1000;
 
 // ── 配置 ────────────────────────────────────────────────────────────
 // 相对路径一律按 HERE 解析，**不能用 process.cwd()** —— GUI 启动子进程时
-// 工作目录不是这里（takase-qq-gui.cs 把美亚起在 runtime\mia\qq-official 下，
-// 那一次恰好一致，但独立部署时不一定）。
+// 工作目录可能由启动器或服务管理器指定，与入口脚本所在目录不同。
 function resolveFrom(config, keys) {
   for (const key of keys) {
     const value = String(config[key] || "").trim();
