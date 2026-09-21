@@ -3,7 +3,6 @@
 为避免未经授权再分发，本仓库不包含角色图片、游戏图片、游戏 UI、曲绘和字体。以下路径由部署者自行创建，并且只能放入自己拥有权利或已获明确许可的文件：
 
 - `mia-chat/emojis/`：`mia-chat/expressions.json` 引用的角色表情。
-- `rio-chat/emojis/`：共享聊天角色的可选表情。
 - `themes/shared/fonts/`：渲染模板所需字体。
 - `themes/*/assets/`：各图片模板所需背景、难度标牌和 UI 素材。
 - `ongeki-icon.ico`：可选的 Windows 程序图标。

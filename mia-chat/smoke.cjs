@@ -1,6 +1,6 @@
 // 美亚人设连通与口径测试：跑几条探针，看实际生成的话有没有守住人设的几道关。
 // 用法：node mia-chat/smoke.cjs
-const { loadSettings, requestReply, failureReason } = require("../rio-chat/chat.cjs");
+const { loadSettings, requestReply, failureReason } = require("../chat-core/chat.cjs");
 
 // 每条的 probe 说明它在验什么；failure 是人工读输出时的判据
 const PROBES = [

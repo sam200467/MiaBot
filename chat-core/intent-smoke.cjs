@@ -3,8 +3,8 @@
 // 模型是真的，网页是桩。router-spike 验的是候选设计（它自带提示词与循环），这一支验的是
 // 接进主链路之后的实际行为，两者不能互相替代。
 //
-// 用法：node rio-chat/intent-smoke.cjs           全部用例
-//       node rio-chat/intent-smoke.cjs fact-    只看 id 匹配的
+// 用法：node chat-core/intent-smoke.cjs           全部用例
+//       node chat-core/intent-smoke.cjs fact-    只看 id 匹配的
 const {loadSettings,requestReply}=require("./chat.cjs");
 
 const CASES=[

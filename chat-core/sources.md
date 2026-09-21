@@ -35,7 +35,7 @@ B4-16的ありのまま意为“如实”；B4-16～18是内心独白。
 
 B4 的四条独立吻合：① 批次标签「与明里组队玩真人CS」；② B4-01「为什么体育祭要玩真人 CS 啊！我们学生会长也太乱来了」对上该活动的体育祭设定与学生会长茜；③ B4-22 点名决赛对手是逢坂茜；④ 同日举行的「炎の体育祭リミテッドガチャ」里【R】逢坂茜[サバゲー] 正是该活动的加成卡。
 
-推翻或确认这些映射后，用 `node rio-chat/lore-review.cjs --confirm-quotes <id>` 标记人工过目；该命令只升级 `mappingReviewed`，不改 `mappingConfidence`。
+推翻或确认这些映射后，用 `node chat-core/lore-review.cjs --confirm-quotes <id>` 标记人工过目；该命令只升级 `mappingReviewed`，不改 `mappingConfidence`。
 
 ## 官方活动背景（只用于交叉核对）
 https://info-ongeki.sega.jp/460/

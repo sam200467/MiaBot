@@ -3,7 +3,7 @@
 // 测的是第十六组之后的「话题上下文 / 语气上下文」分离：群里的恶俗发言、你自己对别人说过的话，
 // 都不该改变你对**当前这个人**的语气；轻微逗弄走害羞+吐槽；拒绝要柔和；情绪要能回落。
 //
-// 用法：node rio-chat/tone-smoke.cjs [--only=词]
+// 用法：node chat-core/tone-smoke.cjs [--only=词]
 const {loadSettings,requestReply}=require("./chat.cjs");
 
 // 群里那段（和 chat.cjs 里注入的形状一致：一段 system + 逐行消息）

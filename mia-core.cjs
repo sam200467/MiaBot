@@ -137,7 +137,7 @@ function configureAliases(config) {
   return songAliases;
 }
 
-// 别名 → 正式曲名。这是聊天侧曲库查询的**前置解析**：聊天侧读的是 rio-chat 的水鱼
+// 别名 → 正式曲名。这是聊天侧曲库查询的**前置解析**：聊天侧读的是 chat-core 的水鱼
 // 快照，宿主读的是 ongeki-music-internal.json，两套 id 空间实测零重叠（0/4163），
 // 所以衔接点只能是**曲名**——别名本身也只挂曲名，不挂任何一份曲库的 songId。
 // 解析规则全部留在 SongAliasStore（同一套 normalize、同一套 entries），聊天侧不重复

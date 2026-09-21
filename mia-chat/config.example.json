@@ -5,7 +5,7 @@
   "research": false,
   "localKnowledge": true,
   "localKnowledgeGames": ["ongeki"],
-  "factLayerDir": "../rio-chat",
+  "factLayerDir": "../chat-core",
   "provider": {
     "name": "deepseek",
     "baseUrl": "https://api.deepseek.com",

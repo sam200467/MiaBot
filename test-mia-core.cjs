@@ -200,7 +200,7 @@ assert.match(core.safeError(new Error("联系 someone@example.com")), /邮箱已
   assert.deepEqual(core.getAliasStore().list("VIIIbit Explorer", "ongeki"), ["八爪鱼"], "被拒的删除不能动存储");
 
   // ── 别名 → 正式曲名（聊天侧曲库查询的前置解析）────────────────────
-  // 宿主曲库是 ongeki-music-internal.json 的小 id，聊天侧是 rio-chat 的水鱼编号，
+  // 宿主曲库是 ongeki-music-internal.json 的小 id，聊天侧是 chat-core 的水鱼编号，
   // 两套 id 空间实测零重叠，所以衔接点只能是**曲名**。
   const resolved = core.resolveAliasTitle("八爪鱼");
   assert.equal(resolved.title, "VIIIbit Explorer", "别名映射到正式曲名，不绑 songId");

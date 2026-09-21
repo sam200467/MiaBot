@@ -11,11 +11,11 @@
 
 ## 更新
 
-在项目根目录运行 `node rio-chat/update-knowledge.cjs`，然后重新启动 Bot。需要 Node.js 自带 fetch 和外网连接。更新脚本先获取、转换全部数据，再逐文件原子替换；联网失败不会写入半截下载内容。运行时仅读本地快照，不自动访问外网。
+在项目根目录运行 `node chat-core/update-knowledge.cjs`，然后重新启动 Bot。需要 Node.js 自带 fetch 和外网连接。更新脚本先获取、转换全部数据，再逐文件原子替换；联网失败不会写入半截下载内容。运行时仅读本地快照，不自动访问外网。
 
 ## 角色曲目索引（2026-09-17）
 
-`ongeki-characters.json` 是「音击角色 ↔ 曲目」索引，用来回答「某角色（包括梨绪自己）有哪些曲 / 原创曲 / 个人曲」。它由 `node rio-chat/update-characters.cjs` 生成，输入是三份数据：
+`ongeki-characters.json` 是「音击角色 ↔ 曲目」索引，用来回答「某角色（包括梨绪自己）有哪些曲 / 原创曲 / 个人曲」。它由 `node chat-core/update-characters.cjs` 生成，输入是三份数据：
 
 - 本地曲库快照：`ongeki-music-internal.json` 的对战相手（`boss`）与「歌：」署名，分类取自 `ongeki-song-catalog.json`。
 - `../knowledge/ongeki-character-notes.json` 里的 `personalSongs`：萌娘百科各角色条目写明的「个人曲」，一人一首。柏木美亜、皇城セツナ 没有可靠来源，留空，不能编。
@@ -30,9 +30,9 @@
 
 改曲绘判定时：编辑 `ongeki-character-notes.json`，再跑一次 `update-characters.cjs`。曲绘图源是 `https://norca0721.github.io/otoge-db/ongeki/jacket/<曲库里的 image_url>`（190×190）。
 
-发布到 public-bot 时，新增的 `ongeki-characters.json`、`ongeki-character-notes.json` 和 `update-characters.cjs` 要在 public-bot 里手动 `git add` —— `publish.js` 只自动带 `rio-chat/*.cjs`，`knowledge/` 下的文件靠公开仓库的索引同步。
+发布到 public-bot 时，新增的 `ongeki-characters.json`、`ongeki-character-notes.json` 和 `update-characters.cjs` 要在 public-bot 里手动 `git add` —— `publish.js` 只自动带 `chat-core/*.cjs`，`knowledge/` 下的文件靠公开仓库的索引同步。
 
-分发 QQ EXE 时保留其上一级的完整 `rio-chat` 目录，包括 `knowledge/*.json`。Discord 同样需要配置指向的 `rio-chat` 目录。不要只复制 EXE。
+分发 QQ EXE 时保留其上一级的完整 `chat-core` 目录，包括 `knowledge/*.json`。Discord 同样需要配置指向的 `chat-core` 目录。不要只复制 EXE。
 
 ## 原作剧情索引（2026-09-18）
 
@@ -52,11 +52,11 @@
 **联网查到的新剧情不自动入库**：先写进 `ongeki-story-candidates.json`（`lore.cjs` 永不加载它），再用下面这条命令逐条过目。玩家二创和 wiki 错漏一旦写进索引就洗不掉了，而这一层的输出会被当成事实讲给群里听。
 
 ```
-node rio-chat/lore-review.cjs                          列出 canon 条目与待审候选
-node rio-chat/lore-review.cjs --confirm <id>           事实部分标为人工确认
-node rio-chat/lore-review.cjs --confirm-quotes <id>    台词归属标为人工确认
-node rio-chat/lore-review.cjs --approve <id>           候选入库
-node rio-chat/lore-review.cjs --reject <id> --why 理由   候选驳回
+node chat-core/lore-review.cjs                          列出 canon 条目与待审候选
+node chat-core/lore-review.cjs --confirm <id>           事实部分标为人工确认
+node chat-core/lore-review.cjs --confirm-quotes <id>    台词归属标为人工确认
+node chat-core/lore-review.cjs --approve <id>           候选入库
+node chat-core/lore-review.cjs --reject <id> --why 理由   候选驳回
 ```
 
 它只把 `*Reviewed` 从 `null` 升级，**从不改 `*Confidence`** —— 推断就是推断，人工过目加的是另一条轴。候选入库前要过形状检查：没有 `factSources` 的条目不能算事实，没有 `aliases` 的条目用户永远问不到。

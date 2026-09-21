@@ -12,7 +12,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { createOfficial } = require("./official-transport.cjs");
-const { loadSettings, createChat } = require("../rio-chat/chat.cjs");
+const { loadSettings, createChat } = require("../chat-core/chat.cjs");
 const core = require("../mia-core.cjs");
 const { createMiaCommands } = require("./mia-commands.cjs");
 const songSearch = require("./song-search.cjs");
@@ -346,7 +346,7 @@ function createMiaBot(config, deps = {}) {
         },
         // 个人成绩门槛：公共曲库证明不了玩家的成绩，这道闸在模型之外。
         // 不接的话会漏出引擎里的中性提示（「还没有接入按个人成绩筛选」），不是美亚的口吻。
-        personalRecommendationNotice: (message) => require("../rio-chat/personal-recommendation.cjs").bindingNotice(
+        personalRecommendationNotice: (message) => require("../chat-core/personal-recommendation.cjs").bindingNotice(
           (id) => core.getBinding(config, id), String(message.author.id),
           (message.__event?.mentionedOpenids || []).map(String),
           "先私聊美亚发一句话，再发 /绑定。"),

@@ -6,11 +6,11 @@
 
 两个控制台界面上都有「Kimi 搜索设置」按钮，点它就会弹出设置窗口，粘贴 Kimi 开放平台 API Key 后保存。窗口不进行网络请求。按钮旁的状态会显示当前是「已启用 / 未配置 / 已关闭 / 配置损坏」，保存后立刻刷新。
 
-命令行等价写法：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File rio-chat/search-key.ps1`（加 `-Status` 只查状态，加 `-Read` 只读 Key，两者都不会弹窗）。
+命令行等价写法：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File chat-core/search-key.ps1`（加 `-Status` 只查状态，加 `-Read` 只读 Key，两者都不会弹窗）。
 
-Key 用 Windows DPAPI 当前用户加密保存到 `rio-chat/search.local.json`，已加入 Git 忽略和公开版发布排除清单；换 Windows 用户/机器后需要重新填写。
+Key 用 Windows DPAPI 当前用户加密保存到 `chat-core/search.local.json`，已加入 Git 忽略和公开版发布排除清单；换 Windows 用户/机器后需要重新填写。
 
-保存后重新启动 Bot —— Key 只在聊天启动时读取一次，所以填完必须重启才会生效，界面上会提示这一点。QQ EXE 旁使用现有的上一级 `rio-chat` 目录，里面必须保留 `search-key.ps1` 和配置文件。不要把私人配置复制进公开仓库。删除配置或把 enabled 改为 false 可关闭搜索，不影响查分和曲库功能。
+保存后重新启动 Bot —— Key 只在聊天启动时读取一次，所以填完必须重启才会生效，界面上会提示这一点。QQ EXE 旁使用现有的上一级 `chat-core` 目录，里面必须保留 `search-key.ps1` 和配置文件。不要把私人配置复制进公开仓库。删除配置或把 enabled 改为 false 可关闭搜索，不影响查分和曲库功能。
 
 ## 行为
 
@@ -53,7 +53,7 @@ Key 用 Windows DPAPI 当前用户加密保存到 `rio-chat/search.local.json`�
 5. 域内 → 灰区，交分诊器。域信号：游戏名、难度档、**本地曲库里的真实曲名**（`knowledge.cjs` 的曲名索引，规范化后短于 3 字符的丢弃——「+♂」规范化后是空串，会匹配一切），以及评价或选曲类说法。话题（游戏、曲名、等级）可继承最近四轮，问法只认当前这句。
 6. 其余 → 不检索，零额外调用。
 
-曲名索引在 `loadKnowledge` 时建一次（三个游戏共 2845 个唯一曲名，单次匹配约 0.03 毫秒）；测试夹具或公开版缺 `rio-chat/knowledge/` 时安全退化成纯关键词行为。
+曲名索引在 `loadKnowledge` 时建一次（三个游戏共 2845 个唯一曲名，单次匹配约 0.03 毫秒）；测试夹具或公开版缺 `chat-core/knowledge/` 时安全退化成纯关键词行为。
 
 修复从 PowerShell 7 启动 Node 时 Windows PowerShell 模块路径继承导致 Key 读取失败的问题；启动日志明确显示搜索启用/可用，回复完成日志记录联网次数和资料数量，不包含 Key 或检索正文。
 
@@ -68,7 +68,7 @@ Key 用 Windows DPAPI 当前用户加密保存到 `rio-chat/search.local.json`�
 
 已知取舍：难度评价只认「简单／好打／偏难 + 谱面或等级或游戏名或真曲名」，以及攻略档词表里的说法；「推荐几个能稳定出分的」「这个谱面有什么坑」这类没命中的体感问法不再自动检索，改由兜底网在模型表示拿不准时补——要把它们也算进攻略档，在 `research-policy.cjs` 的 `strategy` 里加词即可（代价是「我今天出分了」这类自夸也会触发检索）。
 
-离线：`node --test rio-chat/search.test.cjs rio-chat/knowledge.test.cjs rio-chat/chat.test.cjs`。
+离线：`node --test chat-core/search.test.cjs chat-core/knowledge.test.cjs chat-core/chat.test.cjs`。
 
 2026-09-17（第五组：中间步骤静默 + 引用回复）：检索轮原先要发两条消息——先是「我去翻一下资料」，再是正式答复。两条都占 QQ 侧每群每小时的发送配额（`perGroupPerHour` 默认 20），一次检索问答就等于花掉 10 次配额里的一次；而这句提示解决的问题（群里刷过去几十条之后，用户不确定这条在答谁）其实有个更省的办法：**引用原消息**。
 
@@ -95,7 +95,7 @@ Key 用 Windows DPAPI 当前用户加密保存到 `rio-chat/search.local.json`�
 
 第一级在宿主侧：`mia-core.cjs` 的 `resolveAliasTitle(word, game)`。解析规则**全部留在 `SongAliasStore`**（同一套 normalize、同一套 entries），聊天侧不实现第二套——它只拿到一个名字，从 `adapter.alias.resolve` 取。宿主曲库只有音击，所以 `#是什么歌`、`searchSongs` 这些命令路径固定传作用域 `"ongeki"`，别的游戏专属别名不会在那条路上命中。
 
-第三级是昵称恢复（`rio-chat/alias-recovery.cjs` + `chat.cjs` 的工具循环）。曲库查空后给模型三级提示（换游戏 → 联网查或直接给正式曲名 `aliasGuess` → 说不确定）。但**主力不是模型自觉**：spike 实测模型能把「电管」认成 Dengeki Tube，却不会想起来回曲库核一遍，结果手上只有老帖的旧值、只能诚实拒答。所以程序侧加了**自动核对**——模型检索词里一旦出现曲库真曲名，立刻回本地库查一遍并进**同一条** evidence，零额外模型轮次；模型认出正式曲名的那一刻就被接住了。
+第三级是昵称恢复（`chat-core/alias-recovery.cjs` + `chat.cjs` 的工具循环）。曲库查空后给模型三级提示（换游戏 → 联网查或直接给正式曲名 `aliasGuess` → 说不确定）。但**主力不是模型自觉**：spike 实测模型能把「电管」认成 Dengeki Tube，却不会想起来回曲库核一遍，结果手上只有老帖的旧值、只能诚实拒答。所以程序侧加了**自动核对**——模型检索词里一旦出现曲库真曲名，立刻回本地库查一遍并进**同一条** evidence，零额外模型轮次；模型认出正式曲名的那一刻就被接住了。
 
 自动核对只认**检索词**、不认资料来源正文：正文里顺带提到一堆曲名，全去核一遍等于把额度随机花掉——实测「电管」那条被核成了正文里先出现的 Love & Justice，模型拿到一条不相干的数据，真正要问的那首反而没核到。
 
@@ -177,7 +177,7 @@ Key 用 Windows DPAPI 当前用户加密保存到 `rio-chat/search.local.json`�
 
 **结构**：理解语言交给模型（它标 `intent`、把可验证的外部事实抽成 `factQuery`），管权限留在程序（只对枚举值做映射，**永远不匹配用户原句**）。授权三条来源，优先级从高到低：① 入戏/人设只能走**拆分通道**——只执行通过三项形式检查的 `factQuery`（不是原句、不带假设语气、不指向 bot 自身），纯人设互动直接拒绝；② 程序自己判定的检索（攻略/体感词表、时效规则、兜底网）照旧放行；③ 模型请求，`intent` 含 `research`／`explicit` 才开通，**未知取值与缺失一律拒绝**。被拒时模型会收到一条纠正（「程序未授权联网…」），要求它把事实抽成 factQuery 或直接回答——不把未授权说成网络故障，也不许写「我这就去翻」。
 
-**生产实测**（`rio-chat/intent-smoke.cjs`：走真 `requestReply`、真模型、桩网页）跑出三个 spike 没暴露的坑：
+**生产实测**（`chat-core/intent-smoke.cjs`：走真 `requestReply`、真模型、桩网页）跑出三个 spike 没暴露的坑：
 
 1. **模型经常只给 intent + factQuery、不给 webQuery**——提示词里写的是「程序只执行 factQuery」，它就照字面来了。所以「只给 factQuery」也算请求联网，而且必须在**收尾判断之前**处理：放在后面会被当成「这一轮没要工具」直接收尾，实测就是搜不出去。
 2. 时效问题里模型偶尔什么都不标（intent 与 factQuery 都缺），于是落到安全默认＝不搜。补了一条**很窄的规则**兜底：既有时效词（版本／更新／新曲／活动／最新…）、又真的是问句、而且不是工具指令也不是曲库答得了的数量与定数（「中二一共有多少首歌」照样不查）。第四组砍掉的是「这句话算不算事实问答」那个开集判据；这一条问的是「它问的东西有没有时效性」，闭集词 + 问句形状。
@@ -225,11 +225,11 @@ Key 用 Windows DPAPI 当前用户加密保存到 `rio-chat/search.local.json`�
 
 **C. examples 补三条**（`reset` / `flirty` / `soft_no`）并注册进 `chat.cjs` 的 `sampleStates`（只有注册过的示例才会作为 few-shot 注入）——保持傲娇、嘴硬、吐槽感，只降低攻击性与持续烦躁。
 
-**真模型冒烟**（`rio-chat/tone-smoke.cjs`，真链路、只桩网页）五条全过：别人刚挑完事→这位用户打招呼；同一用户转回正题（快速回落但傲娇还在）；「宝宝」「老婆抱抱」（害羞＋吐槽、不迎合不赶人）；要求帮忙骂人（柔和拒绝并转回能帮的部分）。硬语气黑名单命中 0。
+**真模型冒烟**（`chat-core/tone-smoke.cjs`，真链路、只桩网页）五条全过：别人刚挑完事→这位用户打招呼；同一用户转回正题（快速回落但傲娇还在）；「宝宝」「老婆抱抱」（害羞＋吐槽、不迎合不赶人）；要求帮忙骂人（柔和拒绝并转回能帮的部分）。硬语气黑名单命中 0。
 
 （同日补，冒烟改出来的一条）reset 那条一开始**还是不对**：用户只说「早上好」，梨绪主动接了一句「刚才群里的事我早翻篇了」——语气是软了，但**把那段端出来了**，等于替对方转述冲突。两处提示词补了明文禁令（群上下文那段的**末尾** + persona 的回落段），并写进具体例子：「用户只说一句早上好，就只回问候，**连「我已经翻篇了」都不用说**（说了等于把它端出来）」。实测四次里仍犯两次（模型很想证明自己没被影响），于是按项目老规矩加**程序兜底**：当前句没有指代群里的信号（群里/他们/刚才/那个人…）、而回答里出现「群里／那两位／刚才那事／翻篇／不迁怒」这类表态时，给一次重写（话术：「删掉那部分，只按用户这句话回答；不要解释自己的情绪状态」），改不掉就记 `语气泄漏未纠正` 日志、不再纠缠。改完连跑四次全部干净。冒烟脚本也加了对应断言（`quietAbout`），免得以后靠肉眼。
 
-真实搜索：`node rio-chat/search-smoke.cjs`，会进行少量计费 API 调用，仅在本地输出搜索结果和回复，不发送 QQ/Discord 消息。
+真实搜索：`node chat-core/search-smoke.cjs`，会进行少量计费 API 调用，仅在本地输出搜索结果和回复，不发送 QQ/Discord 消息。
 
 2026-09-18（第十四组，原作剧情层）：新增 `lore.cjs` / `canon-guard.cjs` / `lore-review.cjs` 与 `knowledge/ongeki-story.json`。离线测试 178 条全过（新增 37 条：`lore.test.cjs` 16、`canon-guard.test.cjs` 13、`research-policy.test.cjs` 补 5、`chat.test.cjs` 补 3）。端到端断言的是三件事：本地命中时剧情资料以 `【本地剧情资料…】` 注入、**一次网络请求都不发**；回答否认已确认剧情时纠一轮，且纠错话术与提示词里都留着「你只是在引用/反问就不必改」的出口；本地没有收录的剧情仍能走 canon 拆分通道，只发抽出来的客观事实子问题。
 

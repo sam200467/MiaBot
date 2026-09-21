@@ -10,11 +10,11 @@
 // 联网权限改由「模型出 intent 标签 → 程序查策略表」决定。其余提示词部件复用生产代码。
 //
 // 用法：
-//   node rio-chat/router-spike.cjs                       # 全部用例，思考开
-//   node rio-chat/router-spike.cjs --thinking=off        # 对照：关思考（现在的闲聊档）
-//   node rio-chat/router-spike.cjs --only=roleplay       # 只跑匹配到关键词的用例
-//   node rio-chat/router-spike.cjs --json=out.json       # 存完整轨迹
-//   node rio-chat/router-spike.cjs --real-web            # 联网换成真的（计费）
+//   node chat-core/router-spike.cjs                       # 全部用例，思考开
+//   node chat-core/router-spike.cjs --thinking=off        # 对照：关思考（现在的闲聊档）
+//   node chat-core/router-spike.cjs --only=roleplay       # 只跑匹配到关键词的用例
+//   node chat-core/router-spike.cjs --json=out.json       # 存完整轨迹
+//   node chat-core/router-spike.cjs --real-web            # 联网换成真的（计费）
 const fs=require("node:fs"),path=require("node:path");
 const {fetch}=require("undici");
 const {loadSettings}=require("./chat.cjs");

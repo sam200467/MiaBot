@@ -7,11 +7,11 @@
 // 另外它还负责把两条置信度轴上的 **Reviewed 从 null 升级**——注意它**从不改
 // *Confidence**：来源维度多源就是多源、推断就是推断，人工过目加的是另一条轴。
 //
-//   node rio-chat/lore-review.cjs                    列出 canon 条目与待审候选
-//   node rio-chat/lore-review.cjs --confirm <id>      canon 条目：事实部分标为人工确认
-//   node rio-chat/lore-review.cjs --confirm-quotes <id>  canon 条目：台词归属标为人工确认
-//   node rio-chat/lore-review.cjs --approve <id>      候选 → canon
-//   node rio-chat/lore-review.cjs --reject <id> --why "理由"  候选标为驳回
+//   node chat-core/lore-review.cjs                    列出 canon 条目与待审候选
+//   node chat-core/lore-review.cjs --confirm <id>      canon 条目：事实部分标为人工确认
+//   node chat-core/lore-review.cjs --confirm-quotes <id>  canon 条目：台词归属标为人工确认
+//   node chat-core/lore-review.cjs --approve <id>      候选 → canon
+//   node chat-core/lore-review.cjs --reject <id> --why "理由"  候选标为驳回
 const fs=require("node:fs"),path=require("node:path");
 const root=__dirname;
 const STORY=path.join(root,"knowledge","ongeki-story.json");

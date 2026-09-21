@@ -3,7 +3,7 @@
  "game": "maimai",
  "note": "版本条目由 tools/gen-terms.cjs 从本地快照的 version 字段生成（名称逐字一致、曲目数来自快照）。俗称与组合称呼是人工补的，只收稳定可验证的；长尾口语不进这里，走会话 glossary。发行日期与世代先后尚未收录（需要来源，留给下一批）。",
  "sources": [
-  "版本名与曲目数：本地曲库快照 rio-chat/knowledge/maimai.json 的 version 字段（水鱼 maimai DX music_data）",
+  "版本名与曲目数：本地曲库快照 chat-core/knowledge/maimai.json 的 version 字段（水鱼 maimai DX music_data）",
   "「X代」俗称：萌娘百科《Maimai系列》版本姓名框表 + B站专栏《【maimai】将牌/极牌/神牌怎么获得？》，逐代对照见 knowledge/maimai-version-aliases.review.md",
   "真超檄：群内用户 2026-09-18 说明（maimai / maimai PLUS / GreeN / GreeN PLUS 的合称）",
   "国服合并（熊华/爽煌/宙星）：贴吧玩家资料，标记 region:cn"
@@ -593,7 +593,7 @@
    "body": "舞萌 DX 的 rating 由 Best 50 张谱面（B50）的贡献值加总得出，单张贡献 = 定数 × 达成率系数（本项目用的是已核对的 SSS+ 上限公式 floor(定数×1.005×22.4)）。所以「上分」看的是定数够不够、以及能不能打出高达成率，与曲子的手感评价是两回事。地区版本更新会改变曲目归属，定数与 B50 都要以当前版本为准。",
    "sources": [
     "https://gamerch.com/maimai/533647（本项目 research-policy.cjs 的 ratingEvidence 引用并核对过）",
-    "本项目程序计算：rio-chat/research-policy.cjs 的 ratingEvidence()"
+    "本项目程序计算：chat-core/research-policy.cjs 的 ratingEvidence()"
    ]
   }
  ]

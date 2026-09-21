@@ -15,7 +15,7 @@ qq-official/
 └── config.local.json        **含 AppSecret，已 gitignore**
 ```
 
-和 `qq/`（NapCat 版）是**并列的两个前端**，共用 `rio-chat/chat.cjs` 引擎和 `mia-core.cjs` 的
+和 `qq/`（NapCat 版）是**并列的两个前端**，共用 `chat-core/chat.cjs` 引擎和 `mia-core.cjs` 的
 能力层，互不影响。指令文案、队列、绑定会话各写一份 —— 原因见 `mia-commands.cjs` 顶部的注释。
 
 > 下文的梨绪（`qq/`）是另一条产品线，**不随本仓库分发** —— 提到它只是为了说明两边的边界；
@@ -226,7 +226,7 @@ node --test --test-timeout=45000 qq-official/test-official-transport.cjs   # 传
 node --test --test-timeout=45000 qq-official/test-mia-entry.cjs            # 入口（含指令/聊天两条路）
 node --test --test-timeout=45000 qq-official/test-mia-commands.cjs         # 指令层（不起网关）
 node --test --test-timeout=60000 qq/test-qq-entry.cjs                      # 梨绪不能退化
-node --test --test-timeout=45000 rio-chat/chat.test.cjs                    # 引擎
+node --test --test-timeout=45000 chat-core/chat.test.cjs                    # 引擎
 ```
 
 **全部走 mock，不需要真实凭据、不花 API 费用。**
@@ -370,7 +370,7 @@ if(Directory.Exists(mia)) Directory.Delete(mia,true);                 // 包变�
 > 字面意思是按群切分的；但实测私聊和群共用同一个值，说明至少不是严格按群。
 > 只有一个群可测，等你进了第二个群再确认。
 
-改 `rio-chat/chat.cjs` 或 `mia-core.cjs` 时两边都会受影响，所以上面那两组测试都要跑。
+改 `chat-core/chat.cjs` 或 `mia-core.cjs` 时两边都会受影响，所以上面那两组测试都要跑。
 # 歌曲搜索
 
 `/搜索歌曲 サド`：搜索本地音击曲库，不用绑定账号。支持部分曲名、别名、Bot ID（如 `id870`）、假名与全半角归一化，以及少量拼写错误的候选提示。

@@ -1,6 +1,0 @@
-{
-  "schemaVersion": 1,
-  "game": "ongeki",
-  "note": "剧情候选队列。联网查到的新内容写到这里，**lore.cjs 永不加载本文件**——候选在被人工批准前不是 canon。联网检索到的玩家二创、wiki 错漏一旦自动入 canon 就洗不掉了，所以这里只做暂存。用 `node rio-chat/lore-review.cjs --list` 查看，`--approve <id>` 移入 ongeki-story.json 并记 reviewedAt，`--reject <id>` 标成驳回。",
-  "candidates": []
-}
