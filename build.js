@@ -162,7 +162,9 @@ const runtimeThemeFiles = [
 // 素材与字体由部署者自备（见 ASSETS.md），仓库里没有。缺了不算错：
 // 打出来的核心少这几张图，对应渲染退化，但不用为了试一次构建先去凑齐素材。
 // 主题代码（html/css/js）是本仓库自己的，缺了就是工程坏了 —— 照旧抛错。
-const isDeployerSupplied = (name) => name.includes("/assets/") || name.startsWith("shared/fonts/");
+// special-plates.json 例外：它在 assets/ 里但属于代码要读的数据，仓库里有，缺了就是坏了。
+const isDeployerSupplied = (name) =>
+  (name.includes("/assets/") && !name.endsWith("special-plates.json")) || name.startsWith("shared/fonts/");
 
 const themeBundle = {};
 const themeHasher = crypto.createHash("sha256");

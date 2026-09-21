@@ -17,7 +17,9 @@ config.local.json
 /rio-chat/emoji-animation-preview.jpg
 /rio-chat/emoji-contact-sheet.jpg
 /ongeki-icon.ico
-/themes/**/assets/
+# 主题素材整目录排除，但要留一条缝：牌子定义是代码读的数据（不是美术），跟曲库 JSON 一样随仓库走
+/themes/**/assets/*
+!/themes/completion-search/assets/special-plates.json
 /themes/shared/fonts/
 search.local.json
 secrets.dat
