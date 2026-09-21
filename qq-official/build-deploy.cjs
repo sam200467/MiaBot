@@ -212,9 +212,15 @@ fs.writeFileSync(path.join(OUT, "开机自启.txt"),
   "注意：同一时间只能有一个实例连着腾讯网关，两个进程会让它把每句话回两遍。\r\n" +
   "从旧机器迁过来时，先停旧的再启新的。\r\n");
 
-// 部署说明单独维护成 .md —— 塞进模板字符串的话，里面的反引号会把字面量提前闭合
+// 部署说明单独维护成 .md —— 塞进模板字符串的话，里面的反引号会把字面量提前闭合。
+// 两份文档不随公开仓库分发（写明了部署姿势），缺失时跳过而不是让打包失败。
 for (const doc of ["部署说明.md", "服务器部署清单.md"]) {
-  fs.copyFileSync(path.join(HERE, doc), path.join(OUT, doc));
+  const src = path.join(HERE, doc);
+  if (!fs.existsSync(src)) {
+    console.log("跳过 " + doc + "（本地没这份文档）");
+    continue;
+  }
+  fs.copyFileSync(src, path.join(OUT, doc));
   console.log("带上 " + doc);
 }
 

@@ -125,12 +125,15 @@ test("/b110 是分表的别名", () => {
   assert.equal(parseCommand("/b50")?.name, "chart");
 });
 
-test("同一个说法在两个 bot 上必须是同一个意思（冲突守卫）", () => {
+// 梨绪（qq/ NapCat 版）是并列的另一条线，不随本仓库分发；缺失时这条守卫跳过。
+const RIO_ENTRY = path.join(__dirname, "..", "qq", "qq-entry.cjs");
+
+test("同一个说法在两个 bot 上必须是同一个意思（冲突守卫）", { skip: fs.existsSync(RIO_ENTRY) ? false : "qq/ 不在本仓库里" }, () => {
   // 早先这条写的是「美亚必须覆盖梨绪的全部说法」—— 那是按「两边完全一致」设的。
   // 2026-09-19 美亚砍掉了「别名候选 / 驳回候选」两条，覆盖式断言就站不住了。
   // 但**真正要防的不是「少了几条」，是「同一个词在两边指不同的东西」**：
   // 那才是用户在两个 bot 之间换着用时会被坑的地方。所以改成查冲突，允许美亚更少。
-  const rio = require("../qq/qq-entry.cjs").ALIASES;
+  const rio = require(RIO_ENTRY).ALIASES;
   const lookup = (table) => {
     const map = new Map();
     for (const [name, words] of Object.entries(table)) {

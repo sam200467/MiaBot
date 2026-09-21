@@ -1,85 +1,49 @@
-# ---- 构建中间产物（node build.js / node build-discord-bot.js 可重新生成）----
-ongeki-exe.js
-ongeki-bundle.cjs
-ongeki-core.exe
-takase-discord-bundle.cjs
-takase-discord-core.exe
-takase-discord-vault.exe
-*.blob
-
-# ---- 运行时数据（含个人游戏数据，勿提交）----
-config.json
-ongeki-rating.json
-gui-prefs.txt
-
-# ---- 依赖与交付二进制 ----
-# exe 超过 GitHub 100MB 单文件限制，请通过 Release 发布：
-#   Takase Bot Discord.exe（Discord 查分 Bot，构建：node build-discord-bot.js）
-#   音击小工具 v3.0.exe（本地查分工具，构建：node build.js）
 node_modules/
 *.exe
+*.blob
+*.log
+*.zip
+*.psd
 
-# 本机缓存、凭据和开发临时文件
-.npm-cache/
-# 核对曲绘用的临时目录（下载的曲绘、拼图、核对表）
-.tmp-*/
 .env
 .env.*
 !.env.example
+config.local.json
+.test-config-created
+
+# 外部素材由部署者自行准备，不得误提交授权不明的文件
+/mia-chat/emojis/
+/rio-chat/emojis/
+/rio-chat/emoji-animation-preview.jpg
+/rio-chat/emoji-contact-sheet.jpg
+/ongeki-icon.ico
+/themes/**/assets/
+/themes/shared/fonts/
+search.local.json
 secrets.dat
 bindings.dat
-*.log
+song-aliases-*.json
+song-alias-candidates-*.json
+
+data/
+deploy/
+dist/
+output/
+previews/
+.npm-cache/
 __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# 本地游戏资源包，不作为源代码发布
-/SDDT - O.N.G.E.K.I Re：Fresh/
+# 构建产物：node build.js 可重新生成，不打进公开仓库
+ongeki-exe.js
+ongeki-bundle.cjs
+ongeki-core.exe
+takase-discord-vault.exe
 
-# ---- macOS 版构建产物（node mac/build-macos.js 可重建）----
-mac/dist/
-mac/assets/
-mac/takase-discord-bundle.cjs
-mac/vault/vault-bundle.cjs
-mac/AvaloniaGUI/bin/
-mac/AvaloniaGUI/obj/
-
-# 设计源文件与本地渲染预览
-*.psd
-themes/**/previews/
-
-# 不发布的设计过程文件
-/themes/*/design/
-/themes/chart-info/experiments/legacy-layout/
-/themes/chart-info/experiments/jacket-layout/*-preview.png
-
-song-aliases-*.json
-song-aliases-*.json.*.tmp
-
-# QQ 版：本地配置与数据（含 token 和账号绑定）
-qq/qq-config.json
-qq/data/
-qq/dist/
-qq/*.log
-# 无窗口启动器是**生成物**（见各目录下的 make-launchers.cjs / build-qq-bot.js），
+# 无窗口启动器是生成物（见 qq-official/make-launchers.cjs），
 # 不写死目录前缀 —— 新增前端目录时自动覆盖。
 */启动*.vbs
 */停止*.vbs
-# 角色聊天目录的本地配置：含 DeepSeek 密钥，每个角色目录一份。
-# 不写成 rio-chat/ 前缀 —— 新增角色目录（mia-chat 等）必须自动覆盖，
-# 否则密钥会被提交。rio-chat/.gitignore 里那条 /config.local.json 只管自己那层。
-config.local.json
-rio-chat/search.local.json
-
-
-# Windows 文件夹元数据（表情/素材目录里会被自动生成）
-desktop.ini
-
-# 部署包产物：含 AppSecret 与 DeepSeek 密钥（config.local.json 会被拷进去），绝不提交
-/deploy/
-
-# 自动提取的原始游戏资源与 Codex 工作缓存（可重新生成，体积巨大）
-/.codex-temp/
-/extracted-ongeki-assets/
-/deploy-windows-server/
