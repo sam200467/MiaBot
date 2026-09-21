@@ -4,7 +4,17 @@
 自然语言查分已接入：模型在回复里挑一个查分工具（单曲成绩图、B50、等级、牌子、谱面分析、定数表、Rating），
 由平台入口执行并发送结果，模型那句话作为引出语。工具清单来自takase-core.cjs的CAPABILITY_SPECS，
 两个平台共用同一份解析，井号/斜杠命令照旧可用。
+除只读查询外还接了别名查询/反查/添加、开放关闭成绩查询、查看运行状态和绑定引导。两条约定：
+一是「添加别名」要两个参数，而工具契约只给一个query字符串，所以
+沿用命令路径已有的竖线写法（`id870 | 八爪鱼`），用户不必知道这个格式，是模型负责拼；
+二是**删除别名刻意不进清单**。它只认白名单里的账号（QQ侧是qq-config.json的aliasDeleteQqs，
+不写进源码是因为入口会同步进公开仓库），只走命令格式，所以留在各入口的命令路径上——
+模型看不到这个工具名，任何人都无法从@消息删别名。
+绑定同理不走resolveCapability：那是一条要收邮箱密码的多轮流程，
+凭据一旦成为action参数就会进DeepSeek请求体，所以各入口只负责把用户引到原流程上。
 宿主还可以通过 adapter.context 传一段群上下文（QQ侧是群里最近几条消息），
+以 adapter.quoted 传本条消息引用（QQ的「回复」）的那条——它可能远在上下文窗口之外，
+会作为一条system放在用户那句话前面；宿主返回空字符串表示没有引用或读不到。
 以及 adapter.actionTarget + adapter.ability 声明「本条消息@了谁」，让模型能接住指代、也能查别人；
 查别人的合法性由宿主按真正@过的人校验，chat.cjs只当它是普通编号。
 
@@ -56,9 +66,14 @@ Windows界面沿用原有Discord账号、服务器、频道及HTTP代理配置�
 - smoke.cjs：真实DeepSeek短对话测试，会消耗少量API额度，不发送Discord消息。
 - persona.md：角色提示词v0.3。
 - examples.json：19组原创风格示例；其中5组用于运行时引导，生成时不照抄。
-- quotes.json：74张用户剧情截图的工作译文与标记，不作为随机回复池。
+- quotes.json：74张用户剧情截图的工作译文与标记，不作为随机回复池。**原作台词的唯一存储**——剧情层只用 id 引用它，不复制正文。
 - profile-quotes.json：一张额外资料截图中的10条发言。
 - sources.md：来源和翻译边界。
+- lore.cjs：原作剧情（canon）层的加载、匹配与联网裁决；`knowledge/ongeki-story.json` 是它的数据。
+- canon-guard.cjs：生成后校验——本地已确认的剧情被否认存在时纠一轮（误判防护优先于命中）。
+- lore-review.cjs：剧情库的人工审核工具（候选入库、标记人工过目）；它只升级 `*Reviewed`，从不改 `*Confidence`。
+- profiles.cjs：角色档案层的加载、匹配与注入；`knowledge/ongeki-profiles.json` 是它的数据（原作 17 名主角的基础设定、性格与人际关系）。答的是「别人是谁」，与剧情层的「发生过什么」分开。数据层含梨绪本人，运行时由 `self` 排除——她的人设以 persona.md 为唯一真相源。
+- profiles.test.cjs：档案层的离线测试，含真实数据的字段/关系/roster 覆盖等式与单字简称的误命中回归。
 - config.example.json：公开模板；config.local.json：Git忽略的本地设置。
 - expressions.json：表情白名单与概率。
 

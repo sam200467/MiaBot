@@ -1,0 +1,215 @@
+{
+ "schemaVersion": 1,
+ "game": "ongeki",
+ "note": "版本条目由 tools/gen-terms.cjs 从本地快照的 version 字段生成（名称逐字一致、曲目数来自快照）。俗称与组合称呼是人工补的，只收稳定可验证的；长尾口语不进这里，走会话 glossary。发行日期与世代先后尚未收录（需要来源，留给下一批）。",
+ "sources": [
+  "版本名与曲目数：项目 ongeki-song-catalog.json 生成的曲库快照",
+  "RATING 三榜口径：本项目 fetch-otogame-rating.mjs 与 takase-core.cjs 的出图实现（数据来自 u.otogame.net/api/game/ongeki/rating）",
+  "分数评级阈值：本项目 fetch-otogame-rating.mjs 的 rankFromScore()"
+ ],
+ "entries": [
+  {
+   "id": "ongeki-version-オンゲキ-bright-memory-act-3",
+   "type": "version",
+   "game": "ongeki",
+   "name": "オンゲキ bright MEMORY Act.3",
+   "catalogVersions": [
+    "オンゲキ bright MEMORY Act.3"
+   ],
+   "songs": 428
+  },
+  {
+   "id": "ongeki-version-オンゲキ-re-fresh-act-1",
+   "type": "version",
+   "game": "ongeki",
+   "name": "オンゲキ Re:Fresh Act.1",
+   "catalogVersions": [
+    "オンゲキ Re:Fresh Act.1"
+   ],
+   "songs": 581
+  },
+  {
+   "id": "ongeki-version-オンゲキ-bright",
+   "type": "version",
+   "game": "ongeki",
+   "name": "オンゲキ bright",
+   "catalogVersions": [
+    "オンゲキ bright"
+   ],
+   "songs": 352
+  },
+  {
+   "id": "ongeki-version-オンゲキ-plus",
+   "type": "version",
+   "game": "ongeki",
+   "name": "オンゲキ PLUS",
+   "catalogVersions": [
+    "オンゲキ PLUS"
+   ],
+   "songs": 224
+  },
+  {
+   "id": "ongeki-version-オンゲキ-bright-memory-act-2",
+   "type": "version",
+   "game": "ongeki",
+   "name": "オンゲキ bright MEMORY Act.2",
+   "catalogVersions": [
+    "オンゲキ bright MEMORY Act.2"
+   ],
+   "songs": 551
+  },
+  {
+   "id": "ongeki-version-オンゲキ",
+   "type": "version",
+   "game": "ongeki",
+   "name": "オンゲキ",
+   "catalogVersions": [
+    "オンゲキ"
+   ],
+   "songs": 349
+  },
+  {
+   "id": "ongeki-version-オンゲキ-bright-memory-act-1",
+   "type": "version",
+   "game": "ongeki",
+   "name": "オンゲキ bright MEMORY Act.1",
+   "catalogVersions": [
+    "オンゲキ bright MEMORY Act.1"
+   ],
+   "songs": 447
+  },
+  {
+   "id": "ongeki-version-オンゲキ-r-e-d-plus",
+   "type": "version",
+   "game": "ongeki",
+   "name": "オンゲキ R.E.D. PLUS",
+   "catalogVersions": [
+    "オンゲキ R.E.D. PLUS"
+   ],
+   "songs": 394
+  },
+  {
+   "id": "ongeki-version-オンゲキ-summer",
+   "type": "version",
+   "game": "ongeki",
+   "name": "オンゲキ SUMMER",
+   "catalogVersions": [
+    "オンゲキ SUMMER"
+   ],
+   "songs": 258
+  },
+  {
+   "id": "ongeki-version-オンゲキ-summer-plus",
+   "type": "version",
+   "game": "ongeki",
+   "name": "オンゲキ SUMMER PLUS",
+   "catalogVersions": [
+    "オンゲキ SUMMER PLUS"
+   ],
+   "songs": 216
+  },
+  {
+   "id": "ongeki-version-オンゲキ-r-e-d",
+   "type": "version",
+   "game": "ongeki",
+   "name": "オンゲキ R.E.D.",
+   "catalogVersions": [
+    "オンゲキ R.E.D."
+   ],
+   "songs": 303
+  },
+  {
+   "id": "ongeki-version-オンゲキ-re-fresh-act-2",
+   "type": "version",
+   "game": "ongeki",
+   "name": "オンゲキ Re:Fresh Act.2",
+   "catalogVersions": [
+    "オンゲキ Re:Fresh Act.2"
+   ],
+   "songs": 60
+  },
+  {
+   "id": "ongeki-difficulty-mas",
+   "type": "difficulty",
+   "game": "ongeki",
+   "name": "MASTER",
+   "zh": "紫谱",
+   "aliases": [
+    "紫谱",
+    "紫譜",
+    "MAS"
+   ],
+   "body": "曲库 difficulty 字段是 MAS。",
+   "sources": [
+    "本地快照 difficulty 枚举：BAS/ADV/EXP/MAS/LUN"
+   ]
+  },
+  {
+   "id": "ongeki-difficulty-exp",
+   "type": "difficulty",
+   "game": "ongeki",
+   "name": "EXPERT",
+   "zh": "红谱",
+   "aliases": [
+    "红谱",
+    "紅譜",
+    "EXP"
+   ],
+   "body": "曲库 difficulty 字段是 EXP。",
+   "sources": [
+    "本地快照 difficulty 枚举"
+   ]
+  },
+  {
+   "id": "ongeki-difficulty-lun",
+   "type": "difficulty",
+   "game": "ongeki",
+   "name": "LUNATIC",
+   "aliases": [
+    "LUNATIC",
+    "LUN",
+    "ルナティック"
+   ],
+   "body": "曲库 difficulty 字段是 LUN。",
+   "sources": [
+    "本地快照 difficulty 枚举"
+   ]
+  },
+  {
+   "id": "ongeki-mechanic-rating",
+   "type": "mechanic",
+   "game": "ongeki",
+   "name": "RATING（三榜）",
+   "aliases": [
+    "RATING",
+    "rating",
+    "B50",
+    "N10",
+    "P50",
+    "白榜"
+   ],
+   "body": "音击的 rating 由三块榜单组成：ベスト枠（best_rating_list，出图取 50 首）、新曲枠（best_new_rating_list，10 首）、プラチナスコア枠（p_score_rating_list，50 首），三榜各自有平均分，总 rating 以官方口径为准。本项目出图就是这三榜（B50 + N10 + P50）。讨论「能不能吃分」「值不值得塞进榜单」时指的是新曲枠与ベスト枠这两块，与曲子的主观手感评价不是一回事。",
+   "sources": [
+    "本项目 fetch-otogame-rating.mjs（u.otogame.net/api/game/ongeki/rating 的字段映射）",
+    "本项目 qq/README.md 的出图说明（三榜 50/10/50 曲）"
+   ]
+  },
+  {
+   "id": "ongeki-mechanic-rank",
+   "type": "mechanic",
+   "game": "ongeki",
+   "name": "分数评级",
+   "aliases": [
+    "SSS+",
+    "SSS",
+    "SS",
+    "评级",
+    "rank"
+   ],
+   "body": "音击单曲分数与评级的对应（本项目出图用的阈值）：50 万以下 D、70 万 C、75 万 B、80 万 BB、85 万 BBB、90 万 A、94 万 AA、97 万 AAA、99 万 S、100 万 SS、100.75 万 SSS、101 万及以上 SSS+。",
+   "sources": [
+    "本项目 fetch-otogame-rating.mjs 的 rankFromScore()"
+   ]
+  }
+ ]
+}

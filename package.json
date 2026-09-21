@@ -4,6 +4,7 @@
   "scripts": {
     "build:bot": "node build-discord-bot.js",
     "build:windows": "node build.js",
+    "build:macos-bot": "node qq-official/build-macos-deploy.cjs",
     "preview:completion": "node themes/completion-search/tools/render-preview.js",
     "css:completion": "node themes/completion-search/tools/live-css-editor.js",
     "preview:level": "node themes/level-score/tools/render-preview.js",

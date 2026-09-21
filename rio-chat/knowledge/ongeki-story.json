@@ -1,0 +1,2169 @@
+{
+ "schemaVersion": 1,
+ "game": "ongeki",
+ "note": "原作剧情索引（人工策展输入，脚本只读）。回答「某角色在哪段剧情登场／和谁做过什么／某章讲什么」这类可由原作验证的问题。台词正文不在这里——quoteRefs 只引用 quotes.json 的条目 id，同一份原作素材同时服务 persona 与 canon，不复制第二份。置信度有两条互不相通的轴：factConfidence/factReviewed 管事件本身，quoteRefs[].mappingConfidence/mappingReviewed 管台词归属；事件被多源确认不代表台词映射也被确认。审核工具 lore-review.cjs 只把 *Reviewed 从 null 升级为 {at,by}，不改 *Confidence。",
+ "reviewedAt": null,
+ "confidenceLegend": {
+  "factConfidence": "confirmed＝多源交叉（官方页/wiki 等）｜inferred＝单源或推断",
+  "factReviewed": "null＝未经人工过目｜{at,by}＝人工确认过。运行时信任等级 human-confirmed > source-confirmed > inferred",
+  "mappingConfidence": "同 factConfidence，但只针对「这批台词属于这个事件」这件事"
+ },
+ "stories": [
+  {
+   "id": "ch1-2",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第1章 出会い編 CHAPTER2",
+   "title": "自称・超絶最強、登場！",
+   "titleCn": "自称·超绝最强，登场！",
+   "date": null,
+   "version": "オンゲキ",
+   "characters": [
+    "高瀬 梨緒",
+    "星咲 あかり",
+    "藤沢 柚子",
+    "三角 葵"
+   ],
+   "aliases": [
+    "自称・超絶最強、登場！",
+    "自称超绝最强登场",
+    "第1章CHAPTER2",
+    "第1章チャプター2"
+   ],
+   "keywords": [
+    "初登场",
+    "应援",
+    "エール",
+    "奏坂SHOOTER FES",
+    "シューターフェス",
+    "挑衅",
+    "努力是白费的"
+   ],
+   "summary": "为收集应援而苦恼的明里等人面前，自称「超绝最强」的梨绪登场。她断言努力是白费的，与朝着梦想努力的明里她们正面冲突。这是高濑梨绪的初登场。",
+   "rivals": [
+    "Here We Go Lv.5",
+    "Mare Maris Lv.5",
+    "Hyper Active Lv.8",
+    "Brain Power Lv.8",
+    "Halcyon Lv.10",
+    "Dolphika Lv.10"
+   ],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/第1章チャプター2",
+    "https://dic.pixiv.net/a/高瀬梨緒"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [
+    {
+     "ref": "B1-01",
+     "mappingConfidence": "inferred",
+     "basis": "「废柴三人组」的挑衅口气与本章冲突开场吻合",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B1-02",
+     "mappingConfidence": "inferred",
+     "basis": "「我是高濑梨绪！高中二年级的超绝最强」即初登场的自我介绍",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B1-03",
+     "mappingConfidence": "inferred",
+     "basis": "与 B1-02 同一段自报家门（sources.md 记为一句连续发言）",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B1-04",
+     "mappingConfidence": "inferred",
+     "basis": "「听说废柴三人组正在努力，所以我过来看看」与「努力是白费的」冲突吻合",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B1-05",
+     "mappingConfidence": "inferred",
+     "basis": "初登场段落的挑衅",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B1-06",
+     "mappingConfidence": "inferred",
+     "basis": "初登场段落的挑衅",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B1-07",
+     "mappingConfidence": "inferred",
+     "basis": "初登场段落的自我介绍",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B1-08",
+     "mappingConfidence": "inferred",
+     "basis": "初登场段落的质问",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B1-09",
+     "mappingConfidence": "inferred",
+     "basis": "初登场段落的谐音调侃",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B1-10",
+     "mappingConfidence": "inferred",
+     "basis": "初登场段落的急着解释",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B1-11",
+     "mappingConfidence": "inferred",
+     "basis": "初登场段落的挑战",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B1-12",
+     "mappingConfidence": "inferred",
+     "basis": "与 B1-11 为一句连续发言",
+     "mappingReviewed": null
+    }
+   ],
+   "notes": "B1 批次共 12 张归入本章，依据是 sources.md 的批次标签「初登场：挑衅与自我介绍」与本章あらすじ吻合。逐条 basis 是形式化记录，实质依据是批次级判断。"
+  },
+  {
+   "id": "ch1-3",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第1章 出会い編 CHAPTER3",
+   "title": "嘘とがおー！とかたき討ち",
+   "titleCn": "谎言与吼叫！还有复仇",
+   "date": null,
+   "version": "オンゲキ",
+   "characters": [
+    "高瀬 梨緒",
+    "結城 莉玖",
+    "藍原 椿",
+    "星咲 あかり"
+   ],
+   "aliases": [
+    "嘘とがおー！とかたき討ち",
+    "第1章CHAPTER3",
+    "第1章チャプター3"
+   ],
+   "keywords": [
+    "败北",
+    "哭了",
+    "复仇",
+    "かたき討ち",
+    "结城莉玖初登场",
+    "蓝原椿初登场",
+    "⊿TRiEDGE"
+   ],
+   "summary": "因为梨绪，明里她们发现了应援一直收集不到的原因。追着哭了的梨绪跑出去时，她们遇到了活泼的结城莉玖和文静的蓝原椿——梨绪的两位朋友为了「报仇」向明里她们发起挑战。莉玖与椿在本章初登场。",
+   "rivals": [],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/第1章チャプター3"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [
+    {
+     "ref": "B2-01",
+     "mappingConfidence": "inferred",
+     "basis": "sources.md 批次标签「失败后：委屈、嘴硬与想亲近」",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-02",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-03",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-04",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-05",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-06",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-07",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-08",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-09",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-10",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-11",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-12",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-13",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-14",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B2-15",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    }
+   ],
+   "notes": "B2 批次整体归本章，是批次级推定，未逐条核对截图。"
+  },
+  {
+   "id": "ch1-4",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第1章 出会い編 CHAPTER4",
+   "title": "カフェ de スクランブル",
+   "titleCn": "Cafe de Scramble",
+   "date": null,
+   "version": "オンゲキ",
+   "characters": [
+    "高瀬 梨緒",
+    "結城 莉玖",
+    "藍原 椿",
+    "星咲 あかり"
+   ],
+   "aliases": [
+    "カフェ de スクランブル",
+    "カフェdeスクランブル",
+    "第1章CHAPTER4",
+    "第1章チャプター4"
+   ],
+   "keywords": [
+    "咖啡厅",
+    "打成一片",
+    "三人组"
+   ],
+   "summary": "通过音击打成一片的明里她们，与梨绪、莉玖、椿三人之间的故事。本章中梨绪作为对战对手登场（含 Ai Nov Lv.30）。",
+   "rivals": [
+    "Cyberozar Lv.20",
+    "AMAZING MIGHTYYYY!!!! Lv.20",
+    "Ai Nov Lv.30"
+   ],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/第1章チャプター4"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "本章暂无对应台词批次。"
+  },
+  {
+   "id": "ch2-2",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第2章 バイト編 CHAPTER2",
+   "title": "ゲーセン☆チャンス！？",
+   "titleCn": "游戏厅☆Chance！？",
+   "date": null,
+   "version": null,
+   "characters": [
+    "高瀬 梨緒",
+    "結城 莉玖",
+    "藍原 椿",
+    "星咲 あかり"
+   ],
+   "aliases": [
+    "ゲーセン☆チャンス！？",
+    "ゲーセンチャンス",
+    "第2章CHAPTER2",
+    "第2章チャプター2"
+   ],
+   "keywords": [
+    "游戏厅",
+    "ゲーセン",
+    "打工",
+    "アルバイト",
+    "空气曲棍球",
+    "气垫球",
+    "エアホッケー"
+   ],
+   "summary": "⊿TRiEDGE 三人到游戏厅打工。梨绪提议玩空气曲棍球，椿却怎么都赢不了另外两人，梨绪和莉玖决定想办法。最后三人成功让游戏厅恢复了热闹，但有个可疑人物在暗处热切地盯着她们。",
+   "rivals": [
+    "本能的 Survivor Lv.8",
+    "MEGATON BLAST Lv.10"
+   ],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/第2章チャプター2"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [
+    {
+     "ref": "B3-01",
+     "mappingConfidence": "inferred",
+     "basis": "sources.md 批次标签「组合互动与游戏厅」",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-02",
+     "mappingConfidence": "inferred",
+     "basis": "同上；另见 profile-quotes P1-06「回去路上顺便去游戏厅吧…靠桌上冰球分晓」",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-03",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-04",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-05",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-06",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-07",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-08",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-09",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-10",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-11",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-12",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-13",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-14",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-15",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-16",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-17",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-18",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-19",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-20",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B3-21",
+     "mappingConfidence": "inferred",
+     "basis": "同上",
+     "mappingReviewed": null
+    }
+   ],
+   "notes": "B3 批次整体归本章，是批次级推定。B3-18 的日语谐音梗见 sources.md 的整理说明。"
+  },
+  {
+   "id": "ch2-7",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第2章 バイト編 CHAPTER7",
+   "title": "レッツ・ニャーベラス！",
+   "titleCn": "Let's Nya-velous！",
+   "date": null,
+   "version": null,
+   "characters": [
+    "高瀬 梨緒",
+    "星咲 あかり",
+    "東雲 つむぎ"
+   ],
+   "aliases": [
+    "レッツ・ニャーベラス！",
+    "レッツニャーベラス",
+    "第2章CHAPTER7",
+    "第2章チャプター7"
+   ],
+   "keywords": [
+    "谜之影",
+    "打工结束",
+    "广场",
+    "つむぎ"
+   ],
+   "summary": "打工结束回到广场的明里和梨绪面前，一直暗中窥视的谜之影终于现身。那女孩兴奋得按捺不住，突然扑了上来。",
+   "rivals": [],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/第2章チャプター7"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "あらすじ点名「あかりと梨緒」。谜之影的身份あらすじ未点名，此处不作断言。"
+  },
+  {
+   "id": "ch3-sc6",
+   "game": "ongeki",
+   "type": "side",
+   "chapter": "第3章 シューターフェス編 サイドチャプター6",
+   "title": "犬も歩けば撩乱乙女",
+   "titleCn": "狗出门也会遇上撩乱少女",
+   "date": "2020-03-19",
+   "version": "オンゲキ SUMMER PLUS",
+   "characters": [
+    "高瀬 梨緒",
+    "結城 莉玖",
+    "藍原 椿"
+   ],
+   "aliases": [
+    "犬も歩けば撩乱乙女",
+    "犬も歩けば",
+    "第3章サイドチャプター6",
+    "第3章SIDE6"
+   ],
+   "keywords": [
+    "奏坂シューターフェス",
+    "败北",
+    "反省会",
+    "カルタ",
+    "歌牌",
+    "⊿TRiEDGE"
+   ],
+   "summary": "在奏坂 SHOOTER FES 上败北的 ⊿TRiEDGE 三人开了场反省会，但不知不觉就玩起了歌牌。本章的对战曲是 ⊿TRiEDGE 的新组合曲《撩乱乙女†無双劇》和 Ai Drew（对战对手高瀬梨緒 Lv.50）。",
+   "rivals": [
+    "撩乱乙女†無双劇 Lv.33",
+    "Ai Drew Lv.50"
+   ],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/第3章サイドチャプター6"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "本章 2020/03/19 追加；あらすじ明写 ⊿TRiEDGE 在奏坂シューターフェス败北，败北本身发生在第3章CHAPTER1。"
+  },
+  {
+   "id": "ch4-2",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第4章 学園長総選挙編 CHAPTER2",
+   "title": "負のオンゲキ",
+   "titleCn": "负之音击",
+   "date": null,
+   "version": "オンゲキ R.E.D.",
+   "characters": [
+    "高瀬 梨緒",
+    "結城 莉玖",
+    "藍原 椿",
+    "星咲 あかり",
+    "皇城 セツナ"
+   ],
+   "aliases": [
+    "負のオンゲキ",
+    "负之音击",
+    "第4章CHAPTER2",
+    "第4章チャプター2"
+   ],
+   "keywords": [
+    "学園長総選挙",
+    "セツナ",
+    "被利用",
+    "ライバル意識",
+    "敌对"
+   ],
+   "summary": "作为敌人登场的 ⊿TRiEDGE 被 ASTERISM 击败。梨绪她们那份「不想输」的竞争心，被刹那利用了。",
+   "rivals": [
+    "Over Voltage Lv.20",
+    "FLUFFY FLASH Lv.40"
+   ],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/第4章チャプター2"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": ""
+  },
+  {
+   "id": "ch5-1",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第5章 CHAPTER1",
+   "title": "あの日見た星を目指して",
+   "titleCn": "以那一天见到的星星为目标",
+   "date": "2021-10-21",
+   "version": "オンゲキ bright",
+   "characters": [
+    "高瀬 梨緒",
+    "星咲 あかり",
+    "藤沢 柚子",
+    "三角 葵"
+   ],
+   "aliases": [
+    "あの日見た星を目指して",
+    "第5章CHAPTER1",
+    "第5章チャプター1"
+   ],
+   "keywords": [
+    "ブドーカン",
+    "招待状",
+    "プリメラ"
+   ],
+   "summary": "初次遇见プリメラ的回忆之地ブドーカン，ASTERISM 三人收到神秘邀请函后前往。梨绪在本章作为对战对手登场（Diamond Dust Lv.60、ICEBURN Lv.42）。",
+   "rivals": [
+    "Diamond Dust Lv.60",
+    "ICEBURN Lv.42"
+   ],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/第5章チャプター1"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "本章あらすじ未点名梨绪，她在本章的登场依据是对战对手表，不是剧情简介——按对战对手记，别当成她只是对战对手就一定有戏份。"
+  },
+  {
+   "id": "one-bullet-left",
+   "game": "ongeki",
+   "type": "event",
+   "chapter": "シルバージュエルイベント",
+   "title": "ONE BULLET LEFT",
+   "titleCn": "最后一发子弹",
+   "date": "2020-10-29/2020-11-18",
+   "version": "オンゲキ SUMMER PLUS",
+   "characters": [
+    "高瀬 梨緒",
+    "星咲 あかり",
+    "逢坂 茜"
+   ],
+   "aliases": [
+    "ONE BULLET LEFT",
+    "ワンバレットレフト",
+    "one bullet left",
+    "最后一发子弹",
+    "真人CS",
+    "真人cs",
+    "真人 CS",
+    "サバゲー",
+    "生存游戏",
+    "打枪",
+    "无敌双人组",
+    "無敵のツーマンセル",
+    "ツーマンセル"
+   ],
+   "keywords": [
+    "体育祭",
+    "搭档",
+    "相棒",
+    "跳弾",
+    "跳弹",
+    "间谍",
+    "スパイ",
+    "决赛",
+    "险胜",
+    "新手",
+    "掩体"
+   ],
+   "summary": "学生会长逢坂茜在体育祭上搞出来的真人 CS 对抗赛。梨绪被安排和新手明里搭档，起初满腹牢骚，后来察觉「明里瞄准敌人就必定打中自己、自己瞄准明里就必定打中敌人」的规律，两人作为双人组一路打到决赛，最后由梨绪险胜茜。",
+   "rivals": [
+    "反撃! 突撃! Back To Back! Lv.15",
+    "ツクヨミステップ Lv.25",
+    "Jack-the-Ripper◆ Lv.11"
+   ],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://info-ongeki.sega.jp/460/",
+    "https://wikiwiki.jp/gameongeki/ONE BULLET LEFT（イベント）",
+    "https://wikiwiki.jp/gameongeki/シルバージュエルイベント一覧"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [
+    {
+     "ref": "B4-01",
+     "mappingConfidence": "inferred",
+     "basis": "「为什么体育祭要玩真人 CS 啊！我们学生会长也太乱来了」与活动设定（体育祭＋学生会长茜）吻合",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-02",
+     "mappingConfidence": "inferred",
+     "basis": "「为什么打我这个队友啊」对应与明里搭档的双人组设定",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-03",
+     "mappingConfidence": "inferred",
+     "basis": "「居然让新手当我的搭档」对应明里是新手",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-04",
+     "mappingConfidence": "inferred",
+     "basis": "教明里用枪，属本活动剧情",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-05",
+     "mappingConfidence": "inferred",
+     "basis": "「搭档之间这不是理所当然的吗」，双人组设定",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-06",
+     "mappingConfidence": "inferred",
+     "basis": "本活动剧情",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-07",
+     "mappingConfidence": "inferred",
+     "basis": "「跳弹只是偶然」——跳弹是本活动关键词",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-08",
+     "mappingConfidence": "inferred",
+     "basis": "本活动剧情",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-09",
+     "mappingConfidence": "inferred",
+     "basis": "「为什么每次都会反弹打中我」——跳弹规律",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-10",
+     "mappingConfidence": "inferred",
+     "basis": "本活动剧情",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-11",
+     "mappingConfidence": "inferred",
+     "basis": "「难道你是装成新手的敌方间谍」——间谍猜测是 sources.md 点名的剧情要素",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-12",
+     "mappingConfidence": "inferred",
+     "basis": "本活动剧情",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-13",
+     "mappingConfidence": "inferred",
+     "basis": "滑铲躲进掩体，本活动战斗描写",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-14",
+     "mappingConfidence": "inferred",
+     "basis": "「特种部队的动作」，本活动剧情",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-15",
+     "mappingConfidence": "inferred",
+     "basis": "「一切都在作战计划之内」，逞强台词",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-16",
+     "mappingConfidence": "inferred",
+     "basis": "内心独白，sources.md 标注 B4-16～18 为内心独白",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-17",
+     "mappingConfidence": "inferred",
+     "basis": "「明里瞄准敌人就一定会打中我，我瞄准明里就一定会打中敌人」——正是本活动发现规律那一段",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-18",
+     "mappingConfidence": "inferred",
+     "basis": "承接 B4-17 的内心独白",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-19",
+     "mappingConfidence": "inferred",
+     "basis": "「我找到这场战斗的必胜方法了」，承接发现规律",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-20",
+     "mappingConfidence": "inferred",
+     "basis": "「最后的对手就是你了」，对应决赛",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-21",
+     "mappingConfidence": "inferred",
+     "basis": "「就在这里分个胜负吧」，对应决赛",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-22",
+     "mappingConfidence": "inferred",
+     "basis": "点名对手是逢坂茜，与决赛对手吻合",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-23",
+     "mappingConfidence": "inferred",
+     "basis": "「居然没子弹了」——与活动标题 ONE BULLET LEFT（只剩一发子弹）吻合",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-24",
+     "mappingConfidence": "inferred",
+     "basis": "承接 B4-23",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-25",
+     "mappingConfidence": "inferred",
+     "basis": "「接招吧，茜」",
+     "mappingReviewed": null
+    },
+    {
+     "ref": "B4-26",
+     "mappingConfidence": "inferred",
+     "basis": "「真是险胜啊」，与决赛险胜的结局吻合",
+     "mappingReviewed": null
+    }
+   ],
+   "notes": "B4 批次（26 张）整体归本活动，依据是 sources.md 的批次标签「与明里组队玩真人CS」加上「体育祭＋学生会长＋决赛对手是茜＋茜[サバゲー]加成卡」四条吻合。事件本身由官方活动页与攻略 wiki 多源确认，但台词归属仍属推定，故 mappingConfidence 一律 inferred。活动标题与剧情正文未在公开 wiki 上刊载，剧情细节以用户提供的 B4 截图为准。"
+  },
+  {
+   "id": "holy-night-present",
+   "game": "ongeki",
+   "type": "event",
+   "chapter": "クリスマス期間限定イベント",
+   "title": "聖なる夜のプレゼント",
+   "titleCn": "神圣之夜的礼物",
+   "date": "2019-12-10/2019-12-30",
+   "version": "オンゲキ SUMMER PLUS",
+   "characters": [
+    "高瀬 梨緒",
+    "結城 莉玖",
+    "藍原 椿"
+   ],
+   "aliases": [
+    "聖なる夜のプレゼント",
+    "神圣之夜的礼物",
+    "圣夜的礼物",
+    "圣诞夜",
+    "圣诞节",
+    "クリスマスイベント",
+    "christmas"
+   ],
+   "keywords": [
+    "クリスマス",
+    "⊿TRiEDGE",
+    "限定活动",
+    "礼物",
+    "プレゼント"
+   ],
+   "summary": "以 ⊿TRiEDGE 三人为焦点的圣诞限定活动剧情，能看到三人的关系性。属期间限定活动，现在游戏内已无法观看，官方 YouTube 频道有存档。梨绪在本活动的对战曲是 Snow Fairy Story（Lv.12）。",
+   "rivals": [
+    "Snow Fairy Story Lv.12"
+   ],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/聖なる夜のプレゼント（イベント）",
+    "https://dic.pixiv.net/a/高瀬梨緒"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "剧情正文未在 wiki 刊载；此处只记可核实的事实（举办期间、⊿TRiEDGE 焦点、对战曲、已结束存档在官方 YouTube）。"
+  },
+  {
+   "id": "triedge-ou-ketteisen",
+   "game": "ongeki",
+   "type": "event",
+   "chapter": "ランキングイベント",
+   "title": "⊿TRiEDGE オンゲキーズ王決定戦",
+   "titleCn": "⊿TRiEDGE 音击玩家王决定战",
+   "date": "2023-08-31/2023-09-20",
+   "version": "オンゲキ bright MEMORY",
+   "characters": [
+    "高瀬 梨緒",
+    "結城 莉玖",
+    "藍原 椿"
+   ],
+   "aliases": [
+    "⊿TRiEDGE オンゲキーズ王決定戦",
+    "オンゲキーズ王決定戦",
+    "音击玩家王决定战"
+   ],
+   "keywords": [
+    "ランキングイベント",
+    "排行活动",
+    "⊿TRiEDGE",
+    "オンゲキーズ王決定戦"
+   ],
+   "summary": "以 ⊿TRiEDGE 为主角的排行活动。梨绪在本活动的对战曲是 MeteorSnow（Lv.60），并实装【SSR】［オンゲキーズ王決定戦］高瀬梨緒。",
+   "rivals": [
+    "MeteorSnow Lv.60"
+   ],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/⊿TRiEDGE オンゲキーズ王決定戦（イベント）",
+    "https://wikiwiki.jp/gameongeki/イベント一覧"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "同一系列还有 ASTERISM／マーチングポケッツ／bitter flavor／R.B.P.／刹那／7EVENDAYS⇔HOLIDAYS 各自的「オンゲキーズ王決定戦」。"
+  },
+  {
+   "id": "shooters-dream-triedge",
+   "game": "ongeki",
+   "type": "event",
+   "chapter": "ランキングイベント",
+   "title": "Shooter's Dream《⊿TRiEDGE》",
+   "titleCn": "Shooter's Dream《⊿TRiEDGE》",
+   "date": "2026-08-20/2026-09-09",
+   "version": "オンゲキ Re:Fresh",
+   "characters": [
+    "高瀬 梨緒",
+    "結城 莉玖",
+    "藍原 椿"
+   ],
+   "aliases": [
+    "Shooter's Dream《⊿TRiEDGE》",
+    "Shooters Dream TRiEDGE",
+    "射手之梦"
+   ],
+   "keywords": [
+    "活动剧情",
+    "イベントチャプター",
+    "ときめきインビテーション",
+    "アフタヌーンティー",
+    "マナーレッスン"
+   ],
+   "summary": "⊿TRiEDGE 的活动章节，附带两话活动剧情：第1话「优雅地？下午茶」初始解禁，第2话「真的？礼仪课」通关《ときめきインビテーション》后解禁。活动曲《ときめきインビテーション》由 ⊿TRiEDGE 演唱。",
+   "rivals": [
+    "ときめきインビテーション Lv.15"
+   ],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/Shooter’s Dream《⊿TRiEDGE》（イベント）",
+    "https://info-ongeki.sega.jp/12920/"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "两话的标题来自官方活动公告。同一系列还有《ASTERISM》《bitter flavor ＆ 7EVENDAYS⇔HOLIDAYS》。"
+  },
+  {
+   "id": "autumn-memory-rival",
+   "game": "ongeki",
+   "type": "memory",
+   "chapter": "Memories of O.N.G.E.K.I. / Autumn Memory",
+   "title": "ライバル",
+   "titleCn": "竞争对手",
+   "date": "2022-05-19",
+   "version": "オンゲキ R.E.D. ~ R.E.D. PLUS",
+   "characters": [
+    "高瀬 梨緒",
+    "結城 莉玖",
+    "藍原 椿",
+    "皇城 セツナ"
+   ],
+   "aliases": [
+    "Autumn Memory",
+    "オータムメモリー",
+    "ライバル",
+    "竞争对手",
+    "学园长总选举前夜"
+   ],
+   "keywords": [
+    "メモリーストーリー",
+    "学園長総選挙",
+    "前日",
+    "ゲームセンター",
+    "セツナ",
+    "ライバルとは何か"
+   ],
+   "summary": "Autumn Memory 的回忆剧情。话题转到秋天，讲的是学园长总选举前夜的事：⊿TRiEDGE 三人在游戏厅遇到刹那，被刹那问「竞争对手是什么」，梨绪给出了回答。本章的对战对手含高瀬梨緒（本能的 Survivor LUNATIC Lv.55、ヒストリー×ブレイカー Lv.45、Ai C Lv.62）。",
+   "rivals": [
+    "ヒストリー×ブレイカー Lv.45",
+    "本能的 Survivor (LUNATIC) Lv.55",
+    "Ai C Lv.62"
+   ],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/Autumn%20Memory"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "あらすじ在梨绪回答处截断（「それに対して梨緒は……」），wiki 未给出她具体答了什么。不要补出回答内容。"
+  },
+  {
+   "id": "adv-final-exam-2",
+   "game": "ongeki",
+   "type": "adventure",
+   "chapter": "オンゲキアドベンチャー 期末試験編 メインチャプター1 第2話",
+   "title": "助けて！ナナホリ先生！！",
+   "titleCn": "救命！七堀老师！！",
+   "date": null,
+   "version": "オンゲキ Re:Fresh",
+   "characters": [
+    "高瀬 梨緒",
+    "藍原 椿",
+    "桜井 春菜",
+    "結城 莉玖",
+    "早乙女 彩華"
+   ],
+   "aliases": [
+    "助けて！ナナホリ先生！！",
+    "助けてナナホリ先生",
+    "期末試験編 第2話"
+   ],
+   "keywords": [
+    "期末試験",
+    "追試",
+    "补习",
+    "学习",
+    "ナナホリ先生"
+   ],
+   "summary": "期末考拿了红点、要参加补考的莉玖和彩华，在梨绪、椿、春奈的帮忙下推进复习，但完全不见效果。就在这时，两人组出现在她们面前提出帮忙。",
+   "rivals": [],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/オンゲキアドベンチャー/期末試験編"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": ""
+  },
+  {
+   "id": "adv-final-exam-sidestory-1",
+   "game": "ongeki",
+   "type": "adventure",
+   "chapter": "オンゲキアドベンチャー 期末試験編 サイドチャプター1 第1話",
+   "title": "日常のひとコマ～1年生編～",
+   "titleCn": "日常一幕～一年级篇～",
+   "date": null,
+   "version": "オンゲキ Re:Fresh",
+   "characters": [
+    "高瀬 梨緒",
+    "藍原 椿",
+    "珠洲島 有栖",
+    "結城 莉玖"
+   ],
+   "aliases": [
+    "日常のひとコマ～1年生編～",
+    "日常のひとコマ 1年生編",
+    "期末試験編 サイド1"
+   ],
+   "keywords": [
+    "打扫",
+    "扫除",
+    "仓库",
+    "台灯",
+    "有栖",
+    "一年级"
+   ],
+   "summary": "椿、莉玖、梨绪、有栖四人在打扫学校。有栖一边擦着摆件的台灯，一边说差不多该为了换布置把它收进仓库了。但似乎不想让人把台灯收走的椿，采取了某个行动。",
+   "rivals": [],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/オンゲキアドベンチャー/期末試験編"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": ""
+  },
+  {
+   "id": "adv-final-exam-sidestory-2",
+   "game": "ongeki",
+   "type": "adventure",
+   "chapter": "オンゲキアドベンチャー 期末試験編 サイドチャプター2 第1話",
+   "title": "日常のひとコマ～2年生編～",
+   "titleCn": "日常一幕～二年级篇～",
+   "date": null,
+   "version": "オンゲキ Re:Fresh",
+   "characters": [
+    "高瀬 梨緒",
+    "星咲 あかり",
+    "藤沢 柚子",
+    "三角 葵",
+    "桜井 春菜"
+   ],
+   "aliases": [
+    "日常のひとコマ～2年生編～",
+    "日常のひとコマ 2年生編",
+    "期末試験編 サイド2"
+   ],
+   "keywords": [
+    "午餐",
+    "便当",
+    "章鱼烧",
+    "たこ焼き",
+    "はずれ",
+    "二年级"
+   ],
+   "summary": "某天的午餐时间，除明里、柚子、葵三人外，梨绪和春奈也一起吃午饭。春奈带来的便当里，章鱼烧有一个是「中奖」的。",
+   "rivals": [],
+   "factConfidence": "confirmed",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/オンゲキアドベンチャー/期末試験編"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": ""
+  },
+  {
+   "id": "ch1-1",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第1章 出会い編 CHAPTER1",
+   "title": "目指せ！いっぱいのエール！",
+   "titleCn": "目标！收集满满的应援！",
+   "date": null,
+   "version": null,
+   "characters": [
+    "三角 葵",
+    "星咲 あかり",
+    "藤沢 柚子"
+   ],
+   "aliases": [
+    "目指せ！いっぱいのエール！",
+    "目标！收集满满的应援！",
+    "第1章チャプター1",
+    "第1章CHAPTER1"
+   ],
+   "keywords": [
+    "三角葵",
+    "星咲あかり",
+    "藤沢柚子"
+   ],
+   "summary": "頑張り屋さんの星咲あかり、マイペースな藤沢柚子、しっかりものの三角葵は、奏坂学園に通う高校2年生。\n落ちこぼれ3人組は憧れのステージ「ブドーカン」を目指して、今日もオンゲキの補習に励む。\n【奏坂シューターフェス】というオンゲキの校内大会が近いことを知ったあかり達。\nフェスへ出場するには【エール】と呼ばれるポイントを集める必要があると知り、3人は特訓を始める。",
+   "rivals": [
+    "STARTLINER Lv.2",
+    "Perfect Shining!! Lv.1",
+    "君の知らない物語 Lv.1",
+    "シュガーソングとビターステップ Lv.1",
+    "檄!帝国華撃団 Lv.1",
+    "回レ！雪月花 Lv.3",
+    "ＧＯ！ＧＯ！ラブリズム&#9829; Lv.5",
+    "みんな Happy!! Lv.1",
+    "ようこそジャパリパークへ Lv.1",
+    "ファッとして桃源郷 Lv.1",
+    "かくしん的☆めたまるふぉ～ぜっ！ Lv.1",
+    "脳漿炸裂ガール Lv.3",
+    "Oshama Scramble! Lv.5",
+    "Zest of Blue Lv.1",
+    "This game Lv.1",
+    "Los! Los! Los! Lv.1",
+    "SAVIOR OF SONG Lv.1",
+    "心象蜃気楼 Lv.3",
+    "The Formula Lv.5",
+    "STARTLINER Lv.55"
+   ],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC1%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC1"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch1-5",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第1章 出会い編 CHAPTER5",
+   "title": "ハルちゃん印のお弁当",
+   "titleCn": "小春牌便当",
+   "date": null,
+   "version": null,
+   "characters": [
+    "桜井 春菜",
+    "早乙女 彩華",
+    "藤沢 柚子"
+   ],
+   "aliases": [
+    "ハルちゃん印のお弁当",
+    "小春牌便当",
+    "第1章チャプター5",
+    "第1章CHAPTER5"
+   ],
+   "keywords": [
+    "桜井春菜",
+    "早乙女彩華",
+    "藤沢柚子"
+   ],
+   "summary": "ある日のお昼休み。天然と噂の桜井春奈に、手作り弁当を分けてもらった柚子は、その衝撃的な味に驚く。\n春奈の親友で、姉御肌の早乙女彩華も加わって、いったい何を入れたのかと問い詰めると……",
+   "rivals": [
+    "鳥の詩 Lv.20",
+    "SWEET SHAKE!! Lv.10",
+    "What color... Lv.10",
+    "SAKURA Lv.15",
+    "We Gonna Journey Lv.30",
+    "Paqqin Lv.20",
+    "First Twinkle Lv.30"
+   ],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC1%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC5"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch1-6",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第1章 出会い編 CHAPTER6",
+   "title": "波乱！副会長の通告",
+   "titleCn": "风波！副会长的通告",
+   "date": null,
+   "version": null,
+   "characters": [
+    "九條 楓",
+    "星咲 あかり"
+   ],
+   "aliases": [
+    "波乱！副会長の通告",
+    "风波！副会长的通告",
+    "第1章チャプター6",
+    "第1章CHAPTER6"
+   ],
+   "keywords": [
+    "九條楓",
+    "星咲あかり"
+   ],
+   "summary": "突然、生徒会から退学を言い渡されたASTERISMの3人。\nあまりの出来事に納得がいかないあかり達は、\n冷静沈着な副会長・九條楓にその理由を訪ねる。\nそこで返ってきた答えは……",
+   "rivals": [
+    "閃鋼のブリューナク Lv.30",
+    "神威 Lv.30",
+    "Maqrite Lv.40",
+    "Sword of Secret Lv.40",
+    "Everlasting Today Lv.50"
+   ],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC1%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC6"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch1-7",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第1章 出会い編 CHAPTER7",
+   "title": "小星と咲姫があらわれた！",
+   "titleCn": "小星和咲姬出现了！",
+   "date": null,
+   "version": null,
+   "characters": [
+    "井之原 小星",
+    "柏木 咲姫",
+    "柏木 美亜"
+   ],
+   "aliases": [
+    "小星と咲姫があらわれた！",
+    "小星和咲姬出现了！",
+    "第1章チャプター7",
+    "第1章CHAPTER7"
+   ],
+   "keywords": [
+    "井之原小星",
+    "柏木咲姫",
+    "柏木美亜"
+   ],
+   "summary": "楽しみにしていたゲーム機を手に入れ、ご機嫌な葵。\nそこへ、ぐーたらな井之原小星と優等生の柏木咲姫がやってくる。\n意見の相違から、葵と小星によるゲーム機の奪い合いが始まって……",
+   "rivals": [
+    "GAME IS LIFE Lv.35",
+    "ぼくらの16bit戦争 Lv.35",
+    "oboro Lv.45",
+    "GranFatalit&#233; Lv.35",
+    "&#196;ventyr Lv.35",
+    "7thSense Lv.45"
+   ],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC1%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC7"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch1-8",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第1章 出会い編 CHAPTER8",
+   "title": "世界征服のお誘い",
+   "titleCn": "征服世界的邀请",
+   "date": null,
+   "version": null,
+   "characters": [
+    "逢坂 茜",
+    "星咲 あかり"
+   ],
+   "aliases": [
+    "世界征服のお誘い",
+    "征服世界的邀请",
+    "第1章チャプター8",
+    "第1章CHAPTER8"
+   ],
+   "keywords": [
+    "逢坂茜",
+    "星咲あかり"
+   ],
+   "summary": "生徒会室に呼び出されたASTERISMの3人。\nそこであかり達は、破天荒な生徒会長・逢坂茜の野望を知る。\n3人は自分たちの信じるオンゲキを貫くべく、茜に戦いを挑むのだった。",
+   "rivals": [
+    "今ぞ&#9825;崇め奉れ☆オマエらよ！！～姫の秘メタル渇望～ Lv.35",
+    "Kattobi KEIKYU Rider Lv.40",
+    "エンドマークに希望と涙を添えて Lv.45",
+    "Dazzle hop Lv.50",
+    "YURUSHITE Lv.60"
+   ],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC1%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC8"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch1-9",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第1章 出会い編 CHAPTER9",
+   "title": "黒幕はぬいぐるみ？",
+   "titleCn": "黑幕是玩偶？",
+   "date": null,
+   "version": null,
+   "characters": [
+    "星咲 あかり"
+   ],
+   "aliases": [
+    "黒幕はぬいぐるみ？",
+    "黑幕是玩偶？",
+    "第1章チャプター9",
+    "第1章CHAPTER9"
+   ],
+   "keywords": [
+    "星咲あかり"
+   ],
+   "summary": "フェスへの出場が決まったあかり達の前に、突如、謎の着ぐるみが現れる。明らかに狼狽える茜と楓を尻目に、これまでの騒動の裏を語る着ぐるみ。最後に、着ぐるみが被り物を脱ぐと、そこには……",
+   "rivals": [
+    "怒槌 Lv.50",
+    "混沌を越えし我らが神聖なる調律主を讃えよ Lv.55",
+    "Opfer Lv.60",
+    "Titania Lv.70"
+   ],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC1%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC9"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch2-1",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第2章 バイト編 CHAPTER1",
+   "title": "わくわくバイト・ミッション",
+   "titleCn": "心跳加速的打工任务",
+   "date": null,
+   "version": null,
+   "characters": [
+    "珠洲島 有栖",
+    "星咲 あかり"
+   ],
+   "aliases": [
+    "わくわくバイト・ミッション",
+    "心跳加速的打工任务",
+    "第2章チャプター1",
+    "第2章CHAPTER1"
+   ],
+   "keywords": [
+    "珠洲島有栖",
+    "星咲あかり"
+   ],
+   "summary": "生徒会の騒動から数日後。あかり達は有栖に呼び出され、とあるショッピングモールに集まっていた。そこで予算不足の学園祭を開催するためには、アルバイトをする必要があると告げられて……\n結局、アルバイトをすることになったあかり達。期待と不安を胸に抱きながら、それぞれ配属先へと向かって行く。　　そんなあかり達の姿を物陰から見つめる人物がいるとも知らずに。",
+   "rivals": [
+    "Redo Lv.1",
+    "Jump!! Jump!! Jump!! Lv.2",
+    "TAKE ON THE WORLD Lv.5",
+    "Grand symphony Lv.1",
+    "TeA Lv.5",
+    "流星 Lv.1",
+    "fulgente Lv.5",
+    "ようこそジャパリパークへ Lv.30"
+   ],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC2%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC1"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch2-3",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第2章 バイト編 CHAPTER3",
+   "title": "妄想×動揺×大暴走",
+   "titleCn": "妄想×动摇×大暴走",
+   "date": null,
+   "version": null,
+   "characters": [
+    "桜井 春菜",
+    "早乙女 彩華"
+   ],
+   "aliases": [
+    "妄想×動揺×大暴走",
+    "妄想×动摇×大暴走",
+    "第2章チャプター3",
+    "第2章CHAPTER3"
+   ],
+   "keywords": [
+    "桜井春菜",
+    "早乙女彩華"
+   ],
+   "summary": "レストランでアルバイトをすることになったbitter flavorの春菜と彩華。2人は空いた時間を利用して、占いマシーンにチャレンジする。おみくじの内容に取り乱した彩華は、ひとりで妄想を膨らませてしまい……\n春菜とのオンゲキを経て、なんとか落ち着きを取り戻した彩華。しかし、ひょんなことから再び暴走を始めてしまう。そんな彩華の初心な反応に、影で観察していた謎の人物は興奮を隠せないのだった。",
+   "rivals": [
+    "Cream+Mint Lv.20",
+    "Kiss Me Kiss Lv.15",
+    "Death Doll Lv.20",
+    "Chelly spLash♪♪ Lv.15"
+   ],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC2%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC3"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch2-4",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第2章 バイト編 CHAPTER4",
+   "title": "おかえりなさいませ！ ご主人さま♪",
+   "titleCn": "欢迎回来！主人♪",
+   "date": null,
+   "version": null,
+   "characters": [
+    "井之原 小星",
+    "柏木 咲姫"
+   ],
+   "aliases": [
+    "おかえりなさいませ！ ご主人さま♪",
+    "欢迎回来！主人♪",
+    "第2章チャプター4",
+    "第2章CHAPTER4"
+   ],
+   "keywords": [
+    "井之原小星",
+    "柏木咲姫"
+   ],
+   "summary": "メイド喫茶でアルバイトをすることになった7EVENDAYS⇔HOLIDAYSの小星と咲姫。メイド喫茶の服装や仕事について熱心に語る咲姫を横目に、小星は密かにバイトをサボろうと画策する。\nあと少しのところで仕事をサボる作戦に失敗してしまった小星。そんな小星に対し、咲姫はメイド流のしつけをすると宣言する。一連のやり取りを見た謎の影は、ひとり色めき立つのだった。",
+   "rivals": [
+    "めんどーい！やっほーい！ともだち！ Lv.15",
+    "BOUNCE & DANCE Lv.20",
+    "心 Lv.30",
+    "終わりの先の音節 Lv.25",
+    "Sentimental Snow Lv.25"
+   ],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC2%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC4"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch2-5",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第2章 バイト編 CHAPTER5",
+   "title": "ドタバタ子守り大作戦",
+   "titleCn": "手忙脚乱的带娃大作战",
+   "date": null,
+   "version": null,
+   "characters": [
+    "珠洲島 有栖"
+   ],
+   "aliases": [
+    "ドタバタ子守り大作戦",
+    "手忙脚乱的带娃大作战",
+    "第2章チャプター5",
+    "第2章CHAPTER5"
+   ],
+   "keywords": [
+    "珠洲島有栖"
+   ],
+   "summary": "託児所でアルバイトをすることになったR.B.P.（茜、楓、有栖）の3人。早速、保育士さんとして働き始めるが、子ども達はなかなか言うことを聞いてくれない。困った3人は、オンゲキで子どもたちの心を奪う作戦に出る。\nオンゲキにより、子どもたちの興味を引くことに成功した茜たち。その様子を、またしても謎の影が観察していた。しかし3人に気付かれたと悟るや否や、謎の影は一目散にその場から逃げ去ってしまう。",
+   "rivals": [
+    "conflict Lv.25",
+    "UTAKATA Lv.45",
+    "Rule the World!! Lv.45",
+    "どうぶつ☆パラダイス Lv.45",
+    "Y.Y.Y.計画!!!! Lv.50"
+   ],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC2%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC5"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch2-6",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第2章 バイト編 CHAPTER6",
+   "title": "ギーコギーコでトントントン",
+   "titleCn": "咯吱咯吱咚咚咚",
+   "date": null,
+   "version": null,
+   "characters": [
+    "星咲 あかり",
+    "藤沢 柚子"
+   ],
+   "aliases": [
+    "ギーコギーコでトントントン",
+    "咯吱咯吱咚咚咚",
+    "第2章チャプター6",
+    "第2章CHAPTER6"
+   ],
+   "keywords": [
+    "星咲あかり",
+    "藤沢柚子"
+   ],
+   "summary": "野外ステージで大道具のアルバイトをすることになったASTERISM（あかり、柚子、葵）の3人。ノコギリとトンカチの感覚が、オンゲキにも応用できることに気が付いて……\nアルバイトを通じ、オンゲキのコツを掴んだあかり達。その様子を観察していた謎の影は、その柔軟な発想力に、ただただ驚嘆するのだった。",
+   "rivals": [
+    "Starring Stars Lv.35",
+    "Viyella's Tears Lv.60",
+    "Garakuta Doll Play Lv.60",
+    "The wheel to the right Lv.60"
+   ],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC2%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC6"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch3-1",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第3章 シューターフェス編 CHAPTER1",
+   "title": "いきなりシューターフェス決勝！",
+   "titleCn": "突然就是射手祭决赛！",
+   "date": null,
+   "version": null,
+   "characters": [
+    "星咲 あかり",
+    "東雲 つむぎ",
+    "藤沢 柚子",
+    "日向 千夏",
+    "柏木 咲姫",
+    "柏木 美亜"
+   ],
+   "aliases": [
+    "いきなりシューターフェス決勝！",
+    "突然就是射手祭决赛！",
+    "第3章チャプター1",
+    "第3章CHAPTER1"
+   ],
+   "keywords": [
+    "星咲あかり",
+    "東雲つむぎ",
+    "藤沢柚子",
+    "日向千夏",
+    "柏木咲姫",
+    "柏木美亜"
+   ],
+   "summary": "ついに開催された奏坂シューターフェス、ASTERISM（あかり、柚子、葵）の3人は、幾多のライバルを乗り越え、激戦を勝ち進んでいった、そして迎えた決勝戦、ステージ上で3人を迎えたのは、中学生の3人組だった。\n日向千夏、柏木美亜、東雲つむぎの中学生ユニット【マーチングポケッツ】に勝利し、優勝を手にしたASTERISM。喜びも束の間、敗れたつむぎはショックのあまり、その場を立ち去ってしまう。",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC3%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC1"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch3-2",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第3章 シューターフェス編 CHAPTER2",
+   "title": "ぷれぜんと・ふぉー・ゆー",
+   "titleCn": "礼物·献给你",
+   "date": null,
+   "version": null,
+   "characters": [
+    "珠洲島 有栖",
+    "東雲 つむぎ",
+    "日向 千夏",
+    "柏木 美亜"
+   ],
+   "aliases": [
+    "ぷれぜんと・ふぉー・ゆー",
+    "礼物·献给你",
+    "第3章チャプター2",
+    "第3章CHAPTER2"
+   ],
+   "keywords": [
+    "珠洲島有栖",
+    "東雲つむぎ",
+    "日向千夏",
+    "柏木美亜"
+   ],
+   "summary": "決勝でASTERISMに敗れ、その敗因に思い悩むマーチングポケッツ(千夏、美亜、つむぎ)の3人。そんな3人の前に、突如、学園祭を満喫中の有栖が現れる。\n千夏たちとのオンゲキに満足した有栖は、お礼として学園祭のタダ券を3人に渡す。3人は、そんな有栖の行動に疑念を抱きながらも、学園祭を楽しむことにするのだった。",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC3%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC2"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch3-3",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第3章 シューターフェス編 CHAPTER3",
+   "title": "コスプレ喫茶へようこそ",
+   "titleCn": "欢迎来到cosplay咖啡厅",
+   "date": null,
+   "version": null,
+   "characters": [
+    "東雲 つむぎ",
+    "日向 千夏",
+    "柏木 咲姫",
+    "柏木 美亜"
+   ],
+   "aliases": [
+    "コスプレ喫茶へようこそ",
+    "欢迎来到cosplay咖啡厅",
+    "第3章チャプター3",
+    "第3章CHAPTER3"
+   ],
+   "keywords": [
+    "東雲つむぎ",
+    "日向千夏",
+    "柏木咲姫",
+    "柏木美亜"
+   ],
+   "summary": "千夏、美亜と別れ、ひとりコスプレ喫茶にやって来たつむぎ。そこで出会った咲姫から、冷静に見える葵にも弱点があると告げられる。それを知ったつむぎは……\nがむしゃらにオンゲキをすることで、落ち着きを取り戻したつむぎ。相談に乗ってくれた咲姫にお礼を言うと、葵に謝罪すべく、コスプレ喫茶を飛び出すのだった。",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC3%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC3"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch3-4",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第3章 シューターフェス編 CHAPTER4",
+   "title": "クレープはママの味",
+   "titleCn": "可丽饼是妈妈的味道",
+   "date": null,
+   "version": null,
+   "characters": [
+    "桜井 春菜",
+    "藤沢 柚子",
+    "柏木 美亜"
+   ],
+   "aliases": [
+    "クレープはママの味",
+    "可丽饼是妈妈的味道",
+    "第3章チャプター4",
+    "第3章CHAPTER4"
+   ],
+   "keywords": [
+    "桜井春菜",
+    "藤沢柚子",
+    "柏木美亜"
+   ],
+   "summary": "柚子のことがフルーツに例えられず悩み、ひとり屋台エリアにやって来た美亜。そこで美亜は、なかなかクレープが売れないと嘆く春菜に出会う。見かねた美亜は、春菜を手伝うことにするのだった。\n春菜の特製クレープを食べ、気を失ってしまった美亜。夢の中で、美亜はデビル柚子とエンジェル春菜に出会う。そこで2人からアドバイスを受けた美亜は、ついに柚子のことを例えられるようになるのだった。",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC3%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC4"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch3-5",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第3章 シューターフェス編 CHAPTER5",
+   "title": "逢坂茜の挑戦状",
+   "titleCn": "逢坂茜的挑战书",
+   "date": null,
+   "version": null,
+   "characters": [
+    "日向 千夏"
+   ],
+   "aliases": [
+    "逢坂茜の挑戦状",
+    "逢坂茜的挑战书",
+    "第3章チャプター5",
+    "第3章CHAPTER5"
+   ],
+   "keywords": [
+    "日向千夏"
+   ],
+   "summary": "娯楽エリアをひとり歩いていた千夏は、世界征服屋という不思議な看板を見つける。そこは茜が運営する射的屋だった。渡された銃を構える千夏は、簡単そうなキャラメルを狙うが……\n射的で行われたズルに、悔しさをぶつける千夏。そんな千夏に対し、茜はその悔しい想いこそ大切なのだと説く。ハッとさせられた千夏は、自分のオンゲキに足りなかったものに気付くのだった。",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC3%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC5"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch3-6",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第3章 シューターフェス編 CHAPTER6",
+   "title": "ひよこたちのダ・カーポ",
+   "titleCn": "雏鸟们的返始",
+   "date": null,
+   "version": null,
+   "characters": [
+    "東雲 つむぎ",
+    "日向 千夏",
+    "柏木 美亜"
+   ],
+   "aliases": [
+    "ひよこたちのダ・カーポ",
+    "雏鸟们的返始",
+    "第3章チャプター6",
+    "第3章CHAPTER6"
+   ],
+   "keywords": [
+    "東雲つむぎ",
+    "日向千夏",
+    "柏木美亜"
+   ],
+   "summary": "再び合流したマーチングポケッツ(千夏、美亜、つむぎ)の3人。3人はそれぞれ、先輩から大切なことを教えてもらったと話し始める。\nオンゲキを通じ、お互いの成長を確かめ合った千夏、美亜、つむぎ。気持ちを新たにした3人は、今の想いを伝えるため、ASTERISMの元へと駆けて行く。",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC3%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC6"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch3-7",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第3章 シューターフェス編 CHAPTER7",
+   "title": "仲直りのフィナーレ",
+   "titleCn": "和好的终曲",
+   "date": null,
+   "version": null,
+   "characters": [
+    "星咲 あかり",
+    "東雲 つむぎ"
+   ],
+   "aliases": [
+    "仲直りのフィナーレ",
+    "和好的终曲",
+    "第3章チャプター7",
+    "第3章CHAPTER7"
+   ],
+   "keywords": [
+    "星咲あかり",
+    "東雲つむぎ"
+   ],
+   "summary": "ASTERISMの元へやって来たマーチングポケッツの3人。謝罪しようとするつむぎに対し、あかりは「言葉はいらないよ」と伝える。その真意を理解した3人は……\nオンゲキを通じて想いを伝え合った、ASTERISMとマーチングポケッツ。打ち解けた先輩と後輩は、残り少ない学園祭を共に過ごし、親交を深めるのだった。",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC3%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC7"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch3-sc1",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第3章 シューターフェス編 サイドチャプター1",
+   "title": "海の家で一番美味しいアレ",
+   "titleCn": "海边小屋里最好吃的那玩意",
+   "date": null,
+   "version": null,
+   "characters": [
+    "桜井 春菜",
+    "星咲 あかり"
+   ],
+   "aliases": [
+    "海の家で一番美味しいアレ",
+    "海边小屋里最好吃的那玩意",
+    "第3章サイドチャプター1",
+    "第3章SIDE1"
+   ],
+   "keywords": [
+    "桜井春菜",
+    "星咲あかり"
+   ],
+   "summary": "学園祭巡りをひと休みし、教室で歓談する あかり、春菜、茜の3人、3人は海の家の料理の話題で盛り上がるが、次第に話が噛み合わなくなっていって……",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC3%E7%AB%A0%E3%82%B5%E3%82%A4%E3%83%89%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC1"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch3-sc2",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第3章 シューターフェス編 サイドチャプター2",
+   "title": "箱の中身はなんだろな",
+   "titleCn": "箱子里是什么呀",
+   "date": null,
+   "version": null,
+   "characters": [
+    "東雲 つむぎ",
+    "日向 千夏",
+    "柏木 美亜"
+   ],
+   "aliases": [
+    "箱の中身はなんだろな",
+    "箱子里是什么呀",
+    "第3章サイドチャプター2",
+    "第3章SIDE2"
+   ],
+   "keywords": [
+    "東雲つむぎ",
+    "日向千夏",
+    "柏木美亜"
+   ],
+   "summary": "学園祭の屋台を見て回っていたマーチングポケッツ（千夏、美亜、つむぎ）の3人。豪華賞品に釣られ、3人は箱の中身を触って当てる「箱の中身はなんだろうな屋さん」に挑戦する。",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC3%E7%AB%A0%E3%82%B5%E3%82%A4%E3%83%89%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC2"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch3-sc3",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第3章 シューターフェス編 サイドチャプター3",
+   "title": "あぶない水着大事件",
+   "titleCn": "危险的泳装大事件",
+   "date": null,
+   "version": null,
+   "characters": [
+    "早乙女 彩華",
+    "柏木 咲姫"
+   ],
+   "aliases": [
+    "あぶない水着大事件",
+    "危险的泳装大事件",
+    "第3章サイドチャプター3",
+    "第3章SIDE3"
+   ],
+   "keywords": [
+    "早乙女彩華",
+    "柏木咲姫"
+   ],
+   "summary": "学園祭を一緒に回っていた彩華、咲姫、葵の3人。休憩のために入った教室で、3人はあるモノを発見してしまう。それは、とてもきわどいデザインの水着で……",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC3%E7%AB%A0%E3%82%B5%E3%82%A4%E3%83%89%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC3"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch3-sc4",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第3章 シューターフェス編 サイドチャプター4",
+   "title": "副会長のおサボり体験",
+   "titleCn": "副会长的摸鱼体验",
+   "date": null,
+   "version": null,
+   "characters": [
+    "井之原 小星",
+    "藤沢 柚子"
+   ],
+   "aliases": [
+    "副会長のおサボり体験",
+    "副会长的摸鱼体验",
+    "第3章サイドチャプター4",
+    "第3章SIDE4"
+   ],
+   "keywords": [
+    "井之原小星",
+    "藤沢柚子"
+   ],
+   "summary": "学園祭の屋台で店番をすることになった柚子、小星、楓の3人。サボってばかりの柚子と小星に対し、楓は苦言を呈する。しかし、逆に小星から「休憩するのもルール」と説かれてしまう。",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC3%E7%AB%A0%E3%82%B5%E3%82%A4%E3%83%89%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC4"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch3-sc5",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第3章 シューターフェス編 サイドチャプター5",
+   "title": "千夏の潜入大作戦",
+   "titleCn": "千夏的潜入大作战",
+   "date": null,
+   "version": null,
+   "characters": [
+    "星咲 あかり",
+    "日向 千夏"
+   ],
+   "aliases": [
+    "千夏の潜入大作戦",
+    "千夏的潜入大作战",
+    "第3章サイドチャプター5",
+    "第3章SIDE5"
+   ],
+   "keywords": [
+    "星咲あかり",
+    "日向千夏"
+   ],
+   "summary": "学園祭前日。教室の飾りつけをするあかり達のもとに、千夏がこっそりやってくる。初めは陰から見るだけだった千夏だが、やがてこっそりお手伝いを始めて……",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC3%E7%AB%A0%E3%82%B5%E3%82%A4%E3%83%89%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC5"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch4-1",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第4章 学園長総選挙編 CHAPTER1",
+   "title": "災厄、来たる",
+   "titleCn": "灾厄，降临",
+   "date": null,
+   "version": null,
+   "characters": [
+    "皇城 セツナ",
+    "珠洲島 有栖",
+    "星咲 あかり"
+   ],
+   "aliases": [
+    "災厄、来たる",
+    "灾厄，降临",
+    "第4章チャプター1",
+    "第4章CHAPTER1"
+   ],
+   "keywords": [
+    "皇城セツナ",
+    "珠洲島有栖",
+    "星咲あかり"
+   ],
+   "summary": "――奏坂学園、生徒総会。そこに突如、有栖の姉を名乗る皇城セツナが現れる。学園の堕落した現状を憂うセツナは、改革を断行すると宣言。あかりたちは、その一方的なやり方に反発するのだった。\nR.B.P.をオンゲキで圧倒し、その力の差を見せつけたセツナ。セツナは改めて、奏坂に必要な人物は誰かと問う。その異様な重圧の前に、あかりたちは言葉を発することができなかった。",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC4%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC1"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch4-3",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第4章 学園長総選挙編 CHAPTER3",
+   "title": "輝く、三つ星",
+   "titleCn": "闪耀吧，三颗星",
+   "date": null,
+   "version": null,
+   "characters": [
+    "皇城 セツナ"
+   ],
+   "aliases": [
+    "輝く、三つ星",
+    "闪耀吧，三颗星",
+    "第4章チャプター3",
+    "第4章CHAPTER3"
+   ],
+   "keywords": [
+    "皇城セツナ"
+   ],
+   "summary": "セツナに対し、怒りを露わにするASTERISM。自分たちのオンゲキを信じる3人は、ついにセツナとの直接対決に臨む。――学園の未来を決めるオンゲキが今、幕を開ける。\n健闘及ばず、ASTERISMはセツナに敗北してしまう。このままセツナが学園長に就任してしまうのか――。誰もが諦めかけたその時、固く閉ざされていた扉が勢いよく開いた。",
+   "rivals": [
+    "Falsum Atlantis. Lv.70",
+    "Don't Fight The Music Lv.70"
+   ],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC4%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC3"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch4-4",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第4章 学園長総選挙編 CHAPTER4",
+   "title": "想い、繋がって",
+   "titleCn": "心意，相连",
+   "date": null,
+   "version": null,
+   "characters": [
+    "井之原 小星",
+    "星咲 あかり",
+    "日向 千夏",
+    "柏木 咲姫"
+   ],
+   "aliases": [
+    "想い、繋がって",
+    "心意，相连",
+    "第4章チャプター4",
+    "第4章CHAPTER4"
+   ],
+   "keywords": [
+    "井之原小星",
+    "星咲あかり",
+    "日向千夏",
+    "柏木咲姫"
+   ],
+   "summary": "ASTERISMの窮地を救ったのは、マーチングポケッツだった。千夏たちの力を借り、なんとか最悪の事態を回避したあかりたち。しかし3人の前に、今度は小星と咲姫の2人が立ち塞がる。\n7EVENDAYS⇔HOLIDAYSの2人を破ったASTERISM。あかりたちが敵対した理由を問うと、小星と咲姫はマーチングポケッツのためだったと打ち明ける。",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC4%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC4"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch4-5",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第4章 学園長総選挙編 CHAPTER5",
+   "title": "大切なもの",
+   "titleCn": "重要的东西",
+   "date": null,
+   "version": null,
+   "characters": [
+    "皇城 セツナ",
+    "桜井 春菜",
+    "星咲 あかり",
+    "早乙女 彩華",
+    "藤沢 柚子"
+   ],
+   "aliases": [
+    "大切なもの",
+    "重要的东西",
+    "第4章チャプター5",
+    "第4章CHAPTER5"
+   ],
+   "keywords": [
+    "皇城セツナ",
+    "桜井春菜",
+    "星咲あかり",
+    "早乙女彩華",
+    "藤沢柚子"
+   ],
+   "summary": "ASTERISMの前に立ちはだかる春菜と彩華。そこに、かつての優しい春菜の面影は無かった。春菜は甘える柚子を突き放し、覚悟を胸にASTERISMと対峙する。\nbitter flavorに勝利したASTERISM。戦いの原因となった彩華の勘違いも解け、あかりたちは無事、和解する。幾多の困難を乗り越えたあかりたちは、この騒動に終止符を打つべくセツナの下へ急ぐのだった。",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC4%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC5"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  },
+  {
+   "id": "ch4-6",
+   "game": "ongeki",
+   "type": "main",
+   "chapter": "第4章 学園長総選挙編 CHAPTER6",
+   "title": "STARRED",
+   "titleCn": "STARRED",
+   "date": null,
+   "version": null,
+   "characters": [
+    "皇城 セツナ",
+    "珠洲島 有栖",
+    "星咲 あかり"
+   ],
+   "aliases": [
+    "STARRED",
+    "第4章チャプター6",
+    "第4章CHAPTER6"
+   ],
+   "keywords": [
+    "皇城セツナ",
+    "珠洲島有栖",
+    "星咲あかり"
+   ],
+   "summary": "ついにセツナの下へと辿り着いたあかりたち。言葉巧みなセツナを前に、あかりは自身が信じるオンゲキを貫くことを誓う。あかりとセツナ、2人のオンゲキが今、ぶつかろうとしていた。\n戦いは、セツナの敗北宣言によって終結した。総選挙に勝利したあかりたちは、有栖の学園長就任を喜ぶ。その様子を見たセツナは、ひとり静かに微笑むのだった。",
+   "rivals": [],
+   "factConfidence": "inferred",
+   "factSources": [
+    "https://wikiwiki.jp/gameongeki/%E7%AC%AC4%E7%AB%A0%E3%83%81%E3%83%A3%E3%83%97%E3%82%BF%E3%83%BC6"
+   ],
+   "factReviewed": null,
+   "quoteRefs": [],
+   "notes": "由章节页自动抽取（标题/あらすじ/課題曲）。characters 由曲库角色索引匹配摘要得出，未命中即留空。"
+  }
+ ]
+}
