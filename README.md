@@ -42,13 +42,21 @@ Copy-Item mia-chat/config.example.json mia-chat/config.local.json
 
 填写两个 `config.local.json`。真实配置已被 `.gitignore` 排除，请勿提交 AppSecret、API Key、账号密码或绑定数据。
 
-QQ 指令层还需要：
+QQ 指令层还需要核心程序：
 
 ```powershell
 npm run build:core
 ```
 
-该命令会生成被忽略的 `ongeki-core.exe`。凭据助手可按项目中的 C# 源码构建；详细的平台配置、白名单和排障说明见 [`qq-official/README.md`](qq-official/README.md)。
+该命令生成被忽略的 `ongeki-core.exe`，只用到仓库里的源码和 `npm ci` 装好的依赖。主题里的
+素材和字体（见 [`ASSETS.md`](ASSETS.md)）仓库里没有，缺失时会跳过并在结尾报个数 ——
+打出来的核心少了那几张图，渲染退化，但构建本身不会因此失败。
+
+`npm run build:gui` 在这之后继续用 csc 编译 `gui.cs`，得到本地查分工具「音击小工具 v3.0.exe」。
+这一步额外需要 Windows .NET Framework 的 `csc.exe`、`gui.cs` 和 `ongeki-icon.ico`，
+这三样都不在公开仓库里；不带界面用核心时不需要它。
+
+凭据助手可按项目中的 C# 源码构建；详细的平台配置、白名单和排障说明见 [`qq-official/README.md`](qq-official/README.md)。
 
 启动：
 

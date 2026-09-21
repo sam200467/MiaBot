@@ -159,14 +159,26 @@ const runtimeThemeFiles = [
   "completion-search/assets/ui_userplate_040145.png",
   "completion-search/assets/ui_userplate_040150.png",
 ];
+// 素材与字体由部署者自备（见 ASSETS.md），仓库里没有。缺了不算错：
+// 打出来的核心少这几张图，对应渲染退化，但不用为了试一次构建先去凑齐素材。
+// 主题代码（html/css/js）是本仓库自己的，缺了就是工程坏了 —— 照旧抛错。
+const isDeployerSupplied = (name) => name.includes("/assets/") || name.startsWith("shared/fonts/");
+
 const themeBundle = {};
 const themeHasher = crypto.createHash("sha256");
+const missingThemeFiles = [];
 for (const relativeName of runtimeThemeFiles) {
   const sourcePath = path.join(THEME_ROOT, ...relativeName.split("/"));
-  if (!fs.existsSync(sourcePath)) throw new Error("缺少主题运行资源: " + sourcePath);
+  if (!fs.existsSync(sourcePath)) {
+    if (isDeployerSupplied(relativeName)) { missingThemeFiles.push(relativeName); continue; }
+    throw new Error("缺少主题运行资源: " + sourcePath);
+  }
   const content = fs.readFileSync(sourcePath);
   themeBundle[relativeName] = content.toString("base64");
   themeHasher.update(relativeName).update(content);
+}
+if (missingThemeFiles.length) {
+  console.warn(`   跳过 ${missingThemeFiles.length} 个本地没有的素材/字体（见 ASSETS.md），其余 ${Object.keys(themeBundle).length} 个已打包`);
 }
 const themeHash = themeHasher.digest("hex").slice(0, 16);
 const catalogSource = fs.readFileSync(SUPPLEMENTAL_SONGS, "utf8");
@@ -214,9 +226,14 @@ fs.rmSync(BLOB, { force: true });
 step("4/5 核心自测");
 execSync(`"${CORE}" --selftest`, { stdio: "inherit", cwd: DIR });
 
-// 无界面构建：复用本脚本的注入/打包/SEA 链路，但跳过 Windows 专属的 csc GUI 编译
-if (process.env.TAKASE_SKIP_WIN_GUI === "1") {
-  console.log("（TAKASE_SKIP_WIN_GUI 已设置，跳过 WinForms GUI 编译）");
+// 拆成两段：核心（ongeki-core.exe）是部署真正要的东西；GUI（音击小工具 v3.0.exe）
+// 是本地查分工具，需要 gui.cs、ongeki-icon.ico 和 csc.exe，这三样都不在公开仓库里。
+// 所以要有个只出核心的模式，否则新克隆上跑 build 必然卡在最后一步。
+const CORE_ONLY = process.argv.includes("--core-only") || process.env.MIA_SKIP_WIN_GUI === "1";
+if (CORE_ONLY) {
+  console.log("");
+  console.log("构建完成 -> " + CORE);
+  console.log("（--core-only：只出核心，跳过 WinForms GUI）");
   process.exit(0);
 }
 
