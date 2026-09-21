@@ -93,7 +93,7 @@ Key 用 Windows DPAPI 当前用户加密保存到 `rio-chat/search.local.json`�
 
 **别名映射到正式曲名，不绑 songId。** 同一首歌可能同时收录在舞萌、音击、中二，各游戏的 songId、定数、收录版本完全独立；把别名钉在某个 songId 上就等于让它只对那一份数据成立，换款游戏就变成错答案。条目形状：`{alias, title, game}`——game 非空是那款游戏专属，game 空是跨游戏通用。解析时优先用当前对话的游戏作用域；**没给作用域又撞上歧义（同一叫法指向不同曲名）就是 null，绝不任选一个**。同名不同游戏（同一首歌两边收录）不算歧义：曲名一致，游戏数据的区分交给下游各自的曲库。旧文件（version 1，按 songId 存）照读：`configureAliases` 传 `resolveSong` 回调把 songId 换回曲名与游戏，写回时统一成 version 2；认不出的 songId 宁可报错也不静默丢数据。
 
-第一级在宿主侧：`takase-core.cjs` 的 `resolveAliasTitle(word, game)`。解析规则**全部留在 `SongAliasStore`**（同一套 normalize、同一套 entries），聊天侧不实现第二套——它只拿到一个名字，从 `adapter.alias.resolve` 取。宿主曲库只有音击，所以 `#是什么歌`、`searchSongs` 这些命令路径固定传作用域 `"ongeki"`，别的游戏专属别名不会在那条路上命中。
+第一级在宿主侧：`mia-core.cjs` 的 `resolveAliasTitle(word, game)`。解析规则**全部留在 `SongAliasStore`**（同一套 normalize、同一套 entries），聊天侧不实现第二套——它只拿到一个名字，从 `adapter.alias.resolve` 取。宿主曲库只有音击，所以 `#是什么歌`、`searchSongs` 这些命令路径固定传作用域 `"ongeki"`，别的游戏专属别名不会在那条路上命中。
 
 第三级是昵称恢复（`rio-chat/alias-recovery.cjs` + `chat.cjs` 的工具循环）。曲库查空后给模型三级提示（换游戏 → 联网查或直接给正式曲名 `aliasGuess` → 说不确定）。但**主力不是模型自觉**：spike 实测模型能把「电管」认成 Dengeki Tube，却不会想起来回曲库核一遍，结果手上只有老帖的旧值、只能诚实拒答。所以程序侧加了**自动核对**——模型检索词里一旦出现曲库真曲名，立刻回本地库查一遍并进**同一条** evidence，零额外模型轮次；模型认出正式曲名的那一刻就被接住了。
 

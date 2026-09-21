@@ -149,7 +149,7 @@ function parseReply(content) {
   }
   return null;
 }
-// 工具调用清单由宿主提供（takase-core 的 CAPABILITY_SPECS）：chat.cjs 不认得任何
+// 工具调用清单由宿主提供（mia-core 的 CAPABILITY_SPECS）：chat.cjs 不认得任何
 // 具体功能，只认「名字 + 一句参数」这个形状，便于两边各自 dispatch。
 function normalizeAction(raw, specs) {
   if(!raw||typeof raw!=="object"||Array.isArray(raw))return null;
@@ -902,7 +902,7 @@ function createChat(settings, host, deps={}) {
       const routed=typeof adapter.routeIntent==="function"
         ? await adapter.routeIntent({messages,message,signal:controller.signal,dispatcher}) : null;
       const result=routed || await requestReply(settings,messages,{fetchImpl:deps.fetchImpl,webFetchImpl:deps.webFetchImpl,dispatcher,signal:controller.signal,ability:ability,actions:adapter.routeIntent?[]:actionSpecs,actionTarget:Boolean(adapter.actionTarget),personalRecommendationNotice:typeof adapter.personalRecommendationNotice==='function'?()=>adapter.personalRecommendationNotice(message):undefined,
-        // 别名解析与候选落盘都由宿主注入（QQ 侧接 takase-core 的 SongAliasStore）：
+        // 别名解析与候选落盘都由宿主注入（QQ 侧接 mia-core 的 SongAliasStore）：
         // 聊天侧只拿一个正式曲名，不实现第二套解析规则。propose 绑到本条消息上，
         // 候选里才记得到底是谁提的。
         ...(adapter.alias?{alias:{resolve:(word)=>adapter.alias.resolve(word),

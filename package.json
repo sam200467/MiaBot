@@ -4,7 +4,7 @@
   "scripts": {
     "start": "node qq-official/mia-entry.cjs",
     "pretest": "node tools/prepare-test-config.cjs",
-    "test": "node --test --test-timeout=90000 test-takase-core.cjs test-song-alias-store.cjs qq-official/test-official-transport.cjs qq-official/test-mia-entry.cjs qq-official/test-mia-commands.cjs qq-official/test-mia-command-panel.cjs qq-official/test-song-search.cjs qq-official/test-semantic-router.cjs qq-official/test-asset-browser.cjs rio-chat/chat.test.cjs rio-chat/knowledge.test.cjs rio-chat/research-policy.test.cjs rio-chat/search.test.cjs",
+    "test": "node --test --test-timeout=90000 test-mia-core.cjs test-song-alias-store.cjs qq-official/test-official-transport.cjs qq-official/test-mia-entry.cjs qq-official/test-mia-commands.cjs qq-official/test-mia-command-panel.cjs qq-official/test-song-search.cjs qq-official/test-semantic-router.cjs qq-official/test-asset-browser.cjs rio-chat/chat.test.cjs rio-chat/knowledge.test.cjs rio-chat/research-policy.test.cjs rio-chat/search.test.cjs",
     "posttest": "node tools/cleanup-test-config.cjs",
     "build:core": "node build.js --core-only",
     "build:gui": "node build.js",

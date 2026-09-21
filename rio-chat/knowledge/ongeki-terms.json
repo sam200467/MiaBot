@@ -4,7 +4,7 @@
  "note": "版本条目由 tools/gen-terms.cjs 从本地快照的 version 字段生成（名称逐字一致、曲目数来自快照）。俗称与组合称呼是人工补的，只收稳定可验证的；长尾口语不进这里，走会话 glossary。发行日期与世代先后尚未收录（需要来源，留给下一批）。",
  "sources": [
   "版本名与曲目数：项目 ongeki-song-catalog.json 生成的曲库快照",
-  "RATING 三榜口径：本项目 fetch-otogame-rating.mjs 与 takase-core.cjs 的出图实现（数据来自 u.otogame.net/api/game/ongeki/rating）",
+  "RATING 三榜口径：本项目 fetch-otogame-rating.mjs 与 mia-core.cjs 的出图实现（数据来自 u.otogame.net/api/game/ongeki/rating）",
   "分数评级阈值：本项目 fetch-otogame-rating.mjs 的 rankFromScore()"
  ],
  "entries": [

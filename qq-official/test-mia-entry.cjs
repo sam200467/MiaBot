@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const core = require("../takase-core.cjs");
+const core = require("../mia-core.cjs");
 const { createMockOfficial } = require("./mock-official.cjs");
 const { createMiaBot } = require("./mia-entry.cjs");
 
@@ -56,7 +56,7 @@ function fakeModel(reply = "喵哼哼，收到啦！", expressionIds = [], actio
 }
 
 // 出图和凭据库都是真实现（要 spawn exe），这里从 module.exports 上顶掉。
-// takase-core 的 coreCall() 正是为此存在的（takase-core.cjs:780-782）。
+// mia-core 的 coreCall() 正是为此存在的（mia-core.cjs:780-782）。
 const STUBBED = ["getBinding", "saveBinding", "vaultCall", "verifyAccount",
   "generateChart", "generateSongChart", "generateChartInfo", "generateCompletionChart", "generateLevelChart"];
 function stubCore(overrides = {}) {

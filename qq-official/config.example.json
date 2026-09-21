@@ -14,9 +14,9 @@
   "_数据": "workDir 存放运行期文件（临时图片等）",
   "workDir": "./data",
 
-  "_指令": "指令层要用出图核心和凭据库。三个路径都必须存在，缺一个**启动就报错**——不要让它降级成纯聊天再让每条指令各失败一次。相对路径按 qq-official/ 解析。两个 exe 和梨绪共用同一批（都指仓库根目录）：ongeki-core.exe 由 node build.js 产出，takase-discord-vault.exe 在仓库里。",
+  "_指令": "指令层要用出图核心和凭据库。三个路径都必须存在，缺一个**启动就报错**——不要让它降级成纯聊天再让每条指令各失败一次。相对路径按 qq-official/ 解析。两个 exe 和梨绪共用同一批（都指仓库根目录）：ongeki-core.exe 由 node build.js 产出，mia-vault.exe 在仓库里。",
   "corePath": "../ongeki-core.exe",
-  "vaultHelperPath": "../takase-discord-vault.exe",
+  "vaultHelperPath": "../mia-vault.exe",
   "vaultPath": "./data/bindings.dat",
   "outputDir": "./data/output",
 

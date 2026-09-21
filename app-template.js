@@ -1275,7 +1275,7 @@ function buildLocalThemeData(jsonText, profile) {
   const mapAll = (items) => items.map((item) => mapThemeRatingItem(item, catalogIndex));
   return {
     generatedAt: new Date().toISOString(),
-    generatorName: "Takase bot",
+    generatorName: "MiaBot",
     profile,
     summary: {
       rating: Number(root.rating || 0),
@@ -1448,7 +1448,7 @@ function buildSongDetailThemeData(internalSong, recordData = {}, playerName = ""
   else jacketUrl = songJacketPlaceholder(internalSong.name, internalSong.id);
   return {
     generatedAt: new Date().toISOString(),
-    generatorName: "Takase bot",
+    generatorName: "MiaBot",
     profile: { playerName: String(playerName || "") },
     song: {
       songId: internalSong.id,
@@ -1626,7 +1626,7 @@ function buildChartInfoThemeData(song, difficultyId) {
 
   return {
     generatedAt: new Date().toISOString(),
-    generatorName: "Takase bot",
+    generatorName: "MiaBot",
     chart: {
       songId: Number(song.id),
       title: String(song.name || ""),

@@ -34,7 +34,7 @@ async function main() {
   if (!process.argv.includes("--live")) { console.log("Use --live to test the configured model without executing actions."); return; }
   const { loadConfig, createMiaBot } = require("./mia-entry.cjs");
   const bot = createMiaBot(loadConfig(), { log: () => {} });
-  const specs = [...require("../takase-core.cjs").CAPABILITY_SPECS, require("./song-search.cjs").SEARCH_SPEC];
+  const specs = [...require("../mia-core.cjs").CAPABILITY_SPECS, require("./song-search.cjs").SEARCH_SPEC];
   const results = [];
   try {
     for (const [text, expected, queryPart, history = []] of cases) {

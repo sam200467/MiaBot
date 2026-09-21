@@ -17,7 +17,7 @@
 // 用法：node qq-official/calibrate-tools.cjs [--only 关键字]
 
 const path = require("node:path");
-const core = require("../takase-core.cjs");
+const core = require("../mia-core.cjs");
 const { loadConfig, createMiaBot } = require("./mia-entry.cjs");
 
 const HERE = __dirname;

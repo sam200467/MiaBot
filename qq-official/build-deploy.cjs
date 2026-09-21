@@ -75,7 +75,7 @@ if (fs.existsSync(OUT)) {
 // （最长 15 分钟），不设超时看起来就像卡死了。
 console.log("跑测试（全部走 mock，不花钱）…");
 for (const file of [
-  path.join(ROOT, "test-takase-core.cjs"),
+  path.join(ROOT, "test-mia-core.cjs"),
   path.join(ROOT, "test-song-alias-store.cjs"),
 ]) {
   execFileSync(process.execPath, [file], { cwd: ROOT, stdio: "inherit" });

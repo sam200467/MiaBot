@@ -3,15 +3,15 @@
 // 用假的 send / sendImage 收结果。
 //
 // 凭据库和出图核心都是真实现（要 spawn exe），所以这里按仓库既有做法从
-// module.exports 上顶掉它们：takase-core 的 coreCall() 就是为此存在的
-// （takase-core.cjs:780-782 那段注释）。
+// module.exports 上顶掉它们：mia-core 的 coreCall() 就是为此存在的
+// （mia-core.cjs:780-782 那段注释）。
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const core = require("../takase-core.cjs");
+const core = require("../mia-core.cjs");
 const { createMiaCommands, parseCommand, ALIASES } = require("./mia-commands.cjs");
 
 const GROUP = "GROUP_OPENID_A";
@@ -33,7 +33,7 @@ test("搜索歌曲无需绑定，斜杠与模型工具共用真实曲库", async
 });
 
 // ── 夹具 ────────────────────────────────────────────────────────────
-// 每个用例一份独立的临时目录：别名库是 takase-core 的模块级单例，
+// 每个用例一份独立的临时目录：别名库是 mia-core 的模块级单例，
 // 让它们各自指向自己的目录，用例之间就不会串。
 function setup(configOverrides = {}, optionOverrides = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mia-cmd-"));

@@ -8,7 +8,7 @@
 // mentionedQqs 读的是 CQ 码，quotedContext 要调 get_msg，memberName 要调
 // get_group_member_info —— 后两个官方接口**根本没有**。真抽公共层的话，
 // 得到的是个带十个注入点的壳子，不是共享逻辑，而且要先动正在稳定运行的梨绪
-// 和它 50 个用例的测试。takase-core.cjs:8-12 也早就写明「队列/冷却/去重各前端
+// 和它 50 个用例的测试。mia-core.cjs:8-12 也早就写明「队列/冷却/去重各前端
 // 自带一份，等二期统一到 ctx 接口再搬」—— 现在抽正是在做作者刻意推迟的那次重构。
 //
 // 所以这里复制的是**规则**（队列语义、会话状态机、别名策略），不是代码形状。
@@ -23,7 +23,7 @@
 //   2. **被动回复窗口**：群 5 分钟 5 条、单聊 60 分钟 4～5 条，超了是 40034128。
 //   3. **没有 get_msg**。引用只用于「以回复形式展示」，读不到内容。
 
-const core = require("../takase-core.cjs");
+const core = require("../mia-core.cjs");
 const songSearch = require("./song-search.cjs");
 const { MIA_HELP, MIA_HINTS, MIA_TEMPLATES: T } = require("./mia-voice.cjs");
 
@@ -134,7 +134,7 @@ function createMiaCommands(options = {}) {
 
   // 删除别名的白名单：**只认名单里的 openid**，不看群角色，而且只走「删除别名」
   // 这条命令 —— 聊天路径连这个能力都看不到（CAPABILITY_SPECS 里刻意没有它，
-  // 见 takase-core.cjs 该处的注释）。名单放在 config.local.json 而不是源码里，
+  // 见 mia-core.cjs 该处的注释）。名单放在 config.local.json 而不是源码里，
   // 因为这个文件会同步进公开仓库。没配就是谁都不能删（失败往安全的方向倒）。
   // ⚠ openid 换 AppID 或换环境就会变（跟 allowedGroupIds 同理），换环境后要重新探。
   const aliasDeleteOpenids = new Set((config.aliasDeleteOpenids || []).map((id) => String(id).trim()));
@@ -322,7 +322,7 @@ function createMiaCommands(options = {}) {
     // 实测：用户说「铃铛 fb，连击 fc」，模型传的是 `14.2 1000737 none fb fc` ——
     // 多塞了一个对结果无害的 none（核心按 fb/fc 取值，那个 none 会被忽略）。
     // 按「所有标记都要在用户原话里」判的话，这种正常请求会被误拦成「编参数」。
-    // 取值优先级跟 takase-core 的 calculate 分支保持一致。
+    // 取值优先级跟 mia-core 的 calculate 分支保持一致。
     const bell = /\bfb\b/i.test(q) ? "fb" : "none";
     const combo = /ab\s*\+|abplus|ab-plus/i.test(q) ? "ab-plus"
       : /\bab\b/i.test(q) ? "ab"
@@ -597,7 +597,7 @@ function createMiaCommands(options = {}) {
   }
 
   // ── core 的注册 ───────────────────────────────────────────────────
-  // 这几个都是 takase-core 的**模块级单例**（别名库、转义函数、提示文案、
+  // 这几个都是 mia-core 的**模块级单例**（别名库、转义函数、提示文案、
   // 状态提供者）。梨绪和美亚永远是两个独立进程 —— 各自的启动器、GUI 各起一个
   // ProcessInfo、stop-mia.cjs 只匹配 mia-entry —— 所以不会互相覆盖。
   // ⚠ 但**测试里不要在同一进程同时启动两个入口**，后注册的会盖掉前一个。

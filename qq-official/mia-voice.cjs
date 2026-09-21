@@ -53,7 +53,7 @@ const MIA_HELP = [
 
 // ── configureCapabilities 的 13 个覆盖项 ─────────────────────────────
 // ⚠ **一个都不能漏。** core 只校验「已经存在的键」，漏掉的键不会在启动时报错，
-// 而是运行期静默返回空串（takase-core.cjs:727-728 的注释记着这件事）。
+// 而是运行期静默返回空串（mia-core.cjs:727-728 的注释记着这件事）。
 // 其中 helpText / bindNotice / targetNotAllowed / bindUsage 四个是**必须**覆盖的——
 // core 的默认值里写死了 `/help`、`/bind`、`/allowquery` 那些 Discord 说法。
 const MIA_HINTS = Object.freeze({

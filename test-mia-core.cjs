@@ -1,10 +1,10 @@
 "use strict";
-// takase-core.cjs 的冒烟测试：确认抽取后各函数行为与抽取前一致。
+// mia-core.cjs 的冒烟测试：确认抽取后各函数行为与抽取前一致。
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const core = require("./takase-core.cjs");
+const core = require("./mia-core.cjs");
 
 // 定数计算：与入口 selftest 里同样的样例
 const bands = [

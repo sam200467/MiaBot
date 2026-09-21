@@ -1,4 +1,4 @@
-// Takase Discord Bot 多用户凭据库：使用 Windows DPAPI CurrentUser 加密整个账号库。
+// MiaBot 多用户凭据库：使用 Windows DPAPI CurrentUser 加密整个账号库。
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
 
-class DiscordVaultEntry
+class VaultEntry
 {
     public string userId { get; set; }
     public string email { get; set; }
@@ -16,28 +16,30 @@ class DiscordVaultEntry
     public string boundAt { get; set; }
 }
 
-class DiscordVaultData
+class VaultData
 {
-    public List<DiscordVaultEntry> entries { get; set; }
+    public List<VaultEntry> entries { get; set; }
 }
 
-static class TakaseDiscordVault
+static class MiaVault
 {
+    // ⚠ 这个字节串是 DPAPI 的附加熵，**改了就解不开已有的 bindings.dat** ——
+    // 所有老用户的账号绑定会一起失效。名字里的 Takase 是历史遗留，别顺手改。
     private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("TakaseDiscordBotBindingsV1");
     private static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
 
-    private static DiscordVaultData Load(string vaultPath)
+    private static VaultData Load(string vaultPath)
     {
-        if (!File.Exists(vaultPath)) return new DiscordVaultData { entries = new List<DiscordVaultEntry>() };
+        if (!File.Exists(vaultPath)) return new VaultData { entries = new List<VaultEntry>() };
         byte[] cipher = File.ReadAllBytes(vaultPath);
         byte[] plain = ProtectedData.Unprotect(cipher, Entropy, DataProtectionScope.CurrentUser);
-        DiscordVaultData data = Json.Deserialize<DiscordVaultData>(Encoding.UTF8.GetString(plain));
-        if (data == null) data = new DiscordVaultData();
-        if (data.entries == null) data.entries = new List<DiscordVaultEntry>();
+        VaultData data = Json.Deserialize<VaultData>(Encoding.UTF8.GetString(plain));
+        if (data == null) data = new VaultData();
+        if (data.entries == null) data.entries = new List<VaultEntry>();
         return data;
     }
 
-    private static void Save(string vaultPath, DiscordVaultData data)
+    private static void Save(string vaultPath, VaultData data)
     {
         string directory = Path.GetDirectoryName(Path.GetFullPath(vaultPath));
         Directory.CreateDirectory(directory);
@@ -53,13 +55,13 @@ static class TakaseDiscordVault
     {
         using (SHA256 sha = SHA256.Create()) {
             byte[] digest = sha.ComputeHash(Encoding.UTF8.GetBytes(Path.GetFullPath(path).ToLowerInvariant()));
-            return "Local\\TakaseDiscordBotVault_" + BitConverter.ToString(digest, 0, 12).Replace("-", "");
+            return "Local\\MiaBotVault_" + BitConverter.ToString(digest, 0, 12).Replace("-", "");
         }
     }
 
-    private static DiscordVaultEntry Find(DiscordVaultData data, string userId)
+    private static VaultEntry Find(VaultData data, string userId)
     {
-        return data.entries.Find(delegate(DiscordVaultEntry item) {
+        return data.entries.Find(delegate(VaultEntry item) {
             return String.Equals(item.userId, userId, StringComparison.Ordinal);
         });
     }
@@ -67,19 +69,19 @@ static class TakaseDiscordVault
     private static int Run(string[] args)
     {
         if (args.Length == 1 && args[0] == "--selftest") {
-            byte[] plain = Encoding.UTF8.GetBytes("Takase Discord Vault 自测");
+            byte[] plain = Encoding.UTF8.GetBytes("MiaBot Vault 自测");
             byte[] cipher = ProtectedData.Protect(plain, Entropy, DataProtectionScope.CurrentUser);
             string roundtrip = Encoding.UTF8.GetString(ProtectedData.Unprotect(cipher, Entropy, DataProtectionScope.CurrentUser));
-            if (roundtrip != "Takase Discord Vault 自测") return 10;
-            string testPath = Path.Combine(Path.GetTempPath(), "TakaseDiscordVaultSelftest_" + Guid.NewGuid().ToString("N") + ".dat");
+            if (roundtrip != "MiaBot Vault 自测") return 10;
+            string testPath = Path.Combine(Path.GetTempPath(), "MiaVaultSelftest_" + Guid.NewGuid().ToString("N") + ".dat");
             try {
-                DiscordVaultData sample = new DiscordVaultData { entries = new List<DiscordVaultEntry>() };
-                sample.entries.Add(new DiscordVaultEntry {
+                VaultData sample = new VaultData { entries = new List<VaultEntry>() };
+                sample.entries.Add(new VaultEntry {
                     userId = "100000000000000001", email = "test@example.com", password = "密码♪",
                     playerName = "DEMO PLAYER", boundAt = DateTime.UtcNow.ToString("o")
                 });
                 Save(testPath, sample);
-                DiscordVaultEntry loaded = Find(Load(testPath), "100000000000000001");
+                VaultEntry loaded = Find(Load(testPath), "100000000000000001");
                 return loaded != null && loaded.password == "密码♪" && loaded.playerName == "DEMO PLAYER" ? 0 : 11;
             } finally {
                 if (File.Exists(testPath)) File.Delete(testPath);
@@ -92,20 +94,20 @@ static class TakaseDiscordVault
         using (Mutex mutex = new Mutex(false, MutexName(vaultPath))) {
             if (!mutex.WaitOne(TimeSpan.FromSeconds(10))) throw new Exception("凭据库正忙");
             try {
-                DiscordVaultData data = Load(vaultPath);
+                VaultData data = Load(vaultPath);
                 if (command == "get") {
                     if (args.Length != 3) throw new Exception("get 参数无效");
-                    DiscordVaultEntry entry = Find(data, args[2]);
+                    VaultEntry entry = Find(data, args[2]);
                     if (entry == null) return 4;
                     Console.Write(Json.Serialize(entry));
                     return 0;
                 }
                 if (command == "set") {
-                    DiscordVaultEntry incoming = Json.Deserialize<DiscordVaultEntry>(Console.In.ReadToEnd());
+                    VaultEntry incoming = Json.Deserialize<VaultEntry>(Console.In.ReadToEnd());
                     if (incoming == null || String.IsNullOrEmpty(incoming.userId) || String.IsNullOrEmpty(incoming.email) || String.IsNullOrEmpty(incoming.password)) {
                         throw new Exception("绑定数据不完整");
                     }
-                    DiscordVaultEntry old = Find(data, incoming.userId);
+                    VaultEntry old = Find(data, incoming.userId);
                     if (old != null) data.entries.Remove(old);
                     data.entries.Add(incoming);
                     Save(vaultPath, data);
@@ -114,7 +116,7 @@ static class TakaseDiscordVault
                 }
                 if (command == "delete") {
                     if (args.Length != 3) throw new Exception("delete 参数无效");
-                    data.entries.RemoveAll(delegate(DiscordVaultEntry item) { return String.Equals(item.userId, args[2], StringComparison.Ordinal); });
+                    data.entries.RemoveAll(delegate(VaultEntry item) { return String.Equals(item.userId, args[2], StringComparison.Ordinal); });
                     Save(vaultPath, data);
                     Console.Write("OK");
                     return 0;

@@ -13,7 +13,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createOfficial } = require("./official-transport.cjs");
 const { loadSettings, createChat } = require("../rio-chat/chat.cjs");
-const core = require("../takase-core.cjs");
+const core = require("../mia-core.cjs");
 const { createMiaCommands } = require("./mia-commands.cjs");
 const songSearch = require("./song-search.cjs");
 const { routeIntent } = require("./semantic-router.cjs");
@@ -538,7 +538,7 @@ function createMiaBot(config, deps = {}) {
         fs.mkdirSync(aliasDir, { recursive: true });
       }
 
-      // 别名库 / 格式化 / 提示文案 / 状态提供者都是 takase-core 的模块级单例。
+      // 别名库 / 格式化 / 提示文案 / 状态提供者都是 mia-core 的模块级单例。
       // 放在 start() 而不是工厂体里，是为了让 createMiaBot 保持无副作用 ——
       // 配置有问题就在启动时炸，而不是构造对象的时候（跟梨绪那边一致）。
       if (commands) commands.registerCore();

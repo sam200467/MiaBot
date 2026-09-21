@@ -2,7 +2,7 @@
 
 // Public metadata only: never consult player bindings or send a model-written result.
 const { songs } = require("../ongeki-song-catalog.json");
-const core = require("../takase-core.cjs");
+const core = require("../mia-core.cjs");
 const normalize = value => String(value || "").normalize("NFKC").toLowerCase()
   .replace(/[ぁ-ゖ]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60))
   .replace(/[\s\p{P}\p{S}]/gu, "");

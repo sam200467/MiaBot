@@ -1,15 +1,14 @@
 "use strict";
-// Takase Bot 平台无关核心。
+// MiaBot 平台无关核心。
 //
 // 这里只放与聊天平台无关的东西：曲库检索、定数计算、结果格式化、子进程调用、
-// 凭据库读写、分表渲染任务。Discord 入口（takase-discord-entry.mjs）与 QQ 入口
-// （qq/qq-entry.mjs）都从这里取用。
+// 凭据库读写、分表渲染任务。各前端入口（本仓库里是 qq-official/）都从这里取用。
 //
 // 刻意**不**收进来的东西：
 //   - 命令定义、按钮、弹窗、交互回复时序（各平台自己写）
-//   - 队列 / 冷却 / 去重（Discord 侧的 handler 直接引用这些闭包变量，共 36 处，
+//   - 队列 / 冷却 / 去重（前端的 handler 直接引用这些闭包变量，共 36 处，
 //     等二期 handler 统一到 ctx 接口时再一起搬；QQ 侧目前自带一份）
-//   - helpText（Discord 专属文案与 markdown 风格，QQ 需要自己的版本）
+//   - helpText（带 markdown 风格的文案，QQ 需要自己的版本）
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -38,12 +37,12 @@ const LEVEL_CHOICES = Object.freeze([
   "10", "10+", "11", "11+", "12", "12+", "13", "13+", "14", "14+", "15", "15+",
 ]);
 
-// 给宿主 GUI 的日志协议。tag 名与分隔符是**冻结**的：takase-discord-gui.cs 用硬编码
+// 给宿主 GUI 的日志协议。tag 名与分隔符是**冻结**的：外部的启动器 GUI 用硬编码
 // Substring 偏移解析（BOT_READY / BOT_BINDING_COUNT: / BOT_BINDING_SAVED: / BOT_BUSY: /
 // BOT_FATAL: / BOT_ERROR: / BOT_LOG:），一个字符都不能改。未知 tag 会被 GUI 兜底打进
 // 日志区，所以新增 tag 是安全的。
-// BOT_NAPCAT:1|0 是 QQ 版专有的：NapCat 连接状态，只有 qq/takase-qq-gui.cs 认识它，
-// Discord 侧不会发。加新 tag 时记得同步 GUI 的 HandleLine，否则会原样打进日志区。
+// BOT_NAPCAT:1|0 是 OneBot 那一侧专有的：NapCat 连接状态，别的入口不会发。
+// 加新 tag 时记得同步 GUI 的 HandleLine，否则会原样打进日志区。
 function emit(tag, value = "") {
   process.stdout.write(tag + (value === "" ? "" : ":" + String(value)) + "\n");
 }
@@ -736,7 +735,7 @@ let capabilityHints = Object.freeze({
     "TA 没开放成绩查询，我不能替 TA 查。TA 想开的话，执行 `/allowquery` 就行。",
     "这个不行——TA 没把成绩开放给别人查。TA 自己执行 `/allowquery` 就能开了。",
   ],
-  helpText: "发送 `/help` 查看 Takase Bot 的功能清单。",
+  helpText: "发送 `/help` 查看 MiaBot 的功能清单。",
   chartInfoUsage: "请在曲名或 Song ID 后写明难度，例如 `id870 master`、`初音ミクの激唱 lunatic`。支持 BASIC / ADVANCED / EXPERT / MASTER / LUNATIC 及常用缩写。",
   levelUsage: "请输入显示等级（如 14、14+）、一位小数定数（如 14.1）或 ABFB。",
   constantUsage: "请输入 0–20 的整数或一位小数，例如 14、14.2。",

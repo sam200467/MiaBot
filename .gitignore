@@ -43,7 +43,7 @@ desktop.ini
 ongeki-exe.js
 ongeki-bundle.cjs
 ongeki-core.exe
-takase-discord-vault.exe
+mia-vault.exe
 
 # 无窗口启动器是生成物（见 qq-official/make-launchers.cjs），
 # 不写死目录前缀 —— 新增前端目录时自动覆盖。

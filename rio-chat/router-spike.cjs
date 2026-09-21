@@ -34,7 +34,7 @@ const REAL_WEB=flag("real-web");
 const JSON_OUT=arg("json");
 const debug=flag("verbose");
 
-// 线上这几个工具由宿主（takase-core 的 CAPABILITY_SPECS）提供，chat.cjs 只认
+// 线上这几个工具由宿主（mia-core 的 CAPABILITY_SPECS）提供，chat.cjs 只认
 // 「名字+参数」这个形状。这里取其中几个代表性的，够验证「查分会不会被检索挤掉」。
 const ACTION_SPECS=[
   {name:"help",label:"功能清单",argHint:"不需要参数",needsBinding:false},

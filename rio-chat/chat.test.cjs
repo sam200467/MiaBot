@@ -652,7 +652,7 @@ test_("正式 alias 作为曲库查询的前置解析：先换成正式曲名，
   {text:"电管的紫谱是 15.2。",scene:"explanation",expressionIds:[]},
  ]);
  const chat=createChat(s,host,{random:()=>0,
-  // 宿主注入的解析器背后是 takase-core 的 SongAliasStore，聊天侧只拿到一个正式曲名。
+  // 宿主注入的解析器背后是 mia-core 的 SongAliasStore，聊天侧只拿到一个正式曲名。
   adapter:{alias:{resolve:word=>{asked.push(word);return word==="电管"?{title:"Dengeki Tube",songId:391,alias:"电管"}:null;}}},
   fetchImpl:async(u,o)=>{body=JSON.parse(o.body);return next()}});
  const m=msg("a","<@123> 电管什么定数");await chat.handle(m);

@@ -2,7 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { routeIntent, validateDecision } = require("./semantic-router.cjs");
-const specs = [...require("../takase-core.cjs").CAPABILITY_SPECS, require("./song-search.cjs").SEARCH_SPEC];
+const specs = [...require("../mia-core.cjs").CAPABILITY_SPECS, require("./song-search.cjs").SEARCH_SPEC];
 test("结构校验：拒绝未知工具、空参数和陌生对象", () => {
   assert.throws(() => validateDecision({ route: "action", action: { name: "delete" } }, specs));
   assert.ok(!validateDecision({ route: "action", action: { name: "song" } }, specs).action);

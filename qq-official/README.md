@@ -15,7 +15,7 @@ qq-official/
 └── config.local.json        **含 AppSecret，已 gitignore**
 ```
 
-和 `qq/`（NapCat 版）是**并列的两个前端**，共用 `rio-chat/chat.cjs` 引擎和 `takase-core.cjs` 的
+和 `qq/`（NapCat 版）是**并列的两个前端**，共用 `rio-chat/chat.cjs` 引擎和 `mia-core.cjs` 的
 能力层，互不影响。指令文案、队列、绑定会话各写一份 —— 原因见 `mia-commands.cjs` 顶部的注释。
 
 > 下文的梨绪（`qq/`）是另一条产品线，**不随本仓库分发** —— 提到它只是为了说明两边的边界；
@@ -220,7 +220,7 @@ node qq-official/mia-entry.cjs
 ## 开发
 
 ```bash
-node test-takase-core.cjs                                    # 共享核心
+node test-mia-core.cjs                                    # 共享核心
 node test-song-alias-store.cjs                               # 别名库（含并发/事务/残留锁）
 node --test --test-timeout=45000 qq-official/test-official-transport.cjs   # 传输层
 node --test --test-timeout=45000 qq-official/test-mia-entry.cjs            # 入口（含指令/聊天两条路）
@@ -238,7 +238,7 @@ node --test --test-timeout=45000 rio-chat/chat.test.cjs                    # 引
 新写用例时请照着别漏：**起了 mock 就必须关**。
 
 ⚠ 测试里**不要在同一进程同时启动两个入口**：`configureAliases` / `configureCapabilities` /
-`configureFormatting` / `setStatusProvider` 都是 `takase-core` 的模块级单例，后注册的会盖掉前一个。
+`configureFormatting` / `setStatusProvider` 都是 `mia-core` 的模块级单例，后注册的会盖掉前一个。
 生产上是两个独立进程，所以没问题。
 
 排查连接问题：`node qq-official/probe-official.cjs`，它带**帧级探针**，会把网关上收到的每一帧都打出来 ——
@@ -370,7 +370,7 @@ if(Directory.Exists(mia)) Directory.Delete(mia,true);                 // 包变�
 > 字面意思是按群切分的；但实测私聊和群共用同一个值，说明至少不是严格按群。
 > 只有一个群可测，等你进了第二个群再确认。
 
-改 `rio-chat/chat.cjs` 或 `takase-core.cjs` 时两边都会受影响，所以上面那两组测试都要跑。
+改 `rio-chat/chat.cjs` 或 `mia-core.cjs` 时两边都会受影响，所以上面那两组测试都要跑。
 # 歌曲搜索
 
 `/搜索歌曲 サド`：搜索本地音击曲库，不用绑定账号。支持部分曲名、别名、Bot ID（如 `id870`）、假名与全半角归一化，以及少量拼写错误的候选提示。
