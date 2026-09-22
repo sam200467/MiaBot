@@ -12,6 +12,21 @@ test("结构校验：拒绝未知工具、空参数和陌生对象", () => {
   assert.ok(!validateDecision({ route: "action", action: { name: "calculate", args: { constant: 14.2, score: 1000737, bell: null, combo: null } } }, specs).action);
   assert.equal(validateDecision({ route: "action", action: { name: "calculate", args: { constant: 14.2, score: 1000737, bell: "fb", combo: "fc" } } }, specs).action.query, "14.2 1000737 fb fc");
 });
+
+test("plate 空参数是合法的：程序会列出全部版本牌子", () => {
+  // 版本名是静态公共资料，说不出版本名时程序会把 11 个版本列出来。原先 plate 和
+  // 其他工具一起被「空参数就打回追问」挡住，于是闲聊问「总共有哪些牌子可以拿」
+  // 只能由模型自己编一句「列不全」。
+  const empty = validateDecision({ route: "action", action: { name: "plate", query: "" } }, specs);
+  assert.equal(empty.action.name, "plate", "空参数要原样放行给程序");
+  assert.equal(empty.action.query, "");
+  assert.ok(!/还缺|参数/.test(empty.text), "不该再回「还缺查询的内容」");
+  // 其余工具照旧拦住：空参数对它们是真的缺东西
+  for (const name of ["song", "level", "constant", "chartinfo", "aliases", "whatis"]) {
+    assert.ok(!validateDecision({ route: "action", action: { name, query: "" } }, specs).action, name + " 空参数仍该打回");
+  }
+  assert.match(validateDecision({ route: "action", action: { name: "plate", query: "闪击" } }, specs).action.query, /闪击/);
+});
 test("路由使用上下文、没有人设，格式错误只重试一次", async () => {
   const calls = [];
   const result = await routeIntent({

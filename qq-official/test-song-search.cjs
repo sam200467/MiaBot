@@ -14,6 +14,37 @@ test("查询、假名归一化和拼写纠错", () => {
   assert.equal(search("サドマミホリツク").fuzzy, true);
   assert.match(reply("サドマミホリツク"), /比较接近/);
 });
+test("曲名里的符号不被抹掉：整条就是符号的曲名也搜得到自己", () => {
+  // 曲名《∀》整条就是一个符号，归一化时若把 \p{S} 一起删掉就只剩空串 ——
+  // 查询词抹成空串会被判成「没给线索」，于是这首歌谁也搜不到。
+  const exact = search("∀");
+  assert.equal(exact.total, 1);
+  assert.equal(exact.matches[0].meta.name, "∀");
+  assert.equal(reply("∀"), "《∀》\nBAS 6 / ADV 9.7 / EXP 13 / MAS 14.9", "搜到就该报难度，而不是要线索");
+  // 符号在查询词里也一样：不许再判成空线索
+  assert.ok(search("☆").total > 1, "含 ☆ 的曲名要能一次搜出来");
+  assert.doesNotMatch(reply("☆"), /给我一点曲名线索/);
+  // 曲库里没有 ∇，要老实说没找到，而不是反过来问用户要线索
+  assert.equal(search("∇").total, 0);
+  assert.match(reply("∇"), /没有找到/);
+});
+
+test("去掉符号仍能搜到：用户通常不会照着打「!」「☆」", () => {
+  // 保留符号那一级只解决「整条都是符号」；少打符号的写法还得靠第二级兜底。
+  for (const [query, title] of [
+    ["ウキウキCandy", "ウキウキ☆Candy!"],
+    ["ポジティブダンスタイム", "ポジティブ☆ダンスタイム"],
+    ["ネコ", "ネ！コ！"],
+  ]) {
+    const r = search(query);
+    assert.equal(r.total, 1, `${query} 应该搜到 1 首`);
+    assert.equal(r.matches[0].meta.name, title);
+  }
+  // 这首还有三个 -某某ソロver.-，所以只断言正式版在其中
+  const histories = search("ヒストリーブレイカー");
+  assert.ok(histories.matches.some(m => m.meta.name === "ヒストリー×ブレイカー"), "× 少打了也要搜到");
+});
+
 test("分页完整且没有重复，不把不合法页静默替换", () => {
   const first = search("a");
   assert.ok(first.total > 8);

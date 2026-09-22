@@ -143,6 +143,12 @@ function lookup(knowledge,query){
   const d=knowledge.catalogs[query.game];
   if(!d)return {error:'该游戏的本地资料尚未安装，不能编造曲目或定数。'};
   const title=normalize(String(query.title||'').slice(0,120));
+  // 原值非空、归一化后却是空串的，只有「整条就是符号」的曲名（例如《∀》）。
+  // 这时下面的 title 过滤整段会被跳过，而空串 includes 一切 —— 返回的是该游戏
+  // **全部谱面**：那不是「查不到」，是悄悄把问题换成了另一个，比查不到更坏。
+  // 别顺手去改共用的 normalize：定数裁决层等十几处都要求两边用同一套规则
+  // （见文件末尾导出处），抹不抹符号是那套规则的一部分。
+  const titleUnmatchable=Boolean(String(query.title||'').trim())&&!title;
   const difficulty=String(query.difficulty||'').toUpperCase();
   const level=String(query.level||'').trim();
   const type=String(query.type||'').toUpperCase();
@@ -156,7 +162,8 @@ function lookup(knowledge,query){
   let rows=d.charts.filter(c=>(!difficulty||c.difficulty===difficulty)&&(!level||(decimal?c.constant===Number(level):c.level===level))&&(!type||c.type===type)
     &&(!versions.length||versions.includes(normalize(String(c.version||''))))
     &&(bpm===null||(Number.isFinite(bpm)&&Number(c.bpm)===bpm)));
-  if(title){
+  if(titleUnmatchable)rows=[];
+  else if(title){
     const exact=rows.filter(c=>normalize(c.title)===title||String(c.id)===String(query.title));
     rows=exact.length?exact:rows.filter(c=>normalize(c.title).includes(title));
   }

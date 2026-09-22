@@ -3,10 +3,17 @@
 // Public metadata only: never consult player bindings or send a model-written result.
 const { songs } = require("../ongeki-song-catalog.json");
 const core = require("../mia-core.cjs");
+// 两级归一化。**符号不能在唯一那一级里抹掉**：曲名里真的有符号，而 `∀` 这种
+// 整条曲名就是一个符号的，抹完是空串 —— 空串 includes 一切，查询词抹成空串又会被
+// 下面判成「没给线索」，于是这首歌谁也搜不到。所以第一级保留符号。
 const normalize = value => String(value || "").normalize("NFKC").toLowerCase()
   .replace(/[ぁ-ゖ]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60))
-  .replace(/[\s\p{P}\p{S}]/gu, "");
-const index = songs.map(song => ({ song, title: normalize(song.meta.name) }));
+  .replace(/[\s\p{P}]/gu, "");
+// 第二级再去掉符号，也就是原来的行为：用户通常不会照着打「!」「☆」，
+// 「ウキウキCandy」要能搜到《ウキウキ☆Candy!》。**只在前一级没结果时兜底**，
+// 两级同时用会把这个宽松度换成另一批噪声。
+const squash = value => normalize(value).replace(/\p{S}/gu, "");
+const index = songs.map(song => ({ song, title: normalize(song.meta.name), squashed: squash(song.meta.name) }));
 const SEARCH_SPEC = { name: "songsearch", label: "搜索本地音击歌曲资料（不是个人成绩）", argHint: "只填曲名线索、别名或 id；可加 --page 2 翻页；不支持前缀或等级条件语法；无需绑定", needsBinding: false };
 
 function distance(a, b) {
@@ -28,10 +35,14 @@ function search(raw) {
   query = query.replace(/^[「『“"']|[」』”"']$/g, "");
   const needle = normalize(query);
   if (!needle || needle.length > 100) return { usage: true };
+  // 去符号的那一级可能是**空串**（查询词整个都是符号，比如「☆」）。空串 includes 一切，
+  // 直接拿去匹配会把整库倒出来，所以那一支必须判非空 —— 这正是原代码要拦的东西。
+  const squashedNeedle = squash(query);
   const pool = index;
   const byId = /^(?:id\s*)?\d+$/i.test(query);
   const aliasTitles = new Set(core.searchSongs(query).map(s => normalize(s.name)));
-  let matches = pool.filter(({ title }) => (!byId && title.includes(needle)) || aliasTitles.has(title));
+  let matches = pool.filter(({ title, squashed }) =>
+    (!byId && (title.includes(needle) || (squashedNeedle && squashed.includes(squashedNeedle)))) || aliasTitles.has(title));
   let fuzzy = false;
   if (!matches.length && !byId && needle.length >= 3) {
     const limit = needle.length < 5 ? 1 : Math.min(3, Math.floor(needle.length * 0.25));

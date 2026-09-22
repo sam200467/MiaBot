@@ -219,6 +219,48 @@ test("未绑定：给绑定引导，而且不入队出图", async () => {
   });
 });
 
+test("牌子版本清单不进绑定闸：未绑定也能问有哪些版本牌子", async () => {
+  // 版本名（ID／日文名／中文名／版本号）是静态公共资料，跟 /定数表 一样不该要绑定。
+  // 原先这段解析在绑定闸之后，问「总共有哪些牌子可以拿」的人只会收到「先去 /绑定」——
+  // 他连有哪些版本都还不知道，那句提示解不了他的题。
+  let bindingCalls = 0;
+  await run({}, { getBinding: async () => { bindingCalls++; return null; } }, async ({ commands, sent }) => {
+    // 命令路径：/牌子 不带参数
+    await commands.handleCommand(groupEvent("/牌子"), parseCommand("/牌子"));
+    assert.equal(sent.length, 1, "只该给清单，不该有占位、图片或绑定引导");
+    assert.match(sent[0].text, /闪击|閃撃/, "清单里要有版本牌子名");
+    assert.doesNotMatch(sent[0].text, /绑定|撤回/, "未绑定也要能看到清单，而不是被赶去绑定");
+    for (const id of ["040100", "040145", "040150"]) assert.match(sent[0].text, new RegExp(id), "清单要列全 " + id);
+    assert.equal(bindingCalls, 0, "只是列清单，不该去读凭据库");
+    assert.equal(commands.state.queue.length, 0, "列清单不该入队出图");
+
+    // 闲聊路径（模型挑 plate 且没给版本名）：程序直接兜住
+    await commands.runCapability(groupEvent(""), "plate", "", "好，我来查一下♪");
+    assert.match(sent.at(-1).text, /请选择版本牌子/, "闲聊问「有哪些牌子」也要能答");
+    assert.match(sent.at(-1).text, /想击|想撃/);
+    assert.equal(bindingCalls, 0, "闲聊这条也不该读凭据库");
+
+    // 反过来：真的报了个版本名，才轮到绑定闸。认不出来的名字也只给清单，不误报绑定。
+    await commands.handleCommand(groupEvent("/牌子 闪击"), parseCommand("/牌子 闪击"));
+    assert.match(sent.at(-1).text, /撤回/, "报了版本名但仍未绑定：该给绑定引导");
+    await commands.handleCommand(groupEvent("/牌子 不存在的版本"), parseCommand("/牌子 不存在的版本"));
+    assert.match(sent.at(-1).text, /请选择版本牌子/, "认不出的版本名回清单，不要拿绑定挡在前面");
+  });
+});
+
+test("牌子：认出具体版本才走绑定闸和出图", async () => {
+  await run({}, {
+    getBinding: async () => ({ playerName: "测试玩家", email: "a@b.c", password: "x" }),
+  }, async ({ commands, sent }) => {
+    await commands.handleCommand(groupEvent("/牌子 閃撃"), parseCommand("/牌子 閃撃"));
+    const image = sent.find((s) => s.kind === "image");
+    assert.ok(image, "绑定了就该出图");
+    assert.match(image.caption, /閃撃/, "繁体写法也要认到");
+    assert.match(image.caption, /闪击/);
+    assert.match(image.caption, /bright MEMORY Act\.2/);
+  });
+});
+
 test("群里发 /绑定 直接启动群会话，并提醒用户手动撤回", async () => {
   await run({}, {}, async ({ commands, sent }) => {
     const e = groupEvent("/绑定", { msgId: "bind-probe" });

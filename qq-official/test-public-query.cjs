@@ -24,6 +24,16 @@ test("开头/包含/完整名互不退化；严格搜索不引入别名与纠错
   assert.equal(run([filter("title", "search", "id999999999")]).total, 0);
 });
 
+test("search 操作符不吞符号：整条是符号的曲名也一样查得到", () => {
+  // search 走的是 song-search 那套归一化。它若把 \p{S} 一起抹掉，《∀》这条查询
+  // 就变成空串，静默返回 0 条 —— 用户拿到的是「没这首歌」，而曲库里明明有。
+  assert.equal(run([filter("title", "search", "∀")]).total, run([filter("title", "eq", "∀")]).total);
+  assert.equal(run([filter("title", "search", "∀")]).total, 1);
+  assert.ok(run([filter("title", "search", "☆")]).total > 1);
+  // 少打符号的写法仍走兜底那一级，别因为这次的改动被削掉
+  assert.equal(run([filter("title", "search", "ウキウキCandy")]).total, 1);
+});
+
 test("美亚对战曲包含 both，排除纯歌手；支持中文名与短名消歧", () => {
   const mia = characters.characters.find(c => c.aliases.includes("美亚"));
   const entries = all({ filters: [filter("opponent", "eq", "美亚")] });

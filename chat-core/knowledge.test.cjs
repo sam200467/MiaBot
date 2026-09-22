@@ -57,6 +57,18 @@ test('音击曲目查询会从角色索引补上对战相手',()=>{
  assert.deepEqual(result.opponents,['早乙女彩华']);
  assert.ok(result.charts.length>0);
 });
+test('整条是符号的曲名查不到就是查不到，不能退化成「该游戏全部谱面」',()=>{
+ const k=loadKnowledge(__dirname);
+ const all=lookup(k,{game:'ongeki'});
+ assert.ok(all.total>100,`前提：不带 title 才是列全部，实际 ${all.total}`);
+ // normalize 会把符号抹光，曲名《∀》归一化后是空串，而空串 includes 一切；
+ // 原先 title 过滤整段被跳过，返回的是全库 —— 不是查不到，是把问题换了。
+ const symbol=lookup(k,{game:'ongeki',title:'∀'});
+ assert.equal(symbol.total,0,'空归一化的 title 要照实回 0 条');
+ assert.deepEqual(symbol.charts,[]);
+ // 空的 title 仍然是「不筛曲名」的老行为，别一起改掉
+ assert.equal(lookup(k,{game:'ongeki',title:''}).total,all.total);
+});
 test('queries are read-only and evidence reaches final and degraded replies',async()=>{
  for(const degrade of [false,true]){
   const requests=[];let n=0;

@@ -731,7 +731,9 @@ function describeImage(kind, image, caption) {
 const CAPABILITY_SPECS = Object.freeze([
   { name: "help", label: "功能清单", argHint: "不需要参数", needsBinding: false },
   { name: "chart", label: "B50 + N10 + P50 分表", argHint: "不需要参数", needsBinding: true },
-  { name: "plate", label: "版本牌子完成度图", argHint: "版本牌子名，如 闪击、赤击、想击", needsBinding: true },
+  // argHint 后半句是给「有哪些牌子」这类问法兜底的：版本名是静态公共资料，
+  // 留空参数程序就会把 11 个版本列出来。没有这句，模型会自己编一句「列不全」。
+  { name: "plate", label: "版本牌子完成度图", argHint: "版本牌子名，如 闪击、赤击、想击；用户问有哪些版本牌子、或想查却说不出版本名时留空，程序会列出全部可选的版本", needsBinding: true },
   { name: "song", label: "单曲全难度成绩图", argHint: "曲名或 Song ID", needsBinding: true },
   { name: "chartinfo", label: "单张谱面分数线分析图", argHint: "曲名或 Song ID 加难度，如 id870 master", needsBinding: false },
   { name: "constant", label: "定数表", argHint: "0–20 的整数或一位小数，如 14 或 14.2", needsBinding: false },
@@ -822,6 +824,20 @@ function coreCall(name, ...args) {
   return module.exports[name](...args);
 }
 
+// 版本牌子名的唯一解析口，认不出来（含空参数）返回 null。
+// 调用方据此把 11 个版本原样列出来 —— 那是**静态公共资料**，ID、日文名、中文名和
+// 版本号全在 PLATE_CHOICES 里，跟 /定数表 一样不需要绑定任何人。出图才需要。
+function findPlate(query) {
+  const needle = normalizeSongQuery(query);
+  return needle ? PLATE_CHOICES.find((item) => [item.id, item.nameJa, item.nameZhHans, item.version]
+    .some((value) => normalizeSongQuery(value) === needle)) || null : null;
+}
+
+function plateChoiceText() {
+  return "请选择版本牌子：\n" + PLATE_CHOICES
+    .map((item) => item.id + "：" + item.nameJa + "（" + item.nameZhHans + "）/ " + item.version).join("\n");
+}
+
 // targetUserId 非空且不是自己时，表示「替群里另一个人查」——取的是对方的数据，
 // 所以对方必须绑定过。绑定即视为同意群友查询（2026-09-22 起不再单独开关）。
 async function resolveCapability(config, userId, name, query, onLine = () => {}, targetUserId = null) {
@@ -830,6 +846,12 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
   const q = String(query || "").normalize("NFKC").trim();
   const text = (value) => ({ kind: "text", text: value });
   if (spec.name === "help") return text(pickHint(capabilityHints.helpText));
+
+  // 这道闸**必须在绑定之前**。原先它在绑定之后，于是没绑定的人问「有哪些牌子」
+  // 拿到的是 bindNotice（「先去 /绑定」）—— 而他连有哪些版本都还不知道，
+  // 那句提示解不了他的题。实测群里问「总共有哪些牌子可以拿」就卡在这里。
+  const plate = spec.name === "plate" ? findPlate(q) : null;
+  if (spec.name === "plate" && !plate) return text(plateChoiceText());
 
   let binding = null;
   if (spec.needsBinding) {
@@ -854,13 +876,7 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
   }
 
   if (spec.name === "plate") {
-    const needle = normalizeSongQuery(q);
-    const plate = PLATE_CHOICES.find((item) => [item.id, item.nameJa, item.nameZhHans, item.version]
-      .some((value) => normalizeSongQuery(value) === needle));
-    if (!plate) {
-      return text("请选择版本牌子：\n" + PLATE_CHOICES
-        .map((item) => item.id + "：" + item.nameJa + "（" + item.nameZhHans + "）/ " + item.version).join("\n"));
-    }
+    // plate 在这里一定是解析好的：认不出来上面就已经返回清单了。
     return {
       kind: "image", key: "plate", label: "正在生成牌子完成度图", failText: "牌子完成度图生成失败：",
       caption: escapeText(player) + " 的 " + plate.nameJa + "（" + plate.nameZhHans + "）完成度 · " + plate.version,
