@@ -111,7 +111,7 @@ function stubTransport(realNormalize) {
   // 把那些诊断行记下来，一起打出来。
   const intercepted = [];
   const realBinding = core.getBinding;
-  core.getBinding = async () => ({ playerName: "校准玩家", email: "a@b.c", password: "x", allowOthers: true });
+  core.getBinding = async () => ({ playerName: "校准玩家", email: "a@b.c", password: "x" });
 
   const bot = createMiaBot(config, {
     log: (m) => { if (/拦下|忽略|补了/.test(String(m))) intercepted.push(String(m)); },

@@ -73,6 +73,7 @@ const c2cEvent = (content, over = {}) => ({
 
 // 每次用例前后把被动过手脚的 core 函数恢复回去
 const PATCHED = ["getBinding", "saveBinding", "vaultCall", "verifyAccount",
+  "getDataSource", "setDataSource", "getRinnetClient",
   "generateChart", "generateSongChart", "generateChartInfo", "generateCompletionChart", "generateLevelChart"];
 function stub(overrides = {}) {
   const original = {};
@@ -82,6 +83,9 @@ function stub(overrides = {}) {
     saveBinding: async () => {},
     vaultCall: async () => "0",
     verifyAccount: async () => "测试玩家",
+    getDataSource: async () => "otogame",
+    setDataSource: async () => {},
+    getRinnetClient: () => { throw new Error("测试里不该创建真实 rinnet 客户端"); },
     generateChart: async () => ({ name: "chart.png", buffer: Buffer.from("png"), meta: {} }),
     generateSongChart: async () => ({ name: "song.png", buffer: Buffer.from("png"), meta: {} }),
     generateChartInfo: async () => ({ name: "ci.png", buffer: Buffer.from("png"), meta: {} }),
@@ -193,7 +197,7 @@ test("闲聊触发帮助：开场、清单、安全提醒分段，且不重复�
     assert.ok(text.startsWith("喵哼哼，这就把清单翻给你看～\n\n美亚的小道具"), "开场与清单之间要空一行");
     assert.match(text, /\/取消[^\n]*\n\n等等，这里要认真听/, "清单与安全提醒之间要空一行");
     assert.ok(!text.includes("群里绑定："), "不要把 /绑定 的说明重复写两遍");
-    assert.match(text, /别人能不能查你的成绩/, "权限开关说的是用户自己的成绩，不是美亚的成绩");
+    assert.ok(!/允许查询|禁止查询/.test(text), "权限开关已删除，帮助里不该再出现");
   });
 });
 
@@ -239,6 +243,25 @@ test("出图失败用 core 给的 failText，不是从 label 推导", async () =
     // 梨绪那边是 label.replace(/^正在生成/,"") 推出来的，会变成「测试玩家的分表生成失败：」
     assert.ok(!/测试玩家的分表生成失败/.test(all), "不该出现 label 推导出来的那句");
   });
+});
+
+test("rinnet 查分失败写入接口与业务码，不记录响应凭据", async () => {
+  const { RinnetError } = require("../rinnet-client.cjs");
+  const error = new RinnetError("REJECTED", "rinnet 没有接受这次请求");
+  error.diagnostic = { route: "api/game/ongeki/newRating", http: 200, business: 95001, response: "json" };
+  error.rawResponse = "PRIVATE-TOKEN";
+  const lines = [];
+  const restore = stub({
+    getBinding: async () => ({ dataSource: "rinnet", playerName: "玩家" }),
+    generateChart: async () => { throw error; },
+  });
+  try {
+    const { commands, sent } = setup({}, { log: line => lines.push(line) });
+    await commands.handleCommand(groupEvent("/分表"), parseCommand("/分表"));
+    assert.ok(lines.includes("[rinnet-query-v2] code=REJECTED route=api/game/ongeki/newRating http=200 business=95001 response=json"));
+    assert.ok(!lines.join("\n").includes("PRIVATE-TOKEN"));
+    assert.match(sent.at(-1).text, /分表生成失败/);
+  } finally { restore(); }
 });
 
 test("出图成功：先占位再发图，caption 来自 core", async () => {
@@ -506,8 +529,8 @@ test("解绑：要两次确认，确认时才真的删", async () => {
     assert.deepEqual(deleted, [], "第一次不能真删");
 
     await commands.handleCommand(c2cEvent("/解绑"), parseCommand("/解绑"));
-    assert.deepEqual(deleted, ["delete"], "第二次才删");
-    assert.match(sent[sent.length - 1].text, /已经删掉/);
+    assert.deepEqual(deleted, ["delete-source"], "第二次只删当前来源");
+    assert.match(sent[sent.length - 1].text, /当前数据源的绑定解开/);
   });
 });
 
@@ -537,6 +560,126 @@ test("取消：有会话就中断，没有就照实说", async () => {
     await commands.handleCommand(c2cEvent("/取消"), parseCommand("/取消"));
     assert.equal(commands.getSession("U2"), null, "取消要清掉会话");
     assert.match(sent[sent.length - 1].text, /那就不弄啦/);
+  });
+});
+
+// ── 数据源切换与 rinnet 绑定 ────────────────────────────────────────
+test("/设置数据源：查当前、切换、无效说法，两边绑定分别提示", async () => {
+  let source = "otogame";
+  let bound = false;
+  const sets = [];
+  await run({}, {
+    getDataSource: async () => source,
+    setDataSource: async (cfg, uid, s) => { sets.push(s); source = s; },
+    getBinding: async () => (bound ? { playerName: "玩家" } : null),
+  }, async ({ commands, sent }) => {
+    await commands.handleCommand(c2cEvent("/设置数据源"), parseCommand("/设置数据源"));
+    assert.match(sent.at(-1).text, /现在翻的是「大饼」/);
+
+    await commands.handleCommand(c2cEvent("/设置数据源 rinnet"), parseCommand("/设置数据源 rinnet"));
+    assert.deepEqual(sets, ["rinnet"]);
+    assert.match(sent.at(-1).text, /切到「rinnet」/);
+    assert.match(sent.at(-1).text, /还没绑定/, "切过去但没绑定时要明说");
+
+    bound = true;
+    await commands.handleCommand(c2cEvent("/设置数据源 大餅"), parseCommand("/设置数据源 大餅"));
+    assert.deepEqual(sets, ["rinnet", "otogame"], "繁体说法也要认");
+    assert.match(sent.at(-1).text, /接下来查分就用这边/, "已绑定的那边不用再引导");
+
+    await commands.handleCommand(c2cEvent("/设置数据源 火星服"), parseCommand("/设置数据源 火星服"));
+    assert.deepEqual(sets, ["rinnet", "otogame"], "无效说法不能改来源");
+    assert.match(sent.at(-1).text, /\/设置数据源 大饼 或 \/设置数据源 rinnet/);
+  });
+});
+
+test("rinnet 绑定：邮箱→密码→验证码→卡号，全程凭据不外泄", async () => {
+  const EMAIL = "rin@example.com", PW = "rinnet-绝密-☂", TOTP = "123456", CARDNO = "00000000000000004453";
+  let saved = null;
+  const calls = [];
+  const fakeClient = {
+    login: async (email, pw) => { calls.push(["login", email, pw]); return { totpToken: "tok-1" }; },
+    totp: async (token, code) => { calls.push(["totp", token, code]); return { accessToken: "AT", refreshToken: "RT" }; },
+    bind: async (account, email, cardNumber) => {
+      calls.push(["bind", cardNumber]);
+      if (!cardNumber) return { cards: [{ luid: CARDNO }, { luid: "00000000000000009901" }] };
+      return { dataSource: "rinnet", email, account, cardNumber, aimeId: "44153",
+        playerName: "リネット玩家", boundAt: "t", sessionId: "s-1" };
+    },
+  };
+  await run({}, {
+    getDataSource: async () => "rinnet",
+    getRinnetClient: () => fakeClient,
+    saveBinding: async (cfg, entry) => { saved = entry; },
+  }, async ({ commands, sent }) => {
+    await commands.handleCommand(c2cEvent("/绑定"), parseCommand("/绑定"));
+    assert.match(sent.at(-1).text, /rinnet/);
+    assert.match(sent.at(-1).text, /验证码/, "要预告可能需要两步验证");
+    assert.match(sent.at(-1).text, /撤回/);
+    assert.equal(commands.getSession("U2").state, "awaitingEmail");
+
+    await commands.continueSession(c2cEvent(EMAIL), EMAIL);
+    await commands.continueSession(c2cEvent(PW), PW);
+    assert.match(sent.at(-1).text, /六位验证码/);
+    await commands.continueSession(c2cEvent(TOTP), TOTP);
+    assert.match(sent.at(-1).text, /卡号/, "多张卡时要请用户发 20 位卡号");
+    await commands.continueSession(c2cEvent(CARDNO), CARDNO);
+
+    assert.deepEqual(calls.map((c) => c[0]), ["login", "totp", "bind", "bind"]);
+    assert.deepEqual(calls[0], ["login", EMAIL, PW], "登录用的是用户发的邮箱和密码");
+    assert.equal(commands.getSession("U2"), null, "绑完会话要清掉");
+    assert.equal(saved.dataSource, "rinnet");
+    assert.equal(saved.aimeId, "44153");
+    assert.equal(saved.userId, "U2");
+    assert.match(sent.at(-1).text, /绑好 rinnet 啦/);
+    const dump = JSON.stringify(sent);
+    for (const secret of [EMAIL, PW, TOTP, CARDNO, "tok-1"]) {
+      assert.ok(!dump.includes(secret), "凭据不能出现在任何一条回复里：" + secret);
+    }
+  });
+});
+
+test("rinnet 绑定：只有一张卡时自动选定，不问卡号", async () => {
+  let saved = null;
+  const fakeClient = {
+    login: async () => ({ account: { accessToken: "AT", refreshToken: "RT" } }),
+    bind: async (account, email, cardNumber) => {
+      assert.equal(cardNumber, undefined, "单卡不该要求卡号");
+      return { dataSource: "rinnet", email, account, cardNumber: "00000000000000004453",
+        aimeId: "44153", playerName: "单卡玩家", boundAt: "t", sessionId: "s-1" };
+    },
+  };
+  await run({}, {
+    getDataSource: async () => "rinnet",
+    getRinnetClient: () => fakeClient,
+    saveBinding: async (cfg, entry) => { saved = entry; },
+  }, async ({ commands, sent }) => {
+    await commands.handleCommand(c2cEvent("/绑定"), parseCommand("/绑定"));
+    await commands.continueSession(c2cEvent("rin@example.com"), "rin@example.com");
+    await commands.continueSession(c2cEvent("pw"), "pw");
+    assert.equal(saved?.playerName, "单卡玩家");
+    assert.match(sent.at(-1).text, /绑好 rinnet 啦/);
+    assert.ok(!sent.some((s) => /卡号要是|好几张/.test(s.text)), "单卡流程不出现选卡提示");
+  });
+});
+
+test("rinnet 绑定：验证码格式连错三次就停下，凭据不进回复", async () => {
+  const fakeClient = {
+    login: async () => ({ totpToken: "tok-1" }),
+    totp: async () => { throw new Error("不该被调到：格式不对不该发请求"); },
+  };
+  await run({}, {
+    getDataSource: async () => "rinnet",
+    getRinnetClient: () => fakeClient,
+  }, async ({ commands, sent }) => {
+    await commands.handleCommand(c2cEvent("/绑定"), parseCommand("/绑定"));
+    await commands.continueSession(c2cEvent("rin@example.com"), "rin@example.com");
+    await commands.continueSession(c2cEvent("pw"), "pw");
+    for (const bad of ["abc", "12345", "不是验证码"]) {
+      await commands.continueSession(c2cEvent(bad), bad);
+    }
+    assert.match(sent.at(-1).text, /连续三次/);
+    assert.equal(commands.getSession("U2"), null, "三次错完会话要结束");
+    assert.ok(!JSON.stringify(sent).includes("tok-1"), "totpToken 不能出现在回复里");
   });
 });
 
@@ -574,31 +717,6 @@ test("别名缺竖线：给用法提示", async () => {
   });
 });
 
-// ── 隐私开关 ────────────────────────────────────────────────────────
-test("允许/禁止查询：没绑定时给绑定引导，绑定了才改", async () => {
-  const saved = [];
-  await run({}, {
-    getBinding: async () => null,
-    saveBinding: async (cfg, entry) => { saved.push(entry); },
-  }, async ({ commands, sent }) => {
-    await commands.handleCommand(c2cEvent("/允许查询"), parseCommand("/允许查询"));
-    assert.match(sent[sent.length - 1].text, /\/绑定/, "先引导去绑定");
-    assert.deepEqual(saved, [], "没绑定就不该写");
-  });
-
-  const saved2 = [];
-  await run({}, {
-    getBinding: async () => ({ userId: "U2", playerName: "玩家", email: "a@b.c", password: "x" }),
-    saveBinding: async (cfg, entry) => { saved2.push(entry); },
-  }, async ({ commands }) => {
-    await commands.handleCommand(c2cEvent("/允许查询"), parseCommand("/允许查询"));
-    assert.equal(saved2.length, 1);
-    assert.equal(saved2[0].allowOthers, true, "开关只改调用者自己");
-    await commands.handleCommand(c2cEvent("/禁止查询"), parseCommand("/禁止查询"));
-    assert.equal(saved2[1].allowOthers, false);
-  });
-});
-
 // ── 状态 ────────────────────────────────────────────────────────────
 test("状态：读传输层的连接状态，措辞是美亚的", async () => {
   await run({}, {}, async ({ commands, sent }) => {
@@ -619,4 +737,28 @@ test("素材检索指令：返回带页面类型和关键词的可点击链接",
     assert.match(sent[1].text, /角色们的小表情都整理好啦/);
     assert.match(sent[1].text, /\/expressions\?q=%E6%98%9F%E5%92%B2%E3%81%82%E3%81%8B%E3%82%8A/);
   });
+});
+
+test("rinnet 登录途中取消：迟到的登录响应不能保存绑定", async () => {
+  let resolveLogin;
+  let saves = 0;
+  const pending = new Promise(resolve => { resolveLogin = resolve; });
+  await run({}, {
+    getDataSource: async () => "rinnet",
+    getRinnetClient: () => ({ login: () => pending, bind: async () => { throw new Error("取消后不应查卡"); } }),
+    saveBinding: async () => { saves++; },
+  }, async ({ commands }) => {
+    await commands.handleCommand(c2cEvent("/绑定"), parseCommand("/绑定"));
+    await commands.continueSession(c2cEvent("rin@example.com"), "rin@example.com");
+    const work = commands.continueSession(c2cEvent("secret"), "secret");
+    await commands.handleCommand(c2cEvent("/取消"), parseCommand("/取消"));
+    resolveLogin({ account: { accessToken: "fake", refreshToken: "fake" } });
+    await work;
+    assert.equal(saves, 0);
+    assert.equal(commands.getSession("U2"), null);
+  });
+});
+
+test("已删除的查分开关及旧别名不能解析为功能", () => {
+  for (const text of ["/允许查分", "/禁止查分", "/允许查询", "/禁止查询", "/allowquery", "/denyquery"]) assert.equal(parseCommand(text).name, null);
 });

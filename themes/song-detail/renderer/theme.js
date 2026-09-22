@@ -102,18 +102,52 @@
 
   window.__FIT_SONG_THEME_TEXT__ = fitThemeText;
 
-  async function waitForImages() {
-    await Promise.all([...document.images].map((image) => new Promise((resolve, reject) => {
-      const loaded = () => image.naturalWidth > 0
-        ? resolve()
-        : reject(new Error(`${image.dataset.loadLabel || "图片"}内容无效：${image.src}`));
-      const failed = () => reject(new Error(`${image.dataset.loadLabel || "图片"}加载失败：${image.src}`));
-      if (image.complete) loaded();
+  // 等图有预算。曲绘走公网（大饼是 CDN 哈希，rinnet 是曲库里的公网图），拉不动时
+  // 用本地占位图顶上并记一条提示 —— 不能因为一张图挂住就报「渲染失败」。
+  const IMAGE_BUDGET_MS = 30000;
+  window.__THEME_WARNINGS__ = [];
+
+  function settleImage(image) {
+    return new Promise((resolve) => {
+      const done = () => {
+        image.removeEventListener("load", done);
+        image.removeEventListener("error", done);
+        resolve(image.naturalWidth > 0 && image.naturalHeight > 0);
+      };
+      if (image.complete) done();
       else {
-        image.addEventListener("load", loaded, { once: true });
-        image.addEventListener("error", failed, { once: true });
+        image.addEventListener("load", done);
+        image.addEventListener("error", done);
       }
-    })));
+    });
+  }
+
+  async function waitForImages() {
+    const images = [...document.images];
+    const originSrc = new Map(images.map((image) => [image, image.currentSrc || image.src]));
+    const outstanding = new Set(images);
+    const label = (image) => image.dataset.loadLabel || "图片";
+    const isRemote = (image) => /^https?:/i.test(originSrc.get(image) || "");
+    const degrade = (image) => {
+      if (!outstanding.delete(image)) return;
+      const fallback = image.dataset.fallbackSrc;
+      if (fallback) {
+        image.src = fallback;
+        delete image.dataset.fallbackSrc;
+        window.__THEME_WARNINGS__.push(`${label(image)}没拉下来，图中已换成占位图：${originSrc.get(image)}`);
+      } else {
+        image.style.visibility = "hidden";
+        window.__THEME_WARNINGS__.push(`${label(image)}没拉下来，图中已隐藏：${originSrc.get(image)}`);
+      }
+    };
+    const settled = Promise.all(images.map(async (image) => {
+      if (await settleImage(image)) return void outstanding.delete(image);
+      // 本地主题资源（底图）缺了才算打包坏了；公网资源拉不动只降级。
+      if (!isRemote(image)) throw new Error(`${label(image)}加载失败：${originSrc.get(image)}`);
+      degrade(image);
+    }));
+    await Promise.race([settled, new Promise((resolve) => setTimeout(resolve, IMAGE_BUDGET_MS))]);
+    for (const image of [...outstanding]) if (isRemote(image)) degrade(image);
   }
 
   async function render() {
@@ -121,7 +155,10 @@
     if (!data) throw new Error("没有找到单曲主题数据 preview-data.js");
     const song = data.song || {};
 
-    $("jacket").src = song.jacketUrl;
+    const jacket = $("jacket");
+    jacket.dataset.loadLabel = "曲绘";
+    if (song.jacketFallbackUrl) jacket.dataset.fallbackSrc = song.jacketFallbackUrl;
+    jacket.src = song.jacketUrl;
     setLayeredText($("song-title"), dash(song.title));
     setLayeredText($("artist"), dash(song.artist));
     const status = song.status === "online" ? "online" : "unavailable";

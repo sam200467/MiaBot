@@ -25,6 +25,70 @@ const ROOT = path.resolve(HERE, "..");
 
 const CONTEXT_MAX = 12;
 const CONTEXT_TTL_MS = 10 * 60 * 1000;
+const MAX_INBOUND_IMAGES = 4;
+const MAX_INBOUND_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_INBOUND_IMAGE_TOTAL_BYTES = 24 * 1024 * 1024;
+const IMAGE_FETCH_TIMEOUT_MS = 15000;
+
+function imageMime(buffer) {
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex"))) return "image/png";
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
+  if (buffer.length >= 6 && /^(?:GIF87a|GIF89a)$/.test(buffer.subarray(0, 6).toString("ascii"))) return "image/gif";
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
+  return null;
+}
+
+async function readLimitedBody(response, limit) {
+  const declared = Number(response.headers?.get?.("content-length"));
+  if (Number.isFinite(declared) && declared > limit) throw new Error("图片超过 8 MiB 上限");
+  if (!response.body?.getReader) {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > limit) throw new Error("图片超过 8 MiB 上限");
+    return buffer;
+  }
+  const reader = response.body.getReader(), chunks = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) throw new Error("图片超过 8 MiB 上限");
+      chunks.push(Buffer.from(value));
+    }
+  } catch (error) {
+    try { await reader.cancel(); } catch {}
+    throw error;
+  }
+  return Buffer.concat(chunks, size);
+}
+
+async function fetchIncomingImages(attachments, fetchImpl, log) {
+  const candidates = attachments.filter(a => /^image\//i.test(String(a.content_type || a.contentType || "")) || /\.(?:png|jpe?g|gif|webp)(?:\?|$)/i.test(String(a.filename || a.url || ""))).slice(0, MAX_INBOUND_IMAGES);
+  const images = [];
+  let total = 0;
+  for (const attachment of candidates) {
+    const rawUrl = String(attachment.url || attachment.proxy_url || attachment.proxyUrl || "").trim();
+    let url;
+    try { url = new URL(rawUrl); } catch { log("跳过无法解析的图片附件地址"); continue; }
+    if (url.protocol !== "https:" || rawUrl.length > 8192) { log("跳过非 HTTPS 或地址过长的图片附件"); continue; }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), IMAGE_FETCH_TIMEOUT_MS);
+    try {
+      const response = await fetchImpl(url, { method: "GET", redirect: "follow", signal: controller.signal });
+      if (!response.ok) throw new Error("下载 HTTP " + response.status);
+      const buffer = await readLimitedBody(response, Math.min(MAX_INBOUND_IMAGE_BYTES, MAX_INBOUND_IMAGE_TOTAL_BYTES - total));
+      const mime = imageMime(buffer);
+      if (!mime) throw new Error("不是支持的 PNG/JPEG/GIF/WebP 图片");
+      total += buffer.length;
+      images.push({ url: `data:${mime};base64,${buffer.toString("base64")}` });
+      if (total >= MAX_INBOUND_IMAGE_TOTAL_BYTES) break;
+    } catch (error) {
+      log("读取图片附件失败：" + (error?.name === "AbortError" ? "超时" : error?.message || error));
+    } finally { clearTimeout(timer); }
+  }
+  return images;
+}
 
 // ── 配置 ────────────────────────────────────────────────────────────
 // 相对路径一律按 HERE 解析，**不能用 process.cwd()** —— GUI 启动子进程时
@@ -132,6 +196,7 @@ function makeCommandSenders(transport, log) {
 
 function createMiaBot(config, deps = {}) {
   const log = deps.log || (() => {});
+  const mediaFetchImpl = deps.mediaFetchImpl || fetch;
   const characterDir = config.characterDir ? path.resolve(HERE, config.characterDir) : deps.characterDir || path.join(ROOT, "mia-chat");
   const settings = deps.settings || loadSettings(characterDir);
   if (!settings) throw new Error("美亚聊天未启用：检查 " + path.join(characterDir, "config.local.json"));
@@ -234,15 +299,16 @@ function createMiaBot(config, deps = {}) {
       ability: () => commands
         ? "运行时实际能力：你正在 QQ 里回复消息。"
           + "你可以只读查询本地音击曲库中的曲名、谱面难度、等级、定数、艺术家、版本和对战相手；这不是联网搜索，不能查询其他游戏。"
-          + "找歌、询问有没有某首歌、曲名开头或拼写不确定时调用 songsearch，无需绑定。只有明确要个人成绩或成绩图时才调用 song。查不到不等于歌曲不存在，不要凭记忆否认或猜曲名。"
+          + "公共资料由只读结构化查询处理，无需绑定；严格区分歌名开头、包含、别名线索和角色关系。只有明确要个人成绩或成绩图时才调用 song。查不到不等于歌曲不存在，不要凭记忆否认或猜曲名。"
           + "你可以调用工具替用户办这些事：生成 B50+N10+P50 分表、生成版本牌子完成度图、生成单曲全难度成绩图、"
           + "生成单张谱面分数线分析图、查定数表、生成等级成绩长图、算单曲 Rating、查看某首歌的全部别名、"
-          + "按别名反查曲目、给歌曲加别名、开关「别人能不能查我的成绩」、看运行状态（只在用户明确问你在不在线、"
+          + "按别名反查曲目、给歌曲加别名、看运行状态（只在用户明确问你在不在线、"
           + "是不是掉线了、队列排了多少时才调用，打招呼和寒暄时绝对不要调用）。"
           + "结果和图片由程序发送，你只写一句引出话，**绝不自己报数字或曲名结论**。"
-          + "两件事你没有工具：删除别名（让用户用 /删除别名 指令，而且只有指定账号能用）、"
-          + "读图片内容（别人的图你看不到，被问到就直说看不了）。"
-          + "绑定账号只能把用户引到程序控制的 /绑定 流程：你不能索要、接收或转述邮箱和密码。"
+          + "删除别名需要用户用 /删除别名 指令，而且只有指定账号能用。"
+          + "当前消息直接附带的 PNG/JPEG/GIF/WebP 图片会随本轮请求提供给你，可以正常识别、描述和评价；没有附带原图数据的引用图片仍然看不到，不能猜测。"
+          + "数据源支持大饼和 rinnet，用户通过 /设置数据源 大饼 或 /设置数据源 rinnet 切换。两边绑定分别保存。"
+          + "绑定账号只能把用户引到程序控制的 /绑定 流程：你不能索要、接收或转述邮箱、密码、卡号和验证码。"
           + "用户在群里提到绑定，就让他 @你 发 /绑定，并提醒邮箱和密码发出后立刻手动撤回。"
           // 缺关键信息时先问清楚，不要猜、不要用常见值、不要假设默认。
           //
@@ -257,9 +323,8 @@ function createMiaBot(config, deps = {}) {
           //    不是把自己的活儿推掉。人设那句「她记不住」现在只用来解释她**不凭空报数**，
           //    不用来拒绝干活。
           + "用户要办的事**缺了关键信息**时，先问清楚再动手，**绝对不要替他填**——"
-          + "不要猜、不要用常见值、不要假设默认。比如「id870 的定数是多少」没说难度，"
-          + "就先问一句是哪个难度，别自己挑一个；算 Rating 要的定数、技术分、铃铛、连击"
-          + "四样少一样，就先问那一样。"
+          + "不要猜、不要用常见值、不要假设默认。比如「算 Rating」要的定数、技术分、铃铛、连击"
+          + "四样少一样，就先问那一样。公共曲目没说难度时可以返回全部难度，不为此追问。"
           // ⚠ 上面那条**很容易做过头**，实测吃过一次：美亚开始对什么都先反问一句，
           // 「帮我查一下 id870」被追问要哪个难度（单曲成绩图本来就不分难度），
           // 「出张 b110 分表」反过来质疑人家是不是想说 B50。追问只在**缺的那样真的补不上**
@@ -268,19 +333,20 @@ function createMiaBot(config, deps = {}) {
           + "「帮我查一下 id870」先搜索公共歌曲资料，不要擅自变成查个人成绩；"
           + "用户说的指令叫法（比如 b110 就是 B50+N10+P50 的分表）照办就行，"
           + "不要质疑人家「是不是想说别的」。能办就办，别把活儿推回去。"
-        : "运行时实际能力：你正在 QQ 里回复消息，可以查阅本地音击曲库，但没有联网、查分或读图能力。可以按语境发送你的表情图。",
+        : "运行时实际能力：你正在 QQ 里回复消息，可以查阅本地音击曲库；当前消息直接附带的图片可以读取，但没有原图数据的引用图片看不到。没有联网或查分能力。可以按语境发送你的表情图。",
       // 工具清单与执行入口。模型只负责「挑哪个工具、参数是什么」，执行权在程序侧：
       // 能力名、参数、权限、绑定状态、冷却、队列、@ 名单，六道校验全在 mia-commands 里。
-      ...(commands ? {
-        actions: [...core.CAPABILITY_SPECS, songSearch.SEARCH_SPEC],
-        routeIntent: ({ messages, message, signal, dispatcher }) => routeIntent({
-          settings, messages, signal, dispatcher, log,
-          specs: [...core.CAPABILITY_SPECS, songSearch.SEARCH_SPEC],
+      routeIntent: ({ messages, message, queryState, querySelection, signal, dispatcher }) => routeIntent({
+          settings, messages, queryState, querySelection, media: message.__media, signal, dispatcher, log,
+          specs: commands ? [...core.CAPABILITY_SPECS, songSearch.SEARCH_SPEC] : [],
           targets: (message.__event?.mentionedOpenids || []).map(String).filter(id => id !== botOpenid),
-          validateAction: (action, userText) => action.name === "calculate" && commands.hasInventedEnum(action.query, userText).length
+          validateAction: (action, userText) => action.name === "calculate" && commands?.hasInventedEnum(action.query, userText).length
             ? "铃铛和连击还没说完整呢。告诉我铃铛是 none 还是 fb、连击是 none / fc / ab / ab-plus 吧。" : "",
           ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
         }),
+      images: (message) => message.__media?.images || [],
+      ...(commands ? {
+        actions: [...core.CAPABILITY_SPECS, songSearch.SEARCH_SPEC],
         runAction: async (action, message, result) => {
           const e = message.__event;
           if (!e) return { handled: false };
@@ -393,7 +459,7 @@ function createMiaBot(config, deps = {}) {
     // @全体成员 不是在叫美亚。部分客户端会把它作为 AT 事件投递，旧的事件名兜底
     // 因而会误判成 @ 到自己；在去重、上下文和绑定会话之前整条忽略。
     if (event.type === "group" && event.mentionsEveryone) {
-      log("忽略 @全体成员 消息：" + String(event.content || "").slice(0, 40));
+      log("忽略 @全体成员 消息");
       return;
     }
 
@@ -403,11 +469,19 @@ function createMiaBot(config, deps = {}) {
     // 这里把第二次整条丢掉，**包括群上下文** —— 否则模型看到的上下文里
     // 同一句话出现两遍，「上面那首」这类指代就被污染了。
     if (commands && !commands.claimEvent(event)) {
-      log("忽略重复投递（" + eventName + "）：" + String(event.content || "").slice(0, 40));
+      log("忽略重复投递（" + eventName + "）");
       return;
     }
 
-    const text = String(event.content || "").trim();
+    const attachments = Array.isArray(event.raw?.attachments) ? event.raw.attachments : [];
+    const imageAttachments = attachments.filter(a => /^image\//i.test(String(a.content_type || a.contentType || "")) || /\.(?:png|jpe?g|gif|webp)(?:\?|$)/i.test(String(a.filename || a.url || "")));
+    const media = {
+      hasImage: imageAttachments.length > 0,
+      hasReference: Boolean(event.raw?.message_reference || event.raw?.referenced_message),
+      visionAvailable: false,
+      images: [],
+    };
+    const text = String(event.content || "").trim() || (media.hasImage ? "[图片]" : "");
     if (!text) return;
 
     const isDirect = event.type === "c2c";
@@ -415,11 +489,18 @@ function createMiaBot(config, deps = {}) {
 
     // 群绑定的邮箱/密码必须在进入上下文缓冲、日志或模型之前截走。
     // 会话已经按 user + group 绑定，不会吞掉别人的话或同一用户在别群的消息。
-    if (commands && event.type === "group") {
+    if (commands?.expireSessionFor(event)) {
+      await send(event, T.bindExpired);
+      return;
+    }
+    if (commands) {
       const groupSession = commands.getSession(event.userId);
       if (commands.sessionMatches(event, groupSession)) {
-        if (command?.name === "cancel") await commands.handleCommand(event, command);
-        else await commands.continueSession(event, text);
+        if (["cancel", "source"].includes(command?.name)) await commands.handleCommand(event, command);
+        else if (groupSession.state === "confirmUnbind") {
+          if (command?.name === "unbind" || (isDirect && commands.LOOKUP.get(text.normalize("NFKC").toLowerCase()) === "unbind")) await commands.handleUnbind(event);
+          else await send(event, T.unbindConfirmPending);
+        } else await commands.continueSession(event, String(event.content || ""));
         return;
       }
     }
@@ -427,28 +508,14 @@ function createMiaBot(config, deps = {}) {
     // ── 3. 群上下文 ─────────────────────────────────────────────────
     // 全量群消息也记（模型要靠它接上「他刚才说的」这类指代），但**不进聊天**。
     // 群绑定凭据已在上面提前截走，所以绝不会进入这里。
-    if (event.type === "group") remember(event.openid, "群友", String(event.content || ""));
+    // 有人会把凭据误写在 /绑定 后面；这种指令也不能进入聊天上下文。
+    if (event.type === "group" && command?.name !== "bind") remember(event.openid, "群友", String(event.content || ""));
 
     // ── 4~7. 会话与指令 ─────────────────────────────────────────────
     // 顺序照抄 qq/qq-entry.cjs:785-798，那里的注释解释了为什么必须这样排：
     // 解绑确认期间收到的私聊文本如果落进绑定流程，末尾会回一句「正在验证，请稍候……」，
     // 用户明明是来确认解绑的，只会一头雾水。
     if (commands) {
-      const session = commands.getSession(event.userId);
-
-      if (!command && isDirect && session?.state === "confirmUnbind") {
-        // 「解绑」本身也算确认：用户刚被告知「再发一次」，不一定记得带前缀。
-        if (commands.LOOKUP.get(text.normalize("NFKC").toLowerCase()) === "unbind") {
-          await commands.handleUnbind(event);
-          return;
-        }
-        await send(event, T.unbindConfirmPending);
-        return;
-      }
-      if (!command && isDirect && session) {
-        await commands.continueSession(event, text);
-        return;
-      }
       // 私聊里裸关键字也认（群里不认 —— 群里必须带前缀，而且得 @ 到美亚）
       if (!command && isDirect) {
         const bare = text.normalize("NFKC").match(/^([^\s]+)\s*([\s\S]*)$/);
@@ -459,7 +526,7 @@ function createMiaBot(config, deps = {}) {
       if (command) {
         // 群里光有前缀不够：全量模式下别的 bot 打的 /help 也会送到这儿。
         if (!commandAllowedInGroup(event, eventName)) {
-          log("群里没 @ 美亚，指令不执行：" + text.slice(0, 40));
+          log("群里没 @ 美亚，指令不执行");
           return;
         }
         if (!command.name) return send(event, T.unknownCommand);
@@ -488,12 +555,17 @@ function createMiaBot(config, deps = {}) {
     mark("MIA_BUSY:正在回复…");
     try {
       // 下面 finally 里统一收尾
+      if (media.hasImage) {
+        media.images = await fetchIncomingImages(imageAttachments, mediaFetchImpl, log);
+        media.visionAvailable = media.images.length > 0;
+      }
       await chat.handle({
         id: event.msgId,
         guildId: "qq-official",
         channelId: event.openid,
         author: { id: event.userId, bot: false },
         content: text,
+        __media: media,
         __event: event,
         __replyTo: event.msgId,
       });

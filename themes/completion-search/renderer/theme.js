@@ -14,12 +14,15 @@
 
   const $ = (id) => document.getElementById(id);
 
-  function image(src, className, alt) {
+  function image(src, className, alt, fallbackSrc) {
     const element = document.createElement("img");
     element.src = src;
     element.className = className || "";
     element.alt = alt || "";
     element.decoding = "sync";
+    if (alt || fallbackSrc) element.dataset.loadLabel = alt || "图片资源";
+    // 公网曲绘拉不动时换上的本地占位图（由分表核心随数据给出）
+    if (fallbackSrc) element.dataset.fallbackSrc = fallbackSrc;
     return element;
   }
 
@@ -72,7 +75,7 @@
   function songTile(song) {
     const tile = div("song-tile");
     tile.title = `${song.title}（MASTER ${song.masterLevel}）`;
-    const jacket = image(song.jacketUrl, "song-jacket", `${song.title} 曲绘`);
+    const jacket = image(song.jacketUrl, "song-jacket", `${song.title} 曲绘`, song.jacketFallbackUrl);
     jacket.addEventListener("error", () => jacket.classList.add("image-load-failed"), { once: true });
     tile.append(jacket);
 
@@ -167,15 +170,52 @@
 
   window.__FIT_COMPLETION_THEME__ = fitCompletionLayout;
 
+  // 等图有预算。曲绘/头像走公网，一张图挂住不能把整块牌子拖成「渲染失败」：
+  // 预算到点就不再等，还没下完的公网图降级（有占位图换占位图，没有就留给
+  // CSS 底色），并记一条提示。本地主题资源照旧不等超时。
+  const IMAGE_BUDGET_MS = 45000;
+  window.__THEME_WARNINGS__ = [];
+
+  function settleImage(element) {
+    return new Promise((resolve) => {
+      const done = () => {
+        element.removeEventListener("load", done);
+        element.removeEventListener("error", done);
+        resolve(element.naturalWidth > 0 && element.naturalHeight > 0);
+      };
+      if (element.complete) done();
+      else {
+        element.addEventListener("load", done);
+        element.addEventListener("error", done);
+      }
+    });
+  }
+
   async function waitForImages() {
     const images = [...document.images];
-    await Promise.all(images.map((element) => {
-      if (element.complete) return Promise.resolve();
-      return new Promise((resolve) => {
-        element.addEventListener("load", resolve, { once: true });
-        element.addEventListener("error", resolve, { once: true });
-      });
-    }));
+    const originSrc = new Map(images.map((element) => [element, element.currentSrc || element.src]));
+    const outstanding = new Set(images);
+    const label = (element) => element.dataset.loadLabel || "图片";
+    const isRemote = (element) => /^https?:/i.test(originSrc.get(element) || "");
+    const degrade = (element) => {
+      if (!outstanding.delete(element)) return;
+      const fallback = element.dataset.fallbackSrc;
+      if (fallback) {
+        element.src = fallback;
+        delete element.dataset.fallbackSrc;
+        window.__THEME_WARNINGS__.push(`${label(element)}没拉下来，图中已换成占位图：${originSrc.get(element)}`);
+      } else {
+        window.__THEME_WARNINGS__.push(`${label(element)}没拉下来，图中留空：${originSrc.get(element)}`);
+      }
+    };
+    await Promise.race([
+      Promise.all(images.map(async (element) => {
+        if (await settleImage(element)) outstanding.delete(element);
+        else degrade(element);
+      })),
+      new Promise((resolve) => setTimeout(resolve, IMAGE_BUDGET_MS)),
+    ]);
+    for (const element of [...outstanding]) if (isRemote(element)) degrade(element);
   }
 
   function showError(error) {
@@ -195,7 +235,10 @@
 
     const plateUrl = data?.plate?.layoutUrl || `${PIC}ui_userplate_040100.png`;
     $("plate-frame").src = plateUrl;
-    $("avatar").src = data?.profile?.avatarUrl || "";
+    const avatar = $("avatar");
+    avatar.dataset.loadLabel = "玩家头像";
+    if (data?.profile?.avatarFallbackUrl) avatar.dataset.fallbackSrc = data.profile.avatarFallbackUrl;
+    avatar.src = data?.profile?.avatarUrl || "";
     const levelText = `Lv.${integer(data?.profile?.level)}`;
     $("player-level").textContent = levelText;
     $("player-level").dataset.text = levelText;

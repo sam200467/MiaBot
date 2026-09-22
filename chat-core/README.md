@@ -31,6 +31,11 @@
 原因是各家平台的回复时序和配额模型不一样。宿主注入的能力清单（`adapter.actions`）
 是引擎与前端之间唯一的缝。
 
+QQ 宿主的 `routeIntent` 还可接收当前会话的 `queryState`，返回只读查询结果及新的
+`queryState`。引擎按频道和用户隔离保存它，重置/过期一起清除；模型历史文本不作为
+分页状态的唯一来源。具体字段、筛选和复核由 `qq-official/public-query.cjs` 与
+`semantic-router.cjs` 实现，个人成绩和写操作仍交原指令执行器。
+
 ## 客观事实层
 
 `knowledge/` 下的 JSON 都带来源、置信度和人工过目标记。字段含义、各文件的用途，

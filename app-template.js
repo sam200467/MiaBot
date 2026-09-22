@@ -214,7 +214,12 @@ class CDP {
     // Page.navigate may return while Runtime.evaluate still targets the old
     // about:blank document. Wait for the navigation to commit before
     // accepting readyState.
-    await this.waitFor(`location.href !== "about:blank" && document.readyState === "complete"`, 30000, 250);
+    //
+    // 只等「落地」，不等 readyState === "complete"：load 事件被所有未完成的
+    // 子资源拖着 —— 一张拉不动的远程曲绘/头像就能让 complete 永远不来，整次
+    // 渲染死在这 30 秒上（实测：导航本身 0.5 秒就落地了）。页面是否真的画好，
+    // 由各主题自己的 __THEME_READY__ 负责。
+    await this.waitFor(`location.href !== "about:blank" && document.readyState !== "loading"`, 30000, 250);
     await sleep(1000);
   }
 
@@ -252,6 +257,9 @@ async function launchEdge({ headless }) {
     "--allow-file-access-from-files",
     "about:blank",
   ];
+  // 配置了代理就让浏览器也走它。核心的请求一直走 config.proxyUrl 给的代理，但浏览器
+  // 之前只认系统代理 —— 于是出现「核心能读到分数、图却拉不下来」：曲绘是浏览器去取的。
+  if (proxyEnv) args.unshift("--proxy-server=" + proxyEnv);
   if (headless) args.unshift("--headless=new");
   const proc = spawn(browserPath, args, { stdio: "ignore", windowsHide: headless });
 
@@ -1130,7 +1138,15 @@ function mapThemeRatingItem(item, catalogIndex) {
     platinumScoreStar: Number(item.platinum_score_star || 0),
     platinumScoreMax: Number(item.platinum_score_max || 0),
     platinumScoreTheory: Number(item.platinum_score_theory || 0),
-    jacketUrl: `${OTG_CDN_URL}/SDDT/cover/${encodeURIComponent(coverId)}.webp-thumbnail`,
+    jacketUrl: item.dataSource === "rinnet"
+      ? levelScoreJacket(catalogIndex, { song: internalSong, songId: internalSong.id, difficultyId }, new Map())
+      : `${OTG_CDN_URL}/SDDT/cover/${encodeURIComponent(coverId)}.webp-thumbnail`,
+    // rinnet 没有曲绘哈希，只能退回曲库里的公网图（GitHub Pages）。拉不动时
+    // 主题会换上这张本地生成的占位图，而不是让整张分表失败。
+    jacketFallbackUrl: songJacketPlaceholder(title, coverId),
+    // 本地曲库认出来的歌曲 id：曲绘本地缓存拿它当键。认不出来（曲库外的曲子）
+    // 就是 null，那一张不进缓存，照旧走公网 + 占位图兜底。
+    songId: internalSong ? internalSong.id : null,
   };
 }
 
@@ -1275,8 +1291,8 @@ function buildLocalThemeData(jsonText, profile) {
   const mapAll = (items) => items.map((item) => mapThemeRatingItem(item, catalogIndex));
   return {
     generatedAt: new Date().toISOString(),
-    generatorName: "MiaBot",
-    profile,
+    generatorName: profile.dataSource === "rinnet" ? "MiaBot · rinnet" : "MiaBot",
+    profile: withAvatarFallback(profile),
     summary: {
       rating: Number(root.rating || 0),
       bestRating: Number(root.best_rating ?? root.bestRating ?? 0),
@@ -1309,6 +1325,28 @@ function ensureLocalThemeFiles() {
   return themeDir;
 }
 
+// 主题把「哪些远程图没拉下来、降级成了占位图」记在 __THEME_WARNINGS__ 里。
+// 出图成功也要说一声 —— 否则图少了几张曲绘，没人知道为什么。
+async function themeWarnings(cdp) {
+  try {
+    const warnings = await cdp.evaluate(`window.__THEME_WARNINGS__ || []`);
+    return Array.isArray(warnings) ? warnings.filter((line) => typeof line === "string") : [];
+  } catch { return []; }
+}
+
+// 真等到超时了，就把还没加载完的图报出来。只说「加载超时」没法定位是谁挂住的。
+async function pendingImageText(cdp) {
+  try {
+    const pending = await cdp.evaluate(`[...document.images].filter((img) => !img.complete)
+      .map((img) => (img.dataset.loadLabel || "图片") + " " + img.src)`);
+    if (Array.isArray(pending) && pending.length) {
+      return `（还有 ${pending.length} 个资源没下载完：` + pending.slice(0, 3).join("；") +
+        (pending.length > 3 ? " 等" : "") + "）";
+    }
+  } catch {}
+  return "";
+}
+
 async function waitForLocalTheme(cdp, timeoutMs) {
   const start = Date.now();
   for (;;) {
@@ -1317,17 +1355,176 @@ async function waitForLocalTheme(cdp, timeoutMs) {
       state = await cdp.evaluate(`({ ready: window.__THEME_READY__ === true, error: window.__THEME_ERROR__ || null })`);
     } catch {}
     if (state?.error) throw new Error(state.error);
-    if (state?.ready) return;
-    if (Date.now() - start > timeoutMs) throw new Error("等待本地主题的曲绘、头像和字体加载超时");
+    if (state?.ready) {
+      for (const warning of await themeWarnings(cdp)) console.log("  ⚠ " + warning);
+      return;
+    }
+    if (Date.now() - start > timeoutMs) {
+      throw new Error("等待本地主题的曲绘、头像和字体加载超时" + await pendingImageText(cdp));
+    }
     await sleep(250);
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* 曲绘本地图缓存                                                       */
+/* ------------------------------------------------------------------ */
+// 曲绘是公网图：大饼走 CDN 哈希，rinnet 只能走曲库里的 GitHub Pages 图。
+// 图源在国内时通时不通，不通就只剩占位图 —— 所以把下成功的图在本地留一份：
+//   · 命中缓存 → 给主题 file:// 路径，这一张图一次网络请求都不发；
+//   · 没命中   → 由核心自己补下（核心的请求走 config.proxyUrl 给的代理，比浏览器稳）；
+//   · 还是下不动 → 交给主题降级成占位图，绝不让整张图失败。
+// 目录在 ONGEKI_APP_DIR 下（服务器上就是配置里的 workDir，默认 <部署目录>/qq-official/data）。
+// 可以用 tools/prefetch-jackets.cjs 与 tools/extract_pack_jackets.py 填满再拷过去。
+const JACKET_CACHE_DIR = path.join(appDir, "jacket-cache");
+// 补下的预算：宁可这次少几张（下次接着补），也不要让用户干等。
+const JACKET_DOWNLOAD_BUDGET_MS = 20000;
+const JACKET_DOWNLOAD_CONCURRENCY = 6;
+const JACKET_EXTENSIONS = [".webp", ".png", ".jpg", ".jpeg", ".gif", ".avif", ".bin"];
+
+function jacketCacheExtension(contentType) {
+  const type = String(contentType || "").toLowerCase();
+  if (type.includes("webp")) return ".webp";
+  if (type.includes("jpeg") || type.includes("jpg")) return ".jpg";
+  if (type.includes("gif")) return ".gif";
+  if (type.includes("avif")) return ".avif";
+  return ".png";
+}
+
+// 扩展名按 content-type 存，找的时候挨个试 —— 缓存里放的是别人家的图，
+// 不能假设它一定是 png。
+function findCachedJacket(songId) {
+  for (const extension of JACKET_EXTENSIONS) {
+    const file = path.join(JACKET_CACHE_DIR, songId + extension);
+    try {
+      if (fs.existsSync(file) && fs.statSync(file).size > 1024) return file;
+    } catch {}
+  }
+  return "";
+}
+
+// 主题数据里凡是「带 songId 又有公网 jacketUrl」的对象，都是可缓存的曲绘。
+// 四种主题（分表/单曲/牌子/等级）的数据形状不同，但这一点是共同的。
+function collectJacketItems(value, found = []) {
+  if (Array.isArray(value)) {
+    for (const item of value) collectJacketItems(item, found);
+    return found;
+  }
+  if (!value || typeof value !== "object") return found;
+  const songId = Number(value.songId ?? value.song_id);
+  if (Number.isInteger(songId) && songId > 0 &&
+      typeof value.jacketUrl === "string" && /^https?:/i.test(value.jacketUrl)) {
+    found.push({ holder: value, songId, url: value.jacketUrl });
+  }
+  for (const child of Object.values(value)) collectJacketItems(child, found);
+  return found;
+}
+
+// 拉不动的地址记一笔，两小时内不再为它白等：头像地址跟着人走，某个人的头像
+// 取不到就可能次次都取不到 —— 不记的话，那个人每次渲染都要先白等一轮超时。
+const JACKET_MISS_TTL_MS = 2 * 60 * 60 * 1000;
+
+function recentlyFailed(key) {
+  try {
+    return Date.now() - fs.statSync(path.join(JACKET_CACHE_DIR, key + ".miss")).mtimeMs < JACKET_MISS_TTL_MS;
+  } catch { return false; }
+}
+
+function markFailed(key) {
+  try { fs.writeFileSync(path.join(JACKET_CACHE_DIR, key + ".miss"), ""); } catch {}
+}
+
+async function downloadJacket(key, url) {
+  try {
+    const response = await fetchWithTimeout(url, {}, 15000);
+    if (!response.ok) return "";
+    const buffer = Buffer.from(await response.arrayBuffer());
+    // 太小多半是错误页，存下来只会让下次继续用错图
+    if (buffer.length < 1024) return "";
+    const file = path.join(JACKET_CACHE_DIR, key + jacketCacheExtension(response.headers.get("content-type")));
+    fs.writeFileSync(file, buffer);
+    try { fs.rmSync(path.join(JACKET_CACHE_DIR, key + ".miss"), { force: true }); } catch {}
+    return file;
+  } catch { return ""; }
+}
+
+// 头像也是公网图（默认头像在 u.otogame.net）。地址跟着人走，所以键由 URL 派生：
+// 不求哈希强度，只要稳定、可当文件名。
+function avatarCacheKey(url) {
+  let hash = 0;
+  for (let i = 0; i < url.length; i++) hash = (hash * 31 + url.charCodeAt(i)) >>> 0;
+  const tail = String(url).split("/").pop().replace(/\.[A-Za-z0-9]+$/, "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 24);
+  return "avatar-" + hash.toString(16) + (tail ? "-" + tail : "");
+}
+
+// 把主题数据里的曲绘与头像换成能用的 URL：命中缓存的走本地文件，缺的现补，
+// 补不上的保持公网 URL 由主题降级。返回值就是传进来的那份数据。
+async function localizeJackets(data) {
+  const items = collectJacketItems(data);
+  const avatarUrl = typeof data?.profile?.avatarUrl === "string" && /^https?:/i.test(data.profile.avatarUrl)
+    ? data.profile.avatarUrl : "";
+  if (!items.length && !avatarUrl) return data;
+  try { fs.mkdirSync(JACKET_CACHE_DIR, { recursive: true }); } catch { return data; }
+
+  // 同一张图可能在多个榜里出现，只下一张，下好后一起换上
+  const groups = new Map();
+  const miss = (key, url, apply) => {
+    const group = groups.get(key) || { key, url, apply: [] };
+    group.apply.push(apply);
+    groups.set(key, group);
+  };
+  let hit = 0;
+  for (const item of items) {
+    const cached = findCachedJacket(item.songId);
+    if (cached) {
+      item.holder.jacketUrl = pathToFileURL(cached).href;
+      hit++;
+      continue;
+    }
+    miss(item.songId, item.url, (local) => { item.holder.jacketUrl = local; });
+  }
+  if (avatarUrl) {
+    const key = avatarCacheKey(avatarUrl);
+    const cached = findCachedJacket(key);
+    if (cached) {
+      data.profile.avatarUrl = pathToFileURL(cached).href;
+      hit++;
+    } else {
+      miss(key, avatarUrl, (local) => { data.profile.avatarUrl = local; });
+    }
+  }
+  if (!groups.size) {
+    console.log(`  本地图缓存：${hit} 张全部命中`);
+    return data;
+  }
+  const queue = [];
+  let skipped = 0;
+  for (const group of groups.values()) {
+    if (recentlyFailed(group.key)) skipped++;
+    else queue.push(group);
+  }
+  const deadline = Date.now() + JACKET_DOWNLOAD_BUDGET_MS;
+  let saved = 0;
+  await Promise.all(Array.from({ length: JACKET_DOWNLOAD_CONCURRENCY }, async () => {
+    while (queue.length && Date.now() < deadline) {
+      const group = queue.shift();
+      const file = await downloadJacket(group.key, group.url);
+      if (!file) { markFailed(group.key); continue; }
+      const local = pathToFileURL(file).href;
+      for (const apply of group.apply) apply(local);
+      saved++;
+    }
+  }));
+  console.log(`  本地图缓存：命中 ${hit} 张，本次补下 ${saved} 张，仍缺 ${groups.size - saved} 张` +
+    (skipped ? `（其中 ${skipped} 张刚失败过，两小时内不再重试）` : "") + "，缺的走公网，拉不动就出占位图");
+  return data;
 }
 
 async function renderLocalTheme(jsonText, profile) {
   const themeDir = ensureLocalThemeFiles();
   const rendererDir = path.join(themeDir, "rating-chart", "renderer");
   const dataPath = path.join(rendererDir, "preview-data.js");
-  const data = buildLocalThemeData(jsonText, profile);
+  const data = await localizeJackets(buildLocalThemeData(jsonText, profile));
   fs.writeFileSync(dataPath, `window.__THEME_DATA__ = ${JSON.stringify(data)};\n`, "utf8");
 
   let browser = null;
@@ -1393,14 +1590,32 @@ function findSongSupplement(index, internalSong) {
   return pool.find((song) => song?.[compactKey]?.has_chart === true) || pool[0] || null;
 }
 
-function songJacketPlaceholder(title, songId) {
-  const escape = (value) => String(value || "").replace(/[&<>"']/g, (char) => ({
+function svgEscape(value) {
+  return String(value || "").replace(/[&<>"']/g, (char) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;",
   })[char]);
-  const safeTitle = escape(String(title || "ONGEKI").slice(0, 28));
-  const safeId = escape(songId);
+}
+
+// 曲绘本体的兜底图：公网曲绘拉不动时，主题会把 <img> 换成这张本地生成的占位图，
+// 让整张分表/牌子照样出得来，而不是因为一张图挂住就报「生成失败」。
+function songJacketPlaceholder(title, songId) {
+  const safeTitle = svgEscape(String(title || "ONGEKI").slice(0, 28));
+  const safeId = svgEscape(songId);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#7760c6"/><stop offset="1" stop-color="#62c8de"/></linearGradient></defs><rect width="640" height="640" fill="url(#g)"/><text x="320" y="280" text-anchor="middle" font-family="sans-serif" font-size="42" fill="white">${safeTitle}</text><text x="320" y="365" text-anchor="middle" font-family="sans-serif" font-size="32" fill="white">Song ID ${safeId}</text></svg>`;
   return "data:image/svg+xml;base64," + Buffer.from(svg, "utf8").toString("base64");
+}
+
+// 头像的兜底图。rinnet 档案里没有头像字段，默认头像又是公网 URL（u.otogame.net），
+// 拉不动时用它顶上，别让玩家头像位置空着。
+function avatarPlaceholderUrl(playerName) {
+  const initial = svgEscape(String(playerName || "").trim().slice(0, 1) || "?");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#7760c6"/><stop offset="1" stop-color="#62c8de"/></linearGradient></defs><rect width="160" height="160" rx="14" fill="url(#g)"/><text x="80" y="108" text-anchor="middle" font-family="sans-serif" font-size="72" fill="white">${initial}</text></svg>`;
+  return "data:image/svg+xml;base64," + Buffer.from(svg, "utf8").toString("base64");
+}
+
+// 带头像的三个主题（分表、牌子、等级）共用：头像 URL 是公网的，兜底图跟着一起给。
+function withAvatarFallback(profile) {
+  return { ...profile, avatarFallbackUrl: avatarPlaceholderUrl(profile?.playerName) };
 }
 
 function buildSongDetailThemeData(internalSong, recordData = {}, playerName = "") {
@@ -1461,6 +1676,7 @@ function buildSongDetailThemeData(internalSong, recordData = {}, playerName = ""
       version: internalSong.versionID,
       status: internalSong.status === "online" ? "online" : "unavailable",
       jacketUrl,
+      jacketFallbackUrl: songJacketPlaceholder(internalSong.name, internalSong.id),
       bossName: internalSong.boss,
       bossCardId: internalSong.bossCardId,
       bossCardName: internalSong.bossCardName,
@@ -1477,7 +1693,7 @@ async function renderSongDetailTheme(internalSong, recordData, playerName) {
   const htmlPath = path.join(rendererDir, "theme.html");
   if (!fs.existsSync(htmlPath)) throw new Error("内置主题缺少 song-detail/renderer/theme.html");
   const dataPath = path.join(rendererDir, "preview-data.js");
-  const data = buildSongDetailThemeData(internalSong, recordData, playerName);
+  const data = await localizeJackets(buildSongDetailThemeData(internalSong, recordData, playerName));
   fs.writeFileSync(dataPath, `window.__THEME_DATA__ = ${JSON.stringify(data)};\n`, "utf8");
 
   let browser = null;
@@ -1860,6 +2076,7 @@ function buildCompletionThemeData(plate, versionSongs, recordsByDifficulty, prof
       songId: Number(song.id),
       title: song.name,
       jacketUrl: completionSongJacket(index, song, coverBySong),
+      jacketFallbackUrl: songJacketPlaceholder(song.name, song.id),
       masterLevel: String(song.level[3]),
       masterConstant: Number(song.const[3]),
       isAllBreak: personal.isAllBreak === true,
@@ -1882,7 +2099,7 @@ function buildCompletionThemeData(plate, versionSongs, recordsByDifficulty, prof
 
   return {
     generatedAt: new Date().toISOString(),
-    profile,
+    profile: withAvatarFallback(profile),
     plate: {
       id: plate.id,
       nameJa: plate.nameJa,
@@ -2230,6 +2447,7 @@ function buildLevelScoreThemeData(queryInput, charts, records, profile, requeste
       level: String(chart.displayLevel ?? chart.song.level[chart.position]),
       constant,
       jacketUrl: levelScoreJacket(index, chart, coverByChart),
+      jacketFallbackUrl: songJacketPlaceholder(chart.song.name, chart.songId),
       played,
       techScore,
       rating: calculateLevelScoreRating(constant, techScore, isAllBreak, isFullBell),
@@ -2278,7 +2496,7 @@ function buildLevelScoreThemeData(queryInput, charts, records, profile, requeste
     queryMode: query.mode,
     sortDescription: query.sortDescription,
     canvas: { width: LEVEL_SCORE_CANVAS_WIDTH, height: canvasHeight },
-    profile,
+    profile: withAvatarFallback(profile),
     charts: pageCharts,
     pagination: {
       page,
@@ -2816,6 +3034,10 @@ function normalizeSongScores(detailParsed) {
 }
 
 async function getSongRecordData(job) {
+  if (job.playerData?.source === "rinnet") {
+    if (!Array.isArray(job.playerData.song?.scores)) throw new Error("rinnet 单曲快照不完整");
+    return job.playerData.song;
+  }
   let output;
   if (process.env.ONGEKI_FAKE === "1") {
     const fakeScores = job.isLunatic ? [
@@ -2973,7 +3195,11 @@ async function runCompletionJobData(job) {
 
   let profile;
   let recordsByDifficulty;
-  if (process.env.ONGEKI_FAKE === "1") {
+  if (job.playerData?.source === "rinnet") {
+    profile = { ...job.playerData.profile, avatarUrl: job.playerData.profile.avatarUrl || DEFAULT_ONGEKI_AVATAR_URL };
+    if (!Array.isArray(job.playerData.records)) throw new Error("rinnet 完成度快照不完整");
+    recordsByDifficulty = Object.fromEntries([0, 1, 2, 3].map(d => [d, job.playerData.records.filter(row => row.levelInfo.difficulty === d)]));
+  } else if (process.env.ONGEKI_FAKE === "1") {
     profile = {
       playerName: String(job.playerName || "DEMO PLAYER"),
       level: 49,
@@ -2993,7 +3219,7 @@ async function runCompletionJobData(job) {
     recordsByDifficulty = await fetchCompletionRecords(login.ID_TOKEN, plate);
   }
 
-  const data = buildCompletionThemeData(plate, versionSongs, recordsByDifficulty, profile);
+  const data = await localizeJackets(buildCompletionThemeData(plate, versionSongs, recordsByDifficulty, profile));
   const image = await renderCompletionTheme(data);
   const outName = `音击牌子_${safeFilePart(plate.nameJa)}_${safeFilePart(profile.playerName)}_${timestamp()}.png`;
   if (job.streamOutput) {
@@ -3021,7 +3247,11 @@ async function runLevelScoreJobData(job) {
 
   let profile;
   let records;
-  if (process.env.ONGEKI_FAKE === "1") {
+  if (job.playerData?.source === "rinnet") {
+    profile = { ...job.playerData.profile, avatarUrl: job.playerData.profile.avatarUrl || DEFAULT_ONGEKI_AVATAR_URL };
+    if (!Array.isArray(job.playerData.records)) throw new Error("rinnet 等级快照不完整");
+    records = job.playerData.records;
+  } else if (process.env.ONGEKI_FAKE === "1") {
     profile = {
       playerName: String(job.playerName || "DEMO PLAYER"),
       level: 49,
@@ -3041,7 +3271,7 @@ async function runLevelScoreJobData(job) {
     records = await fetchLevelScoreRecords(login.ID_TOKEN, query);
   }
 
-  const data = buildLevelScoreThemeData(query, charts, records, profile, page);
+  const data = await localizeJackets(buildLevelScoreThemeData(query, charts, records, profile, page));
   const image = await renderLevelScoreTheme(data);
   const outName = `音击等级_${safeFilePart(query.label)}_P${page}_${safeFilePart(profile.playerName)}_${timestamp()}.jpg`;
   if (job.streamOutput) {
@@ -3069,10 +3299,14 @@ async function runJobData(job) {
   const cfg = loadConfig();
 
   // [1] 获取数据（含登录）
-  console.log("[1/3] 获取 u.otogame RATING 数据…");
+  console.log("[1/3] 读取玩家 RATING 数据…");
   let jsonText;
   let profile;
-  if (fake) {
+  if (job.playerData?.source === "rinnet") {
+    if (!Array.isArray(job.playerData.rating?.best_rating_list)) throw new Error("rinnet 分表快照不完整");
+    jsonText = JSON.stringify({ data: job.playerData.rating });
+    profile = { ...job.playerData.profile, avatarUrl: job.playerData.profile.avatarUrl || DEFAULT_ONGEKI_AVATAR_URL };
+  } else if (fake) {
     jsonText = fs.existsSync(RATING_JSON_PATH) ? fs.readFileSync(RATING_JSON_PATH, "utf8") : fakeRatingJson();
     profile = {
       playerName: "DEMO PLAYER",

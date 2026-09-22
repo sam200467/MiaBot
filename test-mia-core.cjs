@@ -69,6 +69,25 @@ assert.ok(chunks.every((chunk) => chunk.length <= 8));
 // 错误脱敏
 assert.match(core.safeError(new Error("密码 password=abc123 出错了")), /已隐藏/);
 assert.match(core.safeError(new Error("联系 someone@example.com")), /邮箱已隐藏/);
+assert.match(core.safeError(new Error("卡号 00000000000000004453 不对")), /卡号已隐藏/);
+
+// 双数据源绑定挑选：两边分别存，按来源各取各的
+const dualEntry = {
+  userId: "U", dataSource: "rinnet",
+  email: "o@example.com", password: "pw", playerName: "大饼玩家",
+  rinnet: { email: "r@example.com", playerName: "rinnet玩家", aimeId: "44153",
+    cardNumber: "00000000000000004453", sessionId: "s-1", account: { accessToken: "AT", refreshToken: "RT" } },
+};
+assert.equal(core.selectBinding(dualEntry, "otogame").playerName, "大饼玩家");
+assert.equal(core.selectBinding(dualEntry, "otogame").dataSource, "otogame");
+assert.equal(core.selectBinding(dualEntry).dataSource, "rinnet", "默认按当前来源挑");
+assert.equal(core.selectBinding(dualEntry).aimeId, "44153");
+assert.equal(core.selectBinding(dualEntry).userId, "U", "rinnet 绑定要带回 userId 供执行期复核");
+assert.equal(core.selectBinding(dualEntry, "rinnet").email, "r@example.com");
+assert.equal(core.selectBinding({ userId: "U", email: "o@x", password: "p" }, "rinnet"), null, "没绑 rinnet 就是没绑");
+assert.equal(core.selectBinding(null), null);
+assert.equal(core.selectBinding({ userId: "U" }), null, "没有邮箱密码的旧条目不算大饼绑定");
+assert.equal(core.selectBinding({ email: "o@x", password: "p" }).dataSource, "otogame", "旧格式绑定默认大饼");
 
 // 能力解析：自然语言查分与 #命令 共用的那一层。
 // 经由 module.exports 取 getBinding，所以这里替换掉就能完全离线跑。
@@ -126,15 +145,13 @@ assert.match(core.safeError(new Error("联系 someone@example.com")), /邮箱已
   assert.equal(level.kind, "image");
   assert.match(level.caption, /第 2 页/);
 
-  // 查别人：取的是对方的数据，所以对方必须绑定过、并且自己开过口
+  // 查别人：取的是对方的数据，对方绑定过就能查（2026-09-22 起不再有单独开关）
   core.getBinding = async (_config, userId) => ({
     me: { playerName: "我自己" },
     closed: { playerName: "小红" },
-    open: { playerName: "小明", allowOthers: true },
+    open: { playerName: "小明" },
   }[String(userId)] || null);
   assert.match((await core.resolveCapability({}, "me", "song", "id870", () => {}, "nobody")).text, /没绑过|还没绑定过/);
-  // 提示是多句说法轮换的，断言要覆盖全部写法
-  assert.match((await core.resolveCapability({}, "me", "song", "id870", () => {}, "closed")).text, /没开放|没把成绩开放/);
   const others = await core.resolveCapability({}, "me", "song", "id870", () => {}, "open");
   assert.equal(others.kind, "image");
   assert.equal(others.caption, "小明 的单曲全难度成绩：id870 VIIIbit Explorer");
@@ -244,23 +261,6 @@ assert.match(core.safeError(new Error("联系 someone@example.com")), /邮箱已
   const bind = await run("bind", "");
   assert.equal(bind.kind, "notice");
   assert.match(bind.text, /bind/i);
-
-  // 隐私开关只改调用者自己 —— 即使模型给了 target 也不能替别人开
-  const savedGetBinding = core.getBinding;
-  const realSaveBinding = core.saveBinding;
-  const saved = [];
-  core.getBinding = async (_config, userId) => ({ playerName: ["me", "free"].includes(String(userId)) ? "我" : "别人", allowOthers: false });
-  core.saveBinding = async (_config, binding) => { saved.push(binding); };
-  assert.match((await run("allow", "")).text, /开了/);
-  assert.equal(saved.at(-1).allowOthers, true);
-  assert.equal(saved.at(-1).playerName, "我");
-  // 带 target 的调用（「帮我给小明开了」）也只能落到自己头上
-  await core.resolveCapability({}, "me", "allow", "", () => {}, "someone-else");
-  assert.equal(saved.at(-1).playerName, "我", "隐私开关不能被 target 带去改别人");
-  assert.match((await run("deny", "")).text, /关了/);
-  assert.equal(saved.at(-1).allowOthers, false);
-  core.getBinding = savedGetBinding;
-  core.saveBinding = realSaveBinding;
 
   console.log("CORE_SMOKE_OK 导出项 " + Object.keys(core).length + " 个");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

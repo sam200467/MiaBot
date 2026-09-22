@@ -14,6 +14,26 @@ class VaultEntry
     public string password { get; set; }
     public string playerName { get; set; }
     public string boundAt { get; set; }
+    public string dataSource { get; set; }
+    public RinnetBinding rinnet { get; set; }
+}
+
+class RinnetBinding
+{
+    public string email { get; set; }
+    public string playerName { get; set; }
+    public string boundAt { get; set; }
+    public string cardNumber { get; set; }
+    public string aimeId { get; set; }
+    public string sessionId { get; set; }
+    public Dictionary<string, object> account { get; set; }
+}
+
+class BindingInput : RinnetBinding
+{
+    public string userId { get; set; }
+    public string dataSource { get; set; }
+    public string password { get; set; }
 }
 
 class VaultData
@@ -103,16 +123,53 @@ static class MiaVault
                     return 0;
                 }
                 if (command == "set") {
-                    VaultEntry incoming = Json.Deserialize<VaultEntry>(Console.In.ReadToEnd());
-                    if (incoming == null || String.IsNullOrEmpty(incoming.userId) || String.IsNullOrEmpty(incoming.email) || String.IsNullOrEmpty(incoming.password)) {
+                    BindingInput incoming = Json.Deserialize<BindingInput>(Console.In.ReadToEnd());
+                    bool isRinnet = incoming != null && incoming.dataSource == "rinnet";
+                    if (incoming == null || String.IsNullOrEmpty(incoming.userId) || String.IsNullOrEmpty(incoming.email) ||
+                        (isRinnet ? (incoming.account == null || String.IsNullOrEmpty(incoming.aimeId) || String.IsNullOrEmpty(incoming.sessionId)) : String.IsNullOrEmpty(incoming.password))) {
                         throw new Exception("绑定数据不完整");
                     }
                     VaultEntry old = Find(data, incoming.userId);
-                    if (old != null) data.entries.Remove(old);
-                    data.entries.Add(incoming);
+                    if (old == null) { old = new VaultEntry { userId = incoming.userId, dataSource = incoming.dataSource ?? "otogame" }; data.entries.Add(old); }
+                    if (isRinnet) {
+                        // A re-bind must not overwrite a token refreshed since the
+                        // caller read this binding.
+                        if (old.rinnet != null && old.rinnet.sessionId == incoming.sessionId) incoming.account = old.rinnet.account;
+                        old.rinnet = new RinnetBinding {
+                            email = incoming.email, playerName = incoming.playerName, boundAt = incoming.boundAt,
+                            cardNumber = incoming.cardNumber, aimeId = incoming.aimeId,
+                            sessionId = incoming.sessionId, account = incoming.account
+                        };
+                    }
+                    else { old.email = incoming.email; old.password = incoming.password; old.playerName = incoming.playerName; old.boundAt = incoming.boundAt; }
                     Save(vaultPath, data);
                     Console.Write("OK");
                     return 0;
+                }
+                if (command == "source") {
+                    if (args.Length != 4 || (args[3] != "otogame" && args[3] != "rinnet")) throw new Exception("数据源参数无效");
+                    VaultEntry entry = Find(data, args[2]);
+                    if (entry == null) { entry = new VaultEntry { userId = args[2] }; data.entries.Add(entry); }
+                    entry.dataSource = args[3];
+                    Save(vaultPath, data); Console.Write("OK"); return 0;
+                }
+                if (command == "refresh-rinnet") {
+                    BindingInput incoming = Json.Deserialize<BindingInput>(Console.In.ReadToEnd());
+                    VaultEntry entry = incoming == null ? null : Find(data, incoming.userId);
+                    // A late refresh must never resurrect an unbound/replaced account.
+                    if (entry == null || entry.rinnet == null || entry.rinnet.sessionId != incoming.sessionId) return 4;
+                    entry.rinnet.account = incoming.account;
+                    Save(vaultPath, data); Console.Write("OK"); return 0;
+                }
+                if (command == "delete-source") {
+                    if (args.Length != 4 || (args[3] != "otogame" && args[3] != "rinnet")) throw new Exception("数据源参数无效");
+                    VaultEntry entry = Find(data, args[2]);
+                    if (entry != null) {
+                        if (args[3] == "rinnet") entry.rinnet = null;
+                        else { entry.email = null; entry.password = null; entry.playerName = null; entry.boundAt = null; }
+                        Save(vaultPath, data);
+                    }
+                    Console.Write("OK"); return 0;
                 }
                 if (command == "delete") {
                     if (args.Length != 3) throw new Exception("delete 参数无效");
@@ -128,7 +185,7 @@ static class MiaVault
                     return 0;
                 }
                 if (command == "count") {
-                    Console.Write(data.entries.Count.ToString());
+                    Console.Write(data.entries.FindAll(delegate(VaultEntry item) { return !String.IsNullOrEmpty(item.password) || item.rinnet != null; }).Count.ToString());
                     return 0;
                 }
                 throw new Exception("未知凭据库命令");

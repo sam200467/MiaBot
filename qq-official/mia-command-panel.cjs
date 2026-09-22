@@ -56,7 +56,8 @@ const DESCRIPTIONS = Object.freeze({
   // 实测：同一个意思换个说法就过（半角括号过、去掉括号过、改这句也过），
   // 而那个原句每次都被拒，稳定复现。所以面板文案要当成**面向陌生人的公开文案**来写，
   // 别出现「把你的账号交给…」这类句式 —— 被拦了也要知道错的是文案不是数量。
-  bind: "先私聊美亚，再发这一条",
+  bind: "跟着美亚绑定当前数据源",
+  source: "选大饼或rinnet，美亚记着呢",
   chart: "B50 + N10 + P50 的分表",
   plate: "版本牌子完成度长图",
   song: "一首歌的全难度成绩图",
@@ -69,10 +70,8 @@ const DESCRIPTIONS = Object.freeze({
   aliasdelete: "删别名（只对指定账号开放）",
   aliases: "这首歌都有哪些叫法",
   whatis: "按别名反查是哪首歌",
-  allow: "让别人能查美亚这边的成绩",
-  deny: "不让别人查我的成绩",
   status: "美亚现在忙不忙",
-  unbind: "删掉本机存的账号",
+  unbind: "解开当前数据源的绑定",
   cancel: "中断正在进行的操作",
   cardbrowser: "打开本地卡面检索页",
   expressionbrowser: "看看角色们的剧情表情",

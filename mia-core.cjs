@@ -16,6 +16,7 @@ const { spawn } = require("node:child_process");
 const { Converter } = require("opencc-js");
 const { SongAliasStore, SongAliasCandidateStore } = require("./song-alias-store.cjs");
 const INTERNAL_SONGS = require("./ongeki-music-internal.json");
+const rinnet = require("./rinnet-client.cjs");
 
 const GENERATE_COOLDOWN_MS = 60 * 1000;
 const MAX_QUEUE = 3;
@@ -52,6 +53,7 @@ function safeError(error) {
     .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/gi, "$1[代理凭据已隐藏]@")
     .replace(/([\w.+-]{1,80})@([\w.-]{1,120})/g, "[邮箱已隐藏]")
     .replace(/(secret|password|passwd|token|authorization)\s*[:=]\s*[^\s,;]+/gi, "$1=[已隐藏]")
+    .replace(/\b\d{20}\b/g, "[卡号已隐藏]")
     .replace(/[A-Za-z0-9_.-]{48,}/g, "[敏感内容已隐藏]")
     .slice(0, 800);
 }
@@ -413,19 +415,62 @@ function scriptCommand(file, args = []) {
 }
 
 async function vaultCall(config, command, args = [], input = "") {
-  const result = await runProcess(config.vaultHelperPath, [command, config.vaultPath, ...args], input, 15000);
+  const executable = scriptCommand(config.vaultHelperPath, [command, config.vaultPath, ...args]);
+  const result = await runProcess(executable.file, executable.args, input, 15000);
   if (result.code === 4) return null;
   if (result.code !== 0) throw new Error(result.stderr.replace(/^VAULT_ERROR:/, "").trim() || "本地加密账号库操作失败");
   return result.stdout;
 }
 
-async function getBinding(config, userId) {
+async function getDataSource(config, userId) {
+  if (!fs.existsSync(config.vaultPath)) return "otogame";
   const text = await vaultCall(config, "get", [userId]);
-  return text ? JSON.parse(text) : null;
+  return text && JSON.parse(text).dataSource === "rinnet" ? "rinnet" : "otogame";
+}
+
+function selectBinding(entry, source) {
+  if (!entry) return null;
+  source = source || entry.dataSource || "otogame";
+  if (source === "rinnet") return entry.rinnet ? { ...entry.rinnet, userId: entry.userId, dataSource: "rinnet" } : null;
+  if (!entry.email || !entry.password) return null;
+  const { rinnet: ignored, ...binding } = entry;
+  return { ...binding, dataSource: "otogame" };
+}
+
+async function getBinding(config, userId, source) {
+  const text = await vaultCall(config, "get", [userId]);
+  return selectBinding(text ? JSON.parse(text) : null, source);
+}
+
+async function setDataSource(config, userId, source) {
+  if (!["otogame", "rinnet"].includes(source)) throw new Error("数据源无效");
+  await vaultCall(config, "source", [String(userId), source]);
+}
+
+async function deleteBinding(config, userId, source) {
+  await module.exports.vaultCall(config, "delete-source", [String(userId), source || await getDataSource(config, userId)]);
 }
 
 async function saveBinding(config, entry) {
   await vaultCall(config, "set", [], JSON.stringify(entry));
+}
+
+const rinnetClients = new Map();
+function getRinnetClient(config) {
+  const proxyUrl = config.proxyUrl || "";
+  if (!rinnetClients.has(proxyUrl)) rinnetClients.set(proxyUrl, rinnet.createClient({ proxyUrl }));
+  return rinnetClients.get(proxyUrl);
+}
+async function personalJob(config, binding, kind, songId) {
+  if (binding.dataSource !== "rinnet") return { email: binding.email, password: binding.password };
+  // Re-read tokens at execution time: queued jobs may have captured an older token.
+  const current = await module.exports.getBinding(config, binding.userId, "rinnet");
+  if (!current || current.sessionId !== binding.sessionId) throw new Error("这份 rinnet 绑定已更换或解除，请重新发起查询。");
+  const snapshot = await module.exports.getRinnetClient(config).snapshot(current, kind, songId, async account => {
+    const saved = await vaultCall(config, "refresh-rinnet", [], JSON.stringify({ userId: current.userId, sessionId: current.sessionId, account }));
+    if (!saved) throw new Error("rinnet 绑定已更换或解除，请重新 /绑定。");
+  });
+  return { playerData: snapshot };
 }
 
 // 分表核心把图片以 base64 经 stdout 流式吐回来，那些行绝不能进日志 ——
@@ -519,8 +564,7 @@ async function verifyAccount(config, email, password, onLine) {
 
 async function generateChart(config, binding, onLine) {
   const result = await runCore(config, "--job-stdin", {
-    email: binding.email,
-    password: binding.password,
+    ...await personalJob(config, binding, "chart"),
     streamOutput: true, // 图片不落盘，以 base64 经 stdout 返回
   }, 360000, onLine);
   const meta = parseSummary(result.stdout, /^CHART_SUMMARY:(.+)$/m);
@@ -536,8 +580,7 @@ async function generateChart(config, binding, onLine) {
 
 async function generateSongChart(config, binding, song, onLine) {
   const result = await runCore(config, "--song-job-stdin", {
-    email: binding.email,
-    password: binding.password,
+    ...await personalJob(config, binding, "song", song.id),
     playerName: binding.playerName || "",
     songId: Number(song.id),
     streamOutput: true,
@@ -572,8 +615,7 @@ async function generateChartInfo(config, match, onLine) {
 
 async function generateCompletionChart(config, binding, plate, onLine) {
   const result = await runCore(config, "--completion-job-stdin", {
-    email: binding.email,
-    password: binding.password,
+    ...await personalJob(config, binding, "plate"),
     playerName: binding.playerName || "",
     plateId: plate.id,
     streamOutput: true,
@@ -592,8 +634,7 @@ async function generateCompletionChart(config, binding, plate, onLine) {
 
 async function generateLevelChart(config, binding, level, page, onLine) {
   const result = await runCore(config, "--level-job-stdin", {
-    email: binding.email,
-    password: binding.password,
+    ...await personalJob(config, binding, "level"),
     playerName: binding.playerName || "",
     level,
     page,
@@ -703,16 +744,12 @@ const CAPABILITY_SPECS = Object.freeze([
   { name: "aliases", label: "查看某首歌的全部别名", argHint: "曲名、已有别名或 Song ID", needsBinding: false },
   { name: "whatis", label: "按别名反查是哪些歌", argHint: "别名，只给一部分也能查", needsBinding: false },
   { name: "aliasadd", label: "给歌曲添加别名", argHint: "曲目和别名用竖线分开，例如 id870 | 八爪鱼", needsBinding: false },
-  // allow / deny 是隐私开关，故意不写 needsBinding：那句话会带上「查别人」的语义，
-  // 而开关永远只改调用者自己，分支里单独取自己的绑定。
-  { name: "allow", label: "开放自己的成绩给群友查", argHint: "不需要参数", needsBinding: false },
-  { name: "deny", label: "关掉群友查自己成绩的权限", argHint: "不需要参数", needsBinding: false },
   // argHint 里那段约束是防寒暄误触发的：没有它，模型会把「在吗」当成问状态，
   // 回一串运维数据，比人设答一句「好得很」体验差得多。
   { name: "status", label: "机器人当前的运行状态",
     argHint: "不需要参数。只在用户明确问机器人在不在线、是不是掉线了、队列里排了多少、运行了多久时才调用；用户只是打招呼、「在吗」、闲聊寒暄时绝对不要调用",
     needsBinding: false },
-  { name: "bind", label: "绑定大饼账号的引导", argHint: "不需要参数", needsBinding: false },
+  { name: "bind", label: "绑定当前数据源账号的引导", argHint: "不需要参数，不得传邮箱、密码、卡号或验证码", needsBinding: false },
 ]);
 
 // 少数几处必须写命令的地方，各平台叫法不同（Discord 是 /bind，QQ 是 #绑定）。
@@ -725,15 +762,10 @@ let capabilityHints = Object.freeze({
     "查成绩得先有账号呀 —— 执行 `/bind` 交给我，马上就能用了。",
     "你的绑定还没做哦。执行 `/bind`，之后想查什么我都给你翻出来。",
   ],
-  // 查别人：对方没绑定 / 对方没开放。都要说清楚原因，别让人以为是机器人坏了
+  // 查别人：对方没绑定。要说清楚原因，别让人以为是机器人坏了
   targetNotBound: [
     "TA 还没绑定过大饼账号，我手里没有 TA 的数据，查不了。",
     "TA 没绑过账号呀，我上哪儿给 TA 翻成绩去。",
-  ],
-  // 默认按 Discord 写；QQ 入口在 start() 里换成 #允许查询
-  targetNotAllowed: [
-    "TA 没开放成绩查询，我不能替 TA 查。TA 想开的话，执行 `/allowquery` 就行。",
-    "这个不行——TA 没把成绩开放给别人查。TA 自己执行 `/allowquery` 就能开了。",
   ],
   helpText: "发送 `/help` 查看 MiaBot 的功能清单。",
   chartInfoUsage: "请在曲名或 Song ID 后写明难度，例如 `id870 master`、`初音ミクの激唱 lunatic`。支持 BASIC / ADVANCED / EXPERT / MASTER / LUNATIC 及常用缩写。",
@@ -745,14 +777,6 @@ let capabilityHints = Object.freeze({
   // 只会在运行期返回空串 —— 两边入口都必须覆盖。
   aliasUsage: "请把曲目和别名用竖线分开，例如 `id870 | 八爪鱼`；曲目可以是曲名、已有别名或 Song ID。",
   bindUsage: "绑定得单独走一遍流程：执行 `/bind`，我带你填账号。别把邮箱密码发在频道里。",
-  allowDone: [
-    "好，开了。以后有人 @ 我查你的成绩，我就帮他们翻。想关掉随时说一声。",
-    "行，开了。以后群里问起你的成绩我就不藏着掖着了，不想给看了再叫一声。",
-  ],
-  denyDone: [
-    "收到，关了。以后别人想查你的成绩，我一律回绝。",
-    "好，关了。往后谁问你的成绩我都不说，放心。",
-  ],
   statusUnavailable: "我现在没法自查状态，这条功能暂时没开。",
 });
 
@@ -799,7 +823,7 @@ function coreCall(name, ...args) {
 }
 
 // targetUserId 非空且不是自己时，表示「替群里另一个人查」——取的是对方的数据，
-// 所以对方必须绑定过、并且自己开过 #允许查询。
+// 所以对方必须绑定过。绑定即视为同意群友查询（2026-09-22 起不再单独开关）。
 async function resolveCapability(config, userId, name, query, onLine = () => {}, targetUserId = null) {
   const spec = CAPABILITY_SPECS.find((item) => item.name === name);
   if (!spec) return { kind: "notice", text: "这个功能暂时没有开放。" };
@@ -811,11 +835,8 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
   if (spec.needsBinding) {
     const targetId = targetUserId ? String(targetUserId) : "";
     if (targetId && targetId !== String(userId)) {
-      // 查别人：用**对方**的绑定去取数，所以必须先确认对方自己开过口。
-      // 这不是技术限制是隐私红线 —— 别人存的账号密码不是拿来给群里公开放的。
       const target = await coreCall("getBinding", config, targetId);
       if (!target) return { kind: "notice", text: pickHint(capabilityHints.targetNotBound) };
-      if (target.allowOthers !== true) return { kind: "notice", text: pickHint(capabilityHints.targetNotAllowed) };
       binding = target;
     } else {
       binding = await coreCall("getBinding", config, userId);
@@ -964,15 +985,6 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
       (shared.length ? "\n这个别名还对应 " + shared.length + " 首歌。" : ""));
   }
 
-  // 隐私开关只改调用者自己。这里**不能**用上面那句 targetUserId 的绑定 ——
-  // 那取的是「被 @ 的人」的绑定，拿它来写就变成替别人开关了。
-  if (spec.name === "allow" || spec.name === "deny") {
-    const mine = await coreCall("getBinding", config, userId);
-    if (!mine) return { kind: "notice", text: pickHint(capabilityHints.bindNotice) };
-    await coreCall("saveBinding", config, { ...mine, allowOthers: spec.name === "allow" });
-    return text(pickHint(spec.name === "allow" ? capabilityHints.allowDone : capabilityHints.denyDone));
-  }
-
   if (spec.name === "status") {
     const provided = statusProvider ? String(statusProvider() || "").trim() : "";
     return provided ? text(provided) : { kind: "notice", text: pickHint(capabilityHints.statusUnavailable) };
@@ -1035,6 +1047,12 @@ module.exports = {
   vaultCall,
   getBinding,
   saveBinding,
+  selectBinding,
+  getDataSource,
+  setDataSource,
+  deleteBinding,
+  getRinnetClient,
+  personalJob,
   runCore,
   verifyAccount,
   generateChart,

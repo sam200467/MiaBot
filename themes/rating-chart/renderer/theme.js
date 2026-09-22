@@ -35,13 +35,15 @@
     return DIFFICULTIES[Number(item.difficulty_id)] || DIFFICULTIES[3];
   }
 
-  function image(src, className, alt = "") {
+  function image(src, className, alt = "", fallbackSrc = "") {
     const el = document.createElement("img");
     el.src = src;
     el.className = className;
     el.alt = alt;
     el.dataset.loadLabel = alt || "图片资源";
     el.decoding = "sync";
+    // 公网曲绘拉不动时换上的本地占位图（由分表核心随数据给出）
+    if (fallbackSrc) el.dataset.fallbackSrc = fallbackSrc;
     return el;
   }
 
@@ -56,7 +58,7 @@
     const d = difficultyInfo(item);
     const card = div("score-card normal-card");
     card.append(image(`${PIC}${d.name}_plate.png`, "card-plate"));
-    card.append(image(item.jacketUrl, "jacket", `${item.title} 曲绘`));
+    card.append(image(item.jacketUrl, "jacket", `${item.title} 曲绘`, item.jacketFallbackUrl));
     card.append(div("rank-number", `#${index + 1}`));
     card.append(image(`${PIC}diff_${d.name}_59x15.png`, "difficulty", d.chartKey));
     card.append(div("title", item.title));
@@ -77,7 +79,7 @@
     const d = difficultyInfo(item);
     const card = div("score-card platinum-card");
     card.append(image(`${PIC}${d.name}_plate_platinum.png`, "card-plate"));
-    card.append(image(item.jacketUrl, "jacket", `${item.title} 曲绘`));
+    card.append(image(item.jacketUrl, "jacket", `${item.title} 曲绘`, item.jacketFallbackUrl));
     card.append(div("rank-number", `#${index + 1}`));
     card.append(image(`${PIC}diff_${d.name}_59x15.png`, "difficulty", d.chartKey));
 
@@ -172,27 +174,62 @@
   // CSS 实时调试器保存或临时应用样式后调用，重新计算依赖实际文字宽度的布局。
   window.__FIT_RATING_THEME__ = refreshThemeLayout;
 
+  // 等图有预算。曲绘走公网，拉不动的时候不能把整张分表拖成「生成失败」：
+  // 预算到点，还没下完的公网图就降级（有占位图换占位图，没有就藏起来），
+  // 本地主题资源（贴纸、底图）缺了才算打包坏了，照旧报错。
+  const IMAGE_BUDGET_MS = 45000;
+  window.__THEME_WARNINGS__ = [];
+
+  function settleImage(img) {
+    return new Promise((resolve) => {
+      const done = () => {
+        img.removeEventListener("load", done);
+        img.removeEventListener("error", done);
+        resolve(img.naturalWidth > 0 && img.naturalHeight > 0);
+      };
+      if (img.complete) done();
+      else {
+        img.addEventListener("load", done);
+        img.addEventListener("error", done);
+      }
+    });
+  }
+
   async function waitForImages() {
     const images = [...document.images];
-    await Promise.all(images.map((img) => new Promise((resolve, reject) => {
-      const ok = () => {
-        if (img.naturalWidth > 0 && img.naturalHeight > 0) resolve();
-        else reject(new Error(`${img.dataset.loadLabel || "图片资源"}内容无效：${img.src}`));
-      };
-      const fail = () => reject(new Error(`${img.dataset.loadLabel || "图片资源"}加载失败：${img.src}`));
-      if (img.complete) ok();
-      else {
-        img.addEventListener("load", ok, { once: true });
-        img.addEventListener("error", fail, { once: true });
+    const originSrc = new Map(images.map((img) => [img, img.currentSrc || img.src]));
+    const outstanding = new Set(images);
+    const label = (img) => img.dataset.loadLabel || "图片资源";
+    const isRemote = (img) => /^https?:/i.test(originSrc.get(img) || "");
+    const degrade = (img) => {
+      if (!outstanding.delete(img)) return;
+      const fallback = img.dataset.fallbackSrc;
+      if (fallback) {
+        img.src = fallback;
+        delete img.dataset.fallbackSrc;
+        window.__THEME_WARNINGS__.push(`${label(img)}没拉下来，图中已换成占位图：${originSrc.get(img)}`);
+      } else {
+        img.style.visibility = "hidden";
+        window.__THEME_WARNINGS__.push(`${label(img)}没拉下来，图中已隐藏：${originSrc.get(img)}`);
       }
-    })));
+    };
+    const settled = Promise.all(images.map(async (img) => {
+      if (await settleImage(img)) return void outstanding.delete(img);
+      if (!isRemote(img)) throw new Error(`${label(img)}加载失败：${originSrc.get(img)}`);
+      degrade(img);
+    }));
+    await Promise.race([settled, new Promise((resolve) => setTimeout(resolve, IMAGE_BUDGET_MS))]);
+    for (const img of [...outstanding]) if (isRemote(img)) degrade(img);
   }
 
   async function render() {
     const data = window.__THEME_DATA__;
     if (!data) throw new Error("没有找到渲染数据 preview-data.js");
 
-    $("avatar").src = data.profile.avatarUrl;
+    const avatar = $("avatar");
+    avatar.dataset.loadLabel = "玩家头像";
+    if (data.profile.avatarFallbackUrl) avatar.dataset.fallbackSrc = data.profile.avatarFallbackUrl;
+    avatar.src = data.profile.avatarUrl;
     const levelText = `Lv.${data.profile.level}`;
     $("level").textContent = levelText;
     $("level").dataset.text = levelText;

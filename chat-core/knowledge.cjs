@@ -172,9 +172,9 @@ function lookup(knowledge,query){
   const offset=Math.max(0,Math.min(10000,Number.isInteger(query.offset)?query.offset:0));
   rows=rows.slice(offset,offset+12);
   // 对战相手只存在角色曲目索引里，不在普通谱面行中。按正式曲名反查后随曲目资料一并返回；
-  // 只认 role=boss，不能把演唱者、原创归属或曲绘人物误报成对战相手。
+  // boss 和 both 都担任对战相手；不能把仅演唱者、原创归属或曲绘人物误报为相手。
   const opponents=query.game==='ongeki'&&title&&knowledge.characters
-    ?(knowledge.characters.characters||[]).filter(char=>(char.songs||[]).some(song=>normalize(song.title)===title&&song.role==='boss')).map(char=>{
+    ?(knowledge.characters.characters||[]).filter(char=>(char.songs||[]).some(song=>normalize(song.title)===title&&['boss','both'].includes(song.role))).map(char=>{
       // 面向中文群优先用索引里登记的全名中文别名；没有才回退到日文正式名。
       const full=(char.aliases||[]).filter(alias=>/^[\p{Script=Han}\s]+$/u.test(alias)&&normalize(alias).length===normalize(char.name).length);
       return full.at(-1)||char.name;

@@ -27,8 +27,8 @@ test("截图查歌请求经语义路由查本地，未绑定不查账号或状�
       assert.doesNotMatch(text, /绑定|网关|排队/);
     }
     assert.equal(model.calls.length, 0);
-    assert.equal(model.routeCalls.length, 2);
-    assert.ok(model.routeCalls[1].messages.some(m => m.role === "assistant" && m.content.includes("サドマミホリック")), "实际检索结果进入后续语义上下文");
+    assert.equal(model.routeCalls.length, 4, "自然语言查询各做一次识别和复核");
+    assert.ok(model.routeCalls[2].messages.some(m => m.role === "assistant" && m.content.includes("サドマミホリック")), "实际检索结果进入后续语义上下文");
   } finally { await bot.stop(); await mock.stop(); restore(); }
 });
 
@@ -41,7 +41,9 @@ function fakeModel(reply = "喵哼哼，收到啦！", expressionIds = [], actio
     if (body.messages[0].content.includes("MIA_SEMANTIC_ROUTER_V1")) {
       routeCalls.push(body);
       const routedAction = action?.name === "calculate" ? { ...action, args: { constant: 14.2, score: 1000737, bell: "fb", combo: "fc" } } : action;
-      const decision = action ? { route: "action", action: routedAction } : { route: "chat" };
+      const decision = action?.name === "songsearch"
+        ? { route: "query", query: { filters: [{ field: "title", op: /开头/.test(body.messages.at(-1).content) ? "prefix" : "search", value: action.query }], select: ["title", "constant"] } }
+        : action ? { route: "action", action: routedAction } : { route: "chat" };
       return { ok: true, text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(decision) } }] }) };
     }
     calls.push({ url: String(url), body });
@@ -57,13 +59,14 @@ function fakeModel(reply = "喵哼哼，收到啦！", expressionIds = [], actio
 
 // 出图和凭据库都是真实现（要 spawn exe），这里从 module.exports 上顶掉。
 // mia-core 的 coreCall() 正是为此存在的（mia-core.cjs:780-782）。
-const STUBBED = ["getBinding", "saveBinding", "vaultCall", "verifyAccount",
+const STUBBED = ["getBinding", "saveBinding", "vaultCall", "verifyAccount", "getDataSource", "getRinnetClient",
   "generateChart", "generateSongChart", "generateChartInfo", "generateCompletionChart", "generateLevelChart"];
 function stubCore(overrides = {}) {
   const original = {};
   for (const name of STUBBED) original[name] = core[name];
   Object.assign(core, {
     getBinding: async () => null,
+    getDataSource: async () => "otogame",
     saveBinding: async () => {},
     vaultCall: async () => "0",
     verifyAccount: async () => "测试玩家",
@@ -122,6 +125,94 @@ const c2cEvent = (over = {}) => ({
   id: "c-" + Math.random().toString(36).slice(2, 8),
   content: "在吗",
   timestamp: new Date().toISOString(), author: { user_openid: "U2" }, ...over,
+});
+
+test("结构化查询状态按用户隔离，闲聊后仍可翻页，重置后清除", async () => {
+  const calls = [];
+  const fetchImpl = async (_, options) => {
+    const body = JSON.parse(options.body); calls.push(body);
+    const question = body.messages.at(-1).content;
+    const decision = body.messages[0].content.includes("MIA_SEMANTIC_ROUTER_V1")
+      ? question.includes("ai") ? { route: "query", query: { filters: [{ field: "title", op: "contains", value: "ai" }], select: ["title"] } } : { route: "chat" }
+      : { text: "喵哼哼，不客气啦！", scene: "ordinary", expressionIds: [] };
+    return { ok: true, text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(decision) } }] }) };
+  };
+  const { mock, bot } = await setup({}, { botDeps: { fetchImpl } });
+  bot.settings.c.limits.userCooldownSeconds = 0;
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "歌名包含ai的有哪些" }));
+    assert.match(mock.state.sent.at(-1).body.content, /第 1\//);
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "下一页", author: { member_openid: "ANOTHER_USER" } }));
+    assert.match(mock.state.sent.at(-1).body.content, /还没有/);
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "谢谢你" }));
+    assert.match(mock.state.sent.at(-1).body.content, /喵哼哼/);
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "下一页" }));
+    assert.match(mock.state.sent.at(-1).body.content, /第 2\//);
+    assert.match(mock.state.sent.at(-1).body.content, /歌名包含ai/);
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "清空对话" }));
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "下一页" }));
+    assert.match(mock.state.sent.at(-1).body.content, /还没有/);
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+test("当前图片附件进入 DeepSeek 多模态请求；只有引用ID时仍说明不可读", async () => {
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+  const fetched = [];
+  const { mock, bot, model } = await setup({}, {
+    reply: "图里有一个测试像素哦。",
+    botDeps: { mediaFetchImpl: async (url) => {
+      fetched.push(String(url));
+      return new Response(png, { status: 200, headers: { "content-type": "image/png", "content-length": String(png.length) } });
+    } },
+  });
+  bot.settings.c.limits.userCooldownSeconds = 0;
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "点评一下这张图", attachments: [{ content_type: "image/png", url: "https://example.invalid/picture.png" }] }));
+    assert.equal(fetched.length, 1);
+    assert.match(mock.state.sent.at(-1).body.content, /测试像素/);
+    assert.equal(model.routeCalls.length, 0);
+    assert.equal(model.calls.length, 1);
+    const imageMessage = model.calls[0].body.messages.find(m => Array.isArray(m.content));
+    assert.ok(imageMessage, "模型请求应包含多模态 user message");
+    assert.equal(imageMessage.role, "user");
+    assert.equal(imageMessage.content[0].type, "text");
+    assert.equal(imageMessage.content[1].type, "image_url");
+    assert.match(imageMessage.content[1].image_url.url, /^data:image\/png;base64,/);
+
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "点评一下这张图", message_reference: { message_id: "unavailable" } }));
+    assert.match(mock.state.sent.at(-1).body.content, /呜喵.*看不到/);
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "看看这张图", attachments: [{ content_type: "image/png", url: "http://example.invalid/not-accepted.png" }] }));
+    assert.match(mock.state.sent.at(-1).body.content, /呜喵.*看不到/);
+    assert.equal(fetched.length, 1, "非 HTTPS 图片不能下载或转发");
+    assert.equal(mock.state.uploads.length, 0);
+    assert.equal(model.calls.length, 1, "拿不到引用原图时不能让模型猜图");
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+test("随机抽样经QQ入口保存，同批翻页不重抽，用户间不能共用抽样", async () => {
+  const fetchImpl = async (_, options) => {
+    const body = JSON.parse(options.body), current = body.messages.at(-1).content;
+    const decision = { route: "query", query: { filters: [{ field: "constant", op: "eq", value: 14.5 }], entity: "charts", select: ["title", "constant"], selection: { kind: "random", count: 10, excludePrevious: current.includes("换一批") } } };
+    return { ok: true, text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(decision) } }] }) };
+  };
+  const { mock, bot } = await setup({}, { botDeps: { fetchImpl } });
+  bot.settings.c.limits.userCooldownSeconds = 0;
+  const titles = text => [...text.matchAll(/^《(.+)》/gm)].map(m => m[1]);
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "随机选10张14.5的谱" }));
+    const first = titles(mock.state.sent.at(-1).body.content);
+    assert.equal(first.length, 8);
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "下一页" }));
+    const second = titles(mock.state.sent.at(-1).body.content);
+    assert.equal(second.length, 2); assert.ok(second.every(t => !first.includes(t)));
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "换一批" }));
+    assert.ok(titles(mock.state.sent.at(-1).body.content).every(t => ![...first, ...second].includes(t)));
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "换一批", author: { member_openid: "ANOTHER_USER" } }));
+    assert.match(mock.state.sent.at(-1).body.content, /还没有/);
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "清空对话" }));
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "换一批" }));
+    assert.match(mock.state.sent.at(-1).body.content, /还没有/);
+  } finally { await bot.stop(); await mock.stop(); }
 });
 
 test("群 @ 消息：走模型并把回复发回同一个群", async () => {
@@ -490,7 +581,7 @@ test("聊天里未知工具名：重试一次后提示重试，不执行", async
     await new Promise((r) => setTimeout(r, 300));
     assert.equal(model.routeCalls.length, 2);
     assert.equal(model.calls.length, 0);
-    assert.match(sentText(mock), /没能确认/);
+    assert.match(sentText(mock), /呜喵.*没接稳/);
     assert.equal(mock.state.uploads.length, 0, "不该有任何出图");
     await bot.stop(); await mock.stop();
   } finally { restore(); }
@@ -568,4 +659,29 @@ test("聊天里模型给的查询对象只认本条消息真的 @ 过的人", as
     assert.ok(!asked.includes("SOMEONE_ELSE"), "模型编的编号不能拿去查别人（实际查了：" + asked.join(",") + "）");
     await bot.stop(); await mock.stop();
   } finally { restore(); }
+});
+
+test("rinnet 群绑定：附带凭据、斜杠密码、TOTP 和卡号不进模型、上下文或日志", async () => {
+  const secrets = ["rin@example.com", "/secret-password", "123456", "00000000000000000001"];
+  const logs = [];
+  const saved = [];
+  const restore = stubCore({
+    getDataSource: async () => "rinnet",
+    getRinnetClient: () => ({
+      login: async (email, password) => { assert.equal(password, secrets[1]); return { totpToken: "challenge-secret" }; },
+      totp: async () => ({ accessToken: "access-secret", refreshToken: "refresh-secret" }),
+      bind: async (account, email, cardNumber) => cardNumber ? { account, email, cardNumber, aimeId: "7", sessionId: "s", playerName: "测试玩家", dataSource: "rinnet" } : { cards: [{}, {}] },
+    }),
+    saveBinding: async (config, entry) => saved.push(entry),
+  });
+  const { mock, bot, model } = await setup({}, { botDeps: { log: line => logs.push(line) } });
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "/绑定 " + secrets.join(" ") }));
+    for (const content of secrets) await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content }));
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].aimeId, "7");
+    const exposed = JSON.stringify([logs, bot.readContext(GROUP, false), model.calls, model.routeCalls, mock.state.sent]);
+    for (const secret of [...secrets, "challenge-secret", "access-secret", "refresh-secret"]) assert.ok(!exposed.includes(secret));
+    assert.equal(model.calls.length + model.routeCalls.length, 0);
+  } finally { await bot.stop(); await mock.stop(); restore(); }
 });

@@ -25,6 +25,8 @@
 
 const core = require("../mia-core.cjs");
 const songSearch = require("./song-search.cjs");
+const { continueRinnetBinding } = require("./rinnet-binding.cjs");
+const { RinnetError, diagnosticText } = require("../rinnet-client.cjs");
 const { MIA_HELP, MIA_HINTS, MIA_TEMPLATES: T } = require("./mia-voice.cjs");
 
 const SESSION_TTL_MS = 5 * 60 * 1000;
@@ -48,6 +50,7 @@ const LINES_LIMIT = 900;
 const COMMANDS = Object.freeze({
   help: "帮助",
   bind: "绑定",
+  source: "设置数据源",
   chart: "分表",
   plate: "牌子",
   song: "单曲",
@@ -60,8 +63,6 @@ const COMMANDS = Object.freeze({
   aliasdelete: "删除别名",
   aliases: "查看别名",
   whatis: "是什么歌",
-  allow: "允许查询",
-  deny: "禁止查询",
   status: "状态",
   unbind: "解绑",
   cancel: "取消",
@@ -72,6 +73,7 @@ const COMMANDS = Object.freeze({
 const ALIASES = Object.freeze({
   help: ["帮助", "help", "幫助", "菜单", "指令"],
   bind: ["绑定", "bind", "綁定", "登录", "登陆"],
+  source: ["设置数据源", "設定資料來源", "设置服务器", "数据源", "source"],
   // b110 = B50 + N10 + P50 正好 110 张，是分表的俗称
   chart: ["分表", "chart", "b50", "b110", "成绩图"],
   plate: ["牌子", "plate", "完成度"],
@@ -85,8 +87,6 @@ const ALIASES = Object.freeze({
   aliasdelete: ["删除别名", "刪除別名", "aliasdelete"],
   aliases: ["查看别名", "查看別名", "aliases"],
   whatis: ["是什么歌", "是什麼歌", "whatis"],
-  allow: ["允许查询", "允許查詢", "开放查询", "開放查詢", "allowquery", "允许别人查我"],
-  deny: ["禁止查询", "禁止查詢", "关闭查询", "關閉查詢", "denyquery", "禁止别人查我"],
   status: ["状态", "status", "狀態"],
   unbind: ["解绑", "unbind", "解綁"],
   cancel: ["取消", "cancel", "取消绑定"],
@@ -222,6 +222,7 @@ function createMiaCommands(options = {}) {
       run: async () => {
         try { settle({ ok: true, image: await plan.run() }); }
         catch (error) {
+          if (error instanceof RinnetError) log("[rinnet-query-v2] " + diagnosticText(error));
           log("出图失败：" + core.safeError(error));
           settle({ ok: false, reason: T.jobFailed(plan.failText || (plan.label + "生成失败："), core.safeError(error)) });
         }
@@ -358,14 +359,14 @@ function createMiaCommands(options = {}) {
     if (!session) return null;
     // TTL 从会话创建算起，中途的状态迁移不续期：整个绑定流程（邮箱+密码+验证）
     // 必须在这段时间内走完。
-    if (now() - session.startedAt > SESSION_TTL_MS) { sessions.delete(key); return null; }
+    if (now() - session.startedAt > SESSION_TTL_MS) { endSession(key); return null; }
     return session;
   }
 
   function endSession(userId) {
     const key = String(userId);
     const session = sessions.get(key);
-    if (session) session.email = "";   // 邮箱也擦掉，别留在内存快照里
+    if (session) { session.email = ""; session.totpToken = ""; session.account = null; }
     sessions.delete(key);
   }
 
@@ -373,12 +374,36 @@ function createMiaCommands(options = {}) {
     return Boolean(session && session.type === event.type && session.openid === String(event.openid));
   }
 
+  function expireSessionFor(event) {
+    const session = sessions.get(String(event.userId));
+    if (session && session.type === event.type && session.openid === String(event.openid) && now() - session.startedAt > SESSION_TTL_MS) {
+      endSession(event.userId);
+      return true;
+    }
+    return false;
+  }
+
   async function startBind(event) {
+    if (getSession(event.userId)?.state === "verifying") return send(event, T.bindBusyVerifying);
+    const source = await core.getDataSource(config, String(event.userId));
+    endSession(event.userId);
     sessions.set(String(event.userId), {
       state: "awaitingEmail", email: "", attempts: 0, startedAt: now(),
-      type: event.type, openid: String(event.openid),
+      type: event.type, openid: String(event.openid), source,
     });
-    await send(event, isGroup(event) ? T.bindGroupIntro : T.bindIntro);
+    await send(event, source === "rinnet" ? T.rinnetIntro(isGroup(event)) : isGroup(event) ? T.bindGroupIntro : T.bindIntro);
+  }
+
+  async function handleSource(event, input) {
+    const word = String(input || "").normalize("NFKC").trim().toLowerCase();
+    const source = ({ "大饼": "otogame", "大餅": "otogame", otogame: "otogame", rinnet: "rinnet", "rin-net": "rinnet" })[word];
+    if (!word) return send(event, T.sourceCurrent(await core.getDataSource(config, String(event.userId)) === "rinnet" ? "rinnet" : "大饼"));
+    if (!source) return send(event, T.sourceUsage);
+    if (getSession(event.userId)?.state === "verifying") return send(event, T.bindBusyVerifying);
+    endSession(event.userId);
+    await core.setDataSource(config, String(event.userId), source);
+    const binding = await core.getBinding(config, String(event.userId));
+    return send(event, T.sourceDone(source === "rinnet" ? "rinnet" : "大饼", Boolean(binding)));
   }
 
   async function handleBind(event) {
@@ -390,6 +415,8 @@ function createMiaCommands(options = {}) {
     if (!session) return false;
     if (!sessionMatches(event, session)) return false;
     if (session.state === "confirmUnbind") return false;   // 解绑确认由 handleUnbind 接管
+    if (session.source === "rinnet") return continueRinnetBinding({ event, text, session,
+      current: getSession, end: endSession, send, core, config, T, log });
 
     if (session.state === "awaitingEmail") {
       const email = String(text).trim();
@@ -430,9 +457,10 @@ function createMiaCommands(options = {}) {
           let reply;
           try {
             const playerName = await core.verifyAccount(config, email, secret, (line) => log(core.safeError(line)));
+            if (getSession(event.userId) !== session) return;
             await core.saveBinding(config, {
               userId: String(event.userId), email, password: secret,
-              playerName, boundAt: new Date().toISOString(),
+              playerName, boundAt: new Date().toISOString(), dataSource: "otogame",
             });
             reply = T.bindSuccess(core.escapeDiscordText(playerName));
           } catch (error) {
@@ -441,7 +469,7 @@ function createMiaCommands(options = {}) {
             secret = "";             // 明文密码的生命到此为止
             // 必须在最终提示发出**之前**结束会话。发送要经过限流/网络，期间用户若再说一句，
             // 旧写法会把那句话误判成仍在验证，回出「正在验证，请稍候」。
-            endSession(event.userId);
+            if (getSession(event.userId) === session) endSession(event.userId);
           }
           await send(event, reply);
         },
@@ -463,13 +491,14 @@ function createMiaCommands(options = {}) {
     const binding = await core.getBinding(config, String(event.userId));
     if (!binding) return send(event, T.unbindNotBound);
     const session = getSession(event.userId);
-    if (session?.state === "confirmUnbind") {
+    if (session?.state === "confirmUnbind" && sessionMatches(event, session)) {
       endSession(event.userId);
-      await core.vaultCall(config, "delete", [String(event.userId)]);
+      await core.deleteBinding(config, String(event.userId), session.source);
       return send(event, T.unbindDone);
     }
     // QQ 没有按钮和确认弹窗，用「再发一次」代替二次确认
-    sessions.set(String(event.userId), { state: "confirmUnbind", email: "", attempts: 0, startedAt: now() });
+    sessions.set(String(event.userId), { state: "confirmUnbind", email: "", attempts: 0, startedAt: now(),
+      type: event.type, openid: String(event.openid), source: binding.dataSource || "otogame" });
     return send(event, T.unbindConfirm(Math.round(SESSION_TTL_MS / 60000)));
   }
 
@@ -480,13 +509,6 @@ function createMiaCommands(options = {}) {
       return send(event, T.cancelDone);
     }
     return send(event, T.cancelNone);
-  }
-
-  async function handleQueryPermission(event, allowed) {
-    const binding = await core.getBinding(config, String(event.userId));
-    if (!binding) return send(event, pick(MIA_HINTS.bindNotice));
-    await core.saveBinding(config, { ...binding, allowOthers: allowed });
-    return send(event, pick(allowed ? MIA_HINTS.allowDone : MIA_HINTS.denyDone));
   }
 
   // ── 别名 ──────────────────────────────────────────────────────────
@@ -575,6 +597,7 @@ function createMiaCommands(options = {}) {
     switch (command.name) {
       case "help": return runCapability(event, "help", "");
       case "bind": return handleBind(event);
+      case "source": return handleSource(event, command.rest);
       case "chart": return runCapability(event, "chart", "", "", event.__target);
       case "plate": return runCapability(event, "plate", command.rest, "", event.__target);
       case "song": return runCapability(event, "song", command.rest, "", event.__target);
@@ -585,8 +608,6 @@ function createMiaCommands(options = {}) {
       case "calculate": return runCapability(event, "calculate", command.rest);
       case "aliasadd": case "aliasdelete": case "aliases": case "whatis":
         return handleAlias(event, command.name, command.rest);
-      case "allow": return handleQueryPermission(event, true);
-      case "deny": return handleQueryPermission(event, false);
       case "status": return send(event, statusText());
       case "unbind": return handleUnbind(event);
       case "cancel": return handleCancel(event);
@@ -616,7 +637,7 @@ function createMiaCommands(options = {}) {
   return {
     COMMANDS, ALIASES, LOOKUP, parseCommand,
     handleCommand, continueSession, handleBind, handleUnbind,
-    getSession, sessionMatches, runCapability, hasInventedEnum,
+    getSession, sessionMatches, expireSessionFor, runCapability, hasInventedEnum,
     claimEvent, messageKey,
     statusText, registerCore,
     aliasDeleteOpenids,

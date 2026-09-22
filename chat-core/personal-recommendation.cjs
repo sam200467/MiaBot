@@ -25,7 +25,6 @@ async function bindingNotice(getBinding,userId,targets=[],bindHint='请先绑定
  const target=targets[0]||userId;
  const binding=await getBinding(String(target));
  if(!binding)return target===userId?'你还没有绑定账号，我读取不到你的个人成绩，不能筛选“没鸟过／没打过”的谱面。'+bindHint:'对方还没有绑定账号，无法读取个人成绩，不能替对方筛选没鸟过或没打过的谱面。';
- if(target!==userId&&binding.allowOthers!==true)return '对方没有开放成绩查询，不能读取或推测对方的个人成绩来推荐。';
  return unavailable;
 }
 module.exports={needsPersonalRecords,bindingNotice,unavailable};

@@ -86,6 +86,10 @@ for (const file of [
   path.join(HERE, "test-mia-commands.cjs"),
   path.join(HERE, "test-song-search.cjs"),
   path.join(HERE, "test-semantic-router.cjs"),
+  path.join(HERE, "test-public-query.cjs"),
+  path.join(ROOT, "test-rinnet-client.cjs"),
+  path.join(ROOT, "test-rinnet-renderer.cjs"),
+  path.join(ROOT, "test-data-source-vault.cjs"),
   // 面板那条「命令表和描述必须一一对应」是防漂移的唯一防线，进闸门才有意义
   path.join(HERE, "test-mia-command-panel.cjs"),
   // 美亚的入口 bundle 里有 chat.cjs，引擎契约坏了这边一样会挂

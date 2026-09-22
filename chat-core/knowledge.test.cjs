@@ -35,11 +35,10 @@ test('personal recommendations never reach model or public lookup without record
  assert.equal(needsPersonalRecords([{role:'user',content:'推荐一些12+'}]),false);
  assert.equal(needsPersonalRecords([{role:'user',content:'没鸟过是什么意思'}]),false);
 });
-test('bound is not equivalent to fetched, and other player permissions are enforced',async()=>{
+test('bound is not equivalent to fetched; bound targets need no extra permission',async()=>{
  assert.match(await bindingNotice(async()=>({}),'u'),/没有接入按个人成绩筛选/);
  assert.match(await bindingNotice(async()=>null,'u',['other']),/对方还没有绑定/);
- assert.match(await bindingNotice(async()=>({allowOthers:false}),'u',['other']),/没有开放/);
- assert.match(await bindingNotice(async()=>({allowOthers:true}),'u',['other']),/没有接入/);
+ assert.match(await bindingNotice(async()=>({}),'u',['other']),/没有接入/);
 });
 const knowledge={catalogs:{ongeki:{source:'test',scope:'fixture',charts:[
  {id:'1',title:'Alpha',difficulty:'EXP',level:'13'},
@@ -255,4 +254,13 @@ test('gameInText 只在唯一提到一款游戏时给线索',()=>{
  assert.equal(gameInText('音击和中二的定数哪个高'),null);
  assert.equal(gameInText('有没有比较水的14+'),null);
  assert.equal(gameInText(''),null);
+});
+
+test('同时是演唱者与对战相手的 both 不能在曲目反查时漏掉',()=>{
+ const knowledge=loadKnowledge(__dirname);
+ const mia=knowledge.characters.characters.find(c=>c.aliases.includes('美亚'));
+ const song=mia.songs.find(s=>s.role==='both'&&knowledge.catalogs.ongeki.charts.some(c=>c.title===s.title));
+ assert.ok(song);
+ const answer=lookup(knowledge,{game:'ongeki',title:song.title});
+ assert.ok(answer.opponents.some(name=>/美亚|美亜/.test(name)));
 });
