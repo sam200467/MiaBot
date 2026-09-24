@@ -96,8 +96,11 @@ function stub(overrides = {}) {
   return () => { Object.assign(core, original); };
 }
 const run = async (configOverrides, overrides, body) => {
-  const restore = stub(overrides);
-  try { await body(setup(configOverrides)); } finally { restore(); }
+  // songJacket 是 createMiaCommands 的注入项，不是 core 的桩 —— 塞给 stub() 只会
+  // 挂到 core 上吃灰，真实的 createSongJacket 照样被建出来、测试就变成真联网了。
+  const { songJacket, ...coreOverrides } = overrides || {};
+  const restore = stub(coreOverrides);
+  try { await body(setup(configOverrides, songJacket ? { songJacket } : {})); } finally { restore(); }
 };
 
 // 队列那类用例没法靠 await 排序（dispatch 会一直等到图出完），
@@ -110,6 +113,49 @@ async function waitUntil(predicate, timeoutMs = 2000) {
   }
   return false;
 }
+
+
+test("查曲绘需要线索，成功时一条图文回复且曲名不加书名号", async () => {
+  let lookups = 0;
+  await run({}, {
+    getBinding: async () => { throw new Error("查曲绘不应读账号"); },
+    songJacket: { lookup: async (query) => {
+      lookups++;
+      assert.equal(query, "id870");
+      return { ok: true, song: { name: "VIIIbit Explorer" },
+        image: { buffer: Buffer.from("image"), name: "jacket.png", meta: {} } };
+    } },
+  }, async ({ commands, sent }) => {
+    assert.equal(parseCommand("/查曲绘")?.name, "songjacket");
+    assert.deepEqual(parseCommand("/查曲绘 id870"), { name: "songjacket", rest: "id870" });
+    await commands.handleCommand(groupEvent("/查曲绘"), parseCommand("/查曲绘"));
+    assert.equal(lookups, 0, "不带线索不能随机抽图");
+    assert.match(sent[0].text, /查曲绘 id870/);
+    sent.length = 0;
+    await commands.handleCommand(groupEvent("/查曲绘 id870"), parseCommand("/查曲绘 id870"));
+    assert.equal(lookups, 1);
+    assert.equal(sent.length, 1, "图片和短文案应在同一条消息里");
+    assert.equal(sent[0].kind, "image");
+    assert.match(sent[0].caption, /VIIIbit Explorer/);
+    assert.doesNotMatch(sent[0].caption, /[《》]/);
+  });
+});
+
+test("查曲绘的重名结果给出可执行的选择指令", async () => {
+  await run({}, {
+    songJacket: { lookup: async () => ({
+      ok: false, code: "AMBIGUOUS", candidates: [
+        { name: "Redo", artist: "艺人甲", selector: "Redo --选 1" },
+        { name: "Redo", artist: "艺人乙", selector: "Redo --选 2" },
+      ],
+    }) },
+  }, async ({ commands, sent }) => {
+    await commands.handleCommand(groupEvent("/查曲绘 Redo"), parseCommand("/查曲绘 Redo"));
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].text, /\/查曲绘 Redo --选 2/);
+    assert.doesNotMatch(sent[0].text, /[《》]/);
+  });
+});
 
 // ── 解析 ────────────────────────────────────────────────────────────
 test("前缀矩阵：斜杠、半角井号、全角井号都认", () => {
@@ -185,7 +231,8 @@ test("/帮助 不碰模型也不碰凭据库", async () => {
     assert.match(sent[0].text, /各难度已知定数/, "帮助说明搜歌返回各难度定数");
     assert.match(sent[0].text, /搜索歌曲/);
     assert.doesNotMatch(sent[0].text, /开头:|紫谱13|条件搜索/);
-    assert.match(sent[0].text, /不会联网搜索/, "帮助里要写清本地资料的边界");
+    assert.match(sent[0].text, /普通搜歌只查本地曲库/, "帮助里要写清普通搜歌的数据边界");
+    assert.match(sent[0].text, /查曲绘缺图时会联网补图/, "帮助里要说明曲绘会联网补图");
     assert.equal(bindingCalls, 0, "帮助不该去读凭据库");
   });
 });

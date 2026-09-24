@@ -85,6 +85,7 @@ for (const file of [
   path.join(HERE, "test-mia-entry.cjs"),
   path.join(HERE, "test-mia-commands.cjs"),
   path.join(HERE, "test-song-search.cjs"),
+  path.join(HERE, "test-song-jacket.cjs"),
   path.join(HERE, "test-semantic-router.cjs"),
   path.join(HERE, "test-public-query.cjs"),
   path.join(ROOT, "test-rinnet-client.cjs"),

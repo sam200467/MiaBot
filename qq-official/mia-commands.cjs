@@ -1,4 +1,5 @@
 "use strict";
+const path = require("node:path");
 // 美亚的指令层：解析、分发、图片队列、绑定会话。
 //
 // ── 为什么这份代码是「抄」梨绪的，而不是两边共用一个模块 ──────────────
@@ -25,6 +26,7 @@
 
 const core = require("../mia-core.cjs");
 const songSearch = require("./song-search.cjs");
+const { createSongJacket } = require("./song-jacket.cjs");
 const { continueRinnetBinding } = require("./rinnet-binding.cjs");
 const { RinnetError, diagnosticText } = require("../rinnet-client.cjs");
 const { MIA_HELP, MIA_HINTS, MIA_TEMPLATES: T } = require("./mia-voice.cjs");
@@ -55,6 +57,7 @@ const COMMANDS = Object.freeze({
   plate: "牌子",
   song: "单曲",
   songsearch: "搜索歌曲",
+  songjacket: "查曲绘",
   chartinfo: "谱面分析",
   constant: "定数表",
   level: "等级",
@@ -79,6 +82,7 @@ const ALIASES = Object.freeze({
   plate: ["牌子", "plate", "完成度"],
   song: ["单曲", "song", "歌曲"],
   songsearch: ["搜索歌曲", "搜歌", "查歌", "songsearch"],
+  songjacket: ["查曲绘", "曲绘", "jacket"],
   chartinfo: ["谱面分析", "譜面分析", "chartinfo", "谱面"],
   constant: ["定数表", "定數表", "constant", "定数"],
   level: ["等级", "等級", "level", "lv"],
@@ -120,6 +124,11 @@ function createMiaCommands(options = {}) {
   const log = options.log || (() => {});
   const now = options.now || Date.now;
   const random = options.random || Math.random;
+  const songJacket = options.songJacket || createSongJacket({
+    cacheDir: config.workDir ? path.join(config.workDir, "song-jacket-cache") : undefined,
+    jacketCacheDir: config.workDir ? path.join(config.workDir, "jacket-cache") : undefined,
+    proxyUrl: config.proxyUrl || "",
+  });
   // Mia 的图片任务很轻，连续查看时 60 秒会显得像卡住。这里只覆盖 Mia，
   // 不改 shared core 的默认值，避免顺手改变梨绪和 Discord 版。
   const generateCooldownMs = Math.max(0, Number.isFinite(Number(config.generateCooldownMs))
@@ -591,6 +600,51 @@ function createMiaCommands(options = {}) {
     return send(event, `角色们的小表情都整理好啦～ 可别挑花眼哦！\n${base}/expressions${suffix}`);
   }
 
+
+  function songJacketCandidateLines(candidates) {
+    const list = Array.isArray(candidates) ? candidates.slice(0, 8) : [];
+    const lines = list.map((candidate, index) => {
+      const name = String(candidate.name || "").replace(/\s+/g, " ").trim();
+      const artist = String(candidate.artist || "").replace(/\s+/g, " ").trim();
+      const selector = String(candidate.selector || "").trim();
+      return `${index + 1}. ${name}${artist ? " / " + artist : ""}${selector ? "\n   /查曲绘 " + selector : ""}`;
+    });
+    if (Array.isArray(candidates) && candidates.length > list.length) {
+      lines.push(`还有 ${candidates.length - list.length} 首，请缩小查询范围。`);
+    }
+    return lines.join("\n");
+  }
+
+  async function handleSongJacket(event, query) {
+    if (!String(query || "").trim()) return send(event, T.songJacketUsage);
+    let result;
+    try {
+      result = await songJacket.lookup(query);
+    } catch (error) {
+      log("查曲绘失败：" + core.safeError(error));
+      return send(event, T.songJacketUnavailable);
+    }
+    if (!result?.ok) {
+      if (result?.code === "USAGE") return send(event, T.songJacketUsage);
+      if (result?.code === "NOT_FOUND") return send(event, T.songJacketNotFound(String(query).trim()));
+      if (result?.code === "AMBIGUOUS") return send(event, T.songJacketAmbiguous(songJacketCandidateLines(result.candidates)));
+      if (result?.code === "FUZZY") return send(event, T.songJacketFuzzy(songJacketCandidateLines(result.candidates)));
+      return send(event, T.songJacketUnavailable);
+    }
+    try {
+      const lines = T.songJacketFoundLines;
+      const line = lines[Math.floor(random() * lines.length)] || lines[0];
+      return await sendImage(event, result.image, line(result.song.name));
+    } catch (error) {
+      if (error?.code === 40034128) {
+        log(T.imageWindowExpired);
+        return null;
+      }
+      log("发送曲绘失败：" + core.safeError(error));
+      return send(event, T.songJacketUnavailable);
+    }
+  }
+
   // ── 命令入口 ──────────────────────────────────────────────────────
   // event.__target 由调用方（mia-entry）在确认「本条消息真的 @ 过谁」之后设进来。
   async function handleCommand(event, command) {
@@ -602,6 +656,7 @@ function createMiaCommands(options = {}) {
       case "plate": return runCapability(event, "plate", command.rest, "", event.__target);
       case "song": return runCapability(event, "song", command.rest, "", event.__target);
       case "songsearch": return runCapability(event, "songsearch", command.rest);
+      case "songjacket": return handleSongJacket(event, command.rest);
       case "chartinfo": return runCapability(event, "chartinfo", command.rest);
       case "constant": return runCapability(event, "constant", command.rest);
       case "level": return runCapability(event, "level", command.rest, "", event.__target);

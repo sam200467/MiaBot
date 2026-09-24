@@ -56,6 +56,7 @@ test("元素名就是能直接用的命令写法", () => {
   // 斜杠 + ALIASES 里的第一个说法（中文那个）。
   assert.equal(panel.commandText("help"), "/帮助");
   assert.equal(panel.commandText("chart"), "/分表");
+  assert.equal(panel.commandText("songjacket"), "/查曲绘");
   for (const name of Object.keys(COMMANDS)) {
     const text = panel.commandText(name);
     assert.ok(text.startsWith("/"), name + " 的命令写法应当以斜杠开头");

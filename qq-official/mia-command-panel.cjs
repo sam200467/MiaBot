@@ -62,6 +62,7 @@ const DESCRIPTIONS = Object.freeze({
   plate: "版本牌子完成度长图",
   song: "一首歌的全难度成绩图",
   songsearch: "按曲名线索找歌，不用绑定",
+  songjacket: "按曲名或ID查曲绘，不用绑定",
   chartinfo: "单张谱面的分数线与容错",
   constant: "按定数查谱面，不用绑定",
   level: "等级成绩长图",
