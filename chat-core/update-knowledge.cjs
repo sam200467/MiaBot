@@ -2,6 +2,7 @@
 // Public metadata only. No player records, login cookies or API keys are used.
 const fs=require('node:fs'),path=require('node:path');
 const root=__dirname,out=path.join(root,'knowledge');
+const {remapOngekiIds}=require('./knowledge.cjs');
 async function main(){
  fs.mkdirSync(out,{recursive:true});
  const fetchedAt=new Date().toISOString();
@@ -10,7 +11,8 @@ async function main(){
  for(const s of local.songs)if(!s.meta.is_deleted)for(const difficulty of ['BAS','ADV','EXP','MAS','LUN']){
    const c=s[difficulty];if(c?.has_chart&&c.level)charts.push({id:s.meta.official_id,title:s.meta.name,artist:s.meta.artist,difficulty,level:c.level,constant:c.const_status==='known'?c.const:null,bpm:s.meta.bpm,version:s.meta.song_release_version});
  }
- const datasets=[['ongeki',{source:'项目 ongeki-song-catalog.json',scope:'音击项目曲库快照；收录/定数以此快照为准，不保证所有地区版本一致',updatedAt:local.meta.last_updated_at,fetchedAt,charts}]];
+ const internal=JSON.parse(fs.readFileSync(path.join(root,'..','ongeki-music-internal.json'),'utf8'));
+ const datasets=[['ongeki',{source:'项目 ongeki-song-catalog.json',scope:'音击项目曲库快照；收录/定数以此快照为准，不保证所有地区版本一致',updatedAt:local.meta.last_updated_at,fetchedAt,charts:remapOngekiIds(charts,internal)}]];
  for(const [game,api] of [['maimai','maimaidxprober'],['chunithm','chunithmprober']]){
    const source='https://www.diving-fish.com/api/'+api+'/music_data';
    const response=await fetch(source,{signal:AbortSignal.timeout(20000)});

@@ -58,12 +58,12 @@ test("组合筛选针对同一张谱面；等级与定数分别比较", () => {
   assert.throws(() => run([filter("level", "eq", "14.4")]), /等级/);
 });
 
-test("未知定数不等于0也不满足不等于条件，返回时标注未知", () => {
-  const song = catalog.songs.find(s => s.ADV?.has_chart && s.ADV.const_status === "unknown");
-  const filters = [filter("title", "eq", song.meta.name), filter("difficulty", "eq", "ADV")];
+test("特殊 LUNATIC 0 的未定定数不等于0，也不满足不等于条件", () => {
+  const song = catalog.songs.find(s => s.meta.name === "Perfect Shining!!" && s.LUN?.const_status === "unknown");
+  const filters = [filter("title", "eq", song.meta.name), filter("difficulty", "eq", "LUN")];
   assert.equal(run([...filters, filter("constant", "gte", 0)]).total, 0);
   assert.equal(run([...filters, filter("constant", "ne", 0)]).total, 0);
-  assert.match(formatResult(run(filters, { select: ["title", "constant"] })), /未知/);
+  assert.match(formatResult(run(filters, { select: ["title", "constant"] })), /无定数/);
 });
 
 test("BPM/谱师/物量等数据库字段可组合，按谱面排序和计数不重复", () => {
@@ -170,4 +170,17 @@ test("抽样数量/计数冲突/模型伪造结果键都拒绝，不静默截断
     assert.throws(() => validateQuery(pickQuery(choice)));
   }
   assert.throws(() => validateQuery(pickQuery({ kind: "random", count: 2 }, { mode: "count" })));
+});
+
+test("问歌曲 ID 返回分表短 ID，明确问官方曲目 ID 仍返回官方编号", () => {
+  const song = "光焔のラテラルアーク";
+  const short = run([filter("title", "eq", song)], { select: ["title", "botId"] });
+  assert.equal(short.total, 1);
+  assert.equal(short.entries[0].rows[0].botId, 728);
+  assert.match(formatResult(short), /ID：728/);
+  assert.doesNotMatch(formatResult(short), /601129/);
+  const byShortId = run([filter("botId", "eq", 728)]);
+  assert.deepEqual(byShortId.entries.map(entry => entry.title), [song]);
+  const official = run([filter("title", "eq", song)], { select: ["title", "officialId"] });
+  assert.match(formatResult(official), /官方曲目ID：601129/);
 });

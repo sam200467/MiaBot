@@ -7,6 +7,7 @@ const internal = require("../ongeki-music-internal.json");
 const { loadCharacters, normalize: titleKey } = require("../chat-core/knowledge.cjs");
 const path = require("node:path");
 const songSearch = require("./song-search.cjs");
+const { botSongId } = require("./song-id.cjs");
 const { randomInt } = require("node:crypto");
 const characters = loadCharacters(path.join(__dirname, "../chat-core"));
 const textKey = value => String(value ?? "").normalize("NFKC").toLowerCase().trim();
@@ -20,7 +21,8 @@ const fields = {
   release: { label: "收录日期", type: "date", note: "YYYY-MM-DD；没有记录就未知" },
   bpm: { label: "BPM", type: "number" },
   deleted: { label: "已删除", type: "boolean" },
-  officialId: { label: "官方曲目ID", type: "text", note: "和 Bot ID 不同；用户只说 id870 时用 title search" },
+  botId: { label: "ID", type: "number", note: "分表和 Bot 指令使用的短 ID；用户问某首歌的 id 时返回此字段" },
+  officialId: { label: "官方曲目ID", type: "text", note: "仅用户明确说“官方曲目 ID”时返回；用户输入 id870 查歌时用 title search" },
   difficulty: { label: "谱面难度", type: "enum", values: DIFFICULTIES },
   level: { label: "显示等级", type: "level", note: "13 与 13+ 不同；不可把等级自动改成定数" },
   constant: { label: "定数", type: "number", note: "仅使用已知定数；未知不能当 0" },
@@ -46,7 +48,7 @@ const SCHEMA = {
   game: "ongeki", fields,
   operations: { ...operations, titleOnly: ["search"] },
   query: { filters: [{ field: "title", op: "prefix", value: "ai" }], entity: "songs或charts", select: ["title", "constant"], mode: "list或count", page: 1, sort: { field: "title", direction: "asc或desc" }, selection: { kind: "all或first或random", count: "first/random必填，1到50的整数；all省略", excludePrevious: false } },
-  rules: "filters 全部为 AND，in 的数组为 OR；每条谱面必须同时满足所有条件，不能拿红谱的等级配紫谱的定数。selection决定筛选后怎么选：随机/随便/任意选N项用random+count=N，前N项用first+count=N，列全部用all且不填count。换一批/排除刚才的用excludePrevious=true。排序后取前几项才是first；随机从完整候选池不放回抽取，不是第一分页。count模式统计全部候选，不与抽样混用。只支持上述字段，不支持的条件不能丢弃，应具体说明或追问。歌曲计数去重，谱面计数不去重。新查询page=1；翻页沿用完整条件和同一批抽样。空结果不放宽条件。",
+  rules: "用户问歌曲的 id/ID 时选 botId（分表用短 ID），只有明确问官方曲目 ID 才选 officialId。filters 全部为 AND，in 的数组为 OR；每条谱面必须同时满足所有条件，不能拿红谱的等级配紫谱的定数。selection决定筛选后怎么选：随机/随便/任意选N项用random+count=N，前N项用first+count=N，列全部用all且不填count。换一批/排除刚才的用excludePrevious=true。排序后取前几项才是first；随机从完整候选池不放回抽取，不是第一分页。count模式统计全部候选，不与抽样混用。只支持上述字段，不支持的条件不能丢弃，应具体说明或追问。歌曲计数去重，谱面计数不去重。新查询page=1；翻页沿用完整条件和同一批抽样。空结果不放宽条件。",
 };
 
 class QueryError extends Error {
@@ -140,7 +142,7 @@ const rows = catalog.songs.flatMap((song, songIndex) => DIFFICULTIES.flatMap((di
       supplemental: !catalogChart?.has_chart,
       artist: song.meta.artist, genre: song.meta.genre, version: song.meta.song_release_version,
       release: song.meta.song_release, bpm: numeric(song.meta.bpm), deleted: Boolean(song.meta.is_deleted),
-      officialId: String(song.meta.official_id ?? ""), difficulty, level: chart.level,
+      botId: botSongId(song), officialId: String(song.meta.official_id ?? ""), difficulty, level: chart.level,
       constant: chart.const_status === "known" ? numeric(chart.const) : null,
       notes: numeric(chart.notes_all), bells: numeric(chart.bell), designer: chart.notesdesigner,
       opponent: v?.boss ? [v.boss] : [], bossLevel: numeric(v?.bossLevel), attribute: v?.attributeType ?? null,
@@ -231,6 +233,7 @@ function executeQuery(input, { preview = false, selectionKeys, excludeKeys = [],
 }
 const opLabels = { eq: "＝", ne: "≠", gt: "＞", gte: "≥", lt: "＜", lte: "≤", contains: "包含", prefix: "开头是", suffix: "结尾是", search: "线索", in: "属于" };
 const show = value => Array.isArray(value) ? value.join("、") || "未知" : !known(value) ? "未知" : typeof value === "boolean" ? value ? "是" : "否" : String(value);
+const displayValue = (field, row) => field === "constant" && row.difficulty === "LUN" && String(row.level) === "0" ? "无定数" : show(row[field]);
 function describeQuery(query) {
   return query.filters.length ? query.filters.map(f => `${fields[f.field].label}${opLabels[f.op]}${show(f.value)}`).join("；") : "全部曲目";
 }
@@ -250,7 +253,7 @@ function formatResult(result) {
     lines.push(`《${entry.title}》${entry.rows.every(r => r.deleted) ? "（已删除记录）" : entry.rows.some(r => r.deleted) ? "（含历史记录）" : ""}`);
     for (const field of query.select.filter(f => f !== "title" && f !== "difficulty")) {
       const chartField = ["constant", "level", "notes", "bells", "designer", "opponent", "bossLevel", "attribute"].includes(field);
-      const values = [...new Set(entry.rows.map(r => `${chartField ? r.difficulty + " " : ""}${show(r[field])}`))];
+      const values = [...new Set(entry.rows.map(r => `${chartField ? r.difficulty + " " : ""}${displayValue(field, r)}`))];
       lines.push(`${fields[field].label}：${values.join(" / ")}`);
     }
     if (query.select.includes("difficulty")) lines.push(`难度：${[...new Set(entry.rows.map(r => r.difficulty))].join(" / ")}`);

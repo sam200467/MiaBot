@@ -52,6 +52,21 @@ test('strict level and difficulty; no invented fallback; normalized title',()=>{
  assert.ok(lookup(knowledge,{game:'invalid'}).error);
  assert.ok(lookup(knowledge,{game:'maimai'}).error);
 });
+test('音击聊天曲库使用本地短 ID，也能按 id870 检索',()=>{
+ const k=loadKnowledge(__dirname);
+ const byId=lookup(k,{game:'ongeki',title:'id870'});
+ assert.ok(byId.charts.length>0);
+ assert.ok(byId.charts.every(chart=>chart.id==='870'&&chart.title==='VIIIbit Explorer'));
+ assert.ok(k.catalogs.ongeki.charts.every(chart=>/^\d{1,4}$/.test(chart.id)),'每张现有谱面都应对应本地短 ID');
+ const by728=lookup(k,{game:'ongeki',title:'id728'});
+ const byTitle=lookup(k,{game:'ongeki',title:'光焔のラテラルアーク'});
+ assert.ok(by728.charts.length>0);
+ assert.ok(by728.charts.every(chart=>chart.id==='728'&&chart.title==='光焔のラテラルアーク'));
+ assert.ok(byTitle.charts.every(chart=>chart.id==='728'),'问曲名的 ID 时只能提供本地 ID');
+ assert.equal(by728.charts.find(chart=>chart.difficulty==='ADV').constant,10.4,'聊天曲库应读到已补全的 ADV 定数');
+ const lun=lookup(k,{game:'ongeki',title:'id8003',difficulty:'LUN'});
+ assert.ok(lun.charts.some(chart=>chart.title==='Perfect Shining!!'&&chart.level==='0'));
+});
 test('音击曲目查询会从角色索引补上对战相手',()=>{
  const result=lookup(loadKnowledge(__dirname),{game:'ongeki',title:'Elusive Emotes'});
  assert.deepEqual(result.opponents,['早乙女彩华']);

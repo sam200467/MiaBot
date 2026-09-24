@@ -221,3 +221,15 @@ test("关闭JSON模式的重试也不能执行自然语言里夹带的工具对�
   assert.equal(result.queryState, null);
   assert.equal(result.action, undefined);
 });
+
+test("自然语言问 ID 强制返回短 ID；明确问官方曲目 ID 才返回六位编号", async () => {
+  const decision = queryDecision("title", "eq", "光焔のラテラルアーク", { select: ["title", "officialId"] });
+  const model = scriptedRoute([decision]);
+  const short = await routeIntent({ settings, specs, messages: [{ role: "user", content: "光焔のラテラルアーク的id是多少" }], fetchImpl: model.fetchImpl });
+  assert.match(short.text, /ID：728/);
+  assert.doesNotMatch(short.text, /601129/);
+  assert.deepEqual(short.queryState.select, ["title", "botId"]);
+  assert.match(model.calls[0].messages[0].content, /botId/);
+  const official = await routeIntent({ settings, specs, messages: [{ role: "user", content: "光焔のラテラルアーク的官方曲目ID是多少" }], fetchImpl: scriptedRoute([decision]).fetchImpl });
+  assert.match(official.text, /官方曲目ID：601129/);
+});
