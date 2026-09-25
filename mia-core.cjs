@@ -168,6 +168,35 @@ function searchSongs(query) {
     .sort((a, b) => Number(a.id) - Number(b.id));
 }
 
+// 添加/删除别名的两个参数。新格式只用空格；旧竖线写法继续兼容。
+// 没有竖线时逐个空格试切，优先选「完整曲名/完整别名/完整 ID」那个边界，
+// 这样 VIIIbit Explorer 这种自带空格的曲名不会被切成两半。
+function parseAliasWriteInput(input) {
+  const raw = String(input || "").normalize("NFKC").replace(/\s+/g, " ").trim();
+  if (!raw) return null;
+  const divider = raw.indexOf("|");
+  if (divider >= 0) {
+    return { query: raw.slice(0, divider).trim(), alias: raw.slice(divider + 1).trim() };
+  }
+  const words = raw.split(" ").filter(Boolean);
+  if (words.length < 2) return null;
+  const candidates = [];
+  for (let i = 1; i < words.length; i++) {
+    const query = words.slice(0, i).join(" ");
+    const matches = searchSongs(query);
+    if (matches.length !== 1) continue;
+    const song = matches[0];
+    const idMatch = query.match(/^(?:id\s*)?(\d+)$/i);
+    const key = normalizeSongQuery(query);
+    const exact = idMatch ? Number(song.id) === Number(idMatch[1])
+      : normalizeSongQuery(song.name) === key || songAliases.matches(song.name, key, "ongeki", true);
+    candidates.push({ query, alias: words.slice(i).join(" "), exact });
+  }
+  if (!candidates.length) return { query: words.slice(0, -1).join(" "), alias: words.at(-1) };
+  const exact = candidates.filter((item) => item.exact);
+  return (exact.length ? exact : candidates).sort((a, b) => b.query.length - a.query.length)[0];
+}
+
 // /是什么歌 同时接受曲名片段和别名；别名沿用反查原有的“精确优先”规则。
 function searchSongClues(query) {
   const raw = String(query || "").normalize("NFKC").trim();
@@ -755,12 +784,12 @@ const CAPABILITY_SPECS = Object.freeze([
   { name: "level", label: "等级成绩长图", argHint: "14、14+、14.1 或 ABFB，可再加页码", needsBinding: true },
   { name: "calculate", label: "单曲 Rating 计算", argHint: "定数、技术分、铃铛 none/fb、连击 none/fc/ab/ab-plus", needsBinding: false },
   // 别名库：社区词汇，读的谁都能读，添加也照命令路径的既有策略对所有人开放。
-  // 「添加」要两个参数，按命令路径已有的竖线约定切开。
+  // 「添加」要两个参数，按命令路径的空格约定切开（旧竖线写法仍兼容）。
   // **删除刻意不在这里** —— 它只认白名单里的那一个账号，而且只走命令格式，
   // 所以留在各入口的命令路径上（QQ 侧见 aliasDeleteQqs），模型永远碰不到它。
   { name: "aliases", label: "查看某首歌的全部别名", argHint: "曲名、已有别名或 Song ID", needsBinding: false },
   { name: "whatis", label: "按别名或部分曲名查歌", argHint: "别名、部分曲名或 Song ID", needsBinding: false },
-  { name: "aliasadd", label: "给歌曲添加别名", argHint: "曲目和别名用竖线分开，例如 id870 | 八爪鱼", needsBinding: false },
+  { name: "aliasadd", label: "给歌曲添加别名", argHint: "曲目和别名用空格分开，例如 id870 八爪鱼", needsBinding: false },
   // argHint 里那段约束是防寒暄误触发的：没有它，模型会把「在吗」当成问状态，
   // 回一串运维数据，比人设答一句「好得很」体验差得多。
   { name: "status", label: "机器人当前的运行状态",
@@ -792,7 +821,7 @@ let capabilityHints = Object.freeze({
   // 以下按 Discord 写默认值，QQ 入口在 start() 里覆盖成 # 命令的说法。
   // 新工具漏配 hint 不会在启动时报错（configureCapabilities 只校验已存在的键），
   // 只会在运行期返回空串 —— 两边入口都必须覆盖。
-  aliasUsage: "请把曲目和别名用竖线分开，例如 `id870 | 八爪鱼`；曲目可以是曲名、已有别名或 Song ID。",
+  aliasUsage: "请把曲目和别名用空格分开，例如 `id870 八爪鱼`；曲目可以是曲名、已有别名或 Song ID。",
   bindUsage: "绑定得单独走一遍流程：执行 `/bind`，我带你填账号。别把邮箱密码发在频道里。",
   statusUnavailable: "我现在没法自查状态，这条功能暂时没开。",
 });
@@ -975,7 +1004,7 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
 
   // ── 别名库 ────────────────────────────────────────────────────────
   // 命令路径（#添加别名 / /aliasadd）各有自己的实现，这里只服务闲聊路径：
-  // 模型给的是一个字符串，「添加」要的两个参数按命令路径已有的竖线约定切开。
+  // 模型给的是一个字符串，「添加」要的两个参数按命令路径的空格约定切开。
   // 删除不在这条链路上，见 CAPABILITY_SPECS 上的说明。
   if (spec.name === "aliases" || spec.name === "whatis") {
     const store = coreCall("getAliasStore");
@@ -998,16 +1027,16 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
   }
 
   if (spec.name === "aliasadd") {
-    const divider = q.indexOf("|");
-    if (divider < 0) return text(capabilityHints.aliasUsage);
-    const matches = searchSongs(q.slice(0, divider).trim());
+    const parsed = parseAliasWriteInput(q);
+    if (!parsed) return text(capabilityHints.aliasUsage);
+    const matches = searchSongs(parsed.query);
     if (matches.length !== 1) {
       return { kind: "lines", header: matches.length ? "找到多首曲目，请用完整 Song ID 明确选择：" : "没有找到曲目。", lines: songMatchLines(matches), footer: "" };
     }
     const song = matches[0];
     const store = coreCall("getAliasStore");
     let alias;
-    try { alias = store.validateAlias(q.slice(divider + 1).trim()); }
+    try { alias = store.validateAlias(parsed.alias); }
     catch (error) { return text(safeError(error)); }
     const result = store.add({ title: song.name, game: "ongeki", alias, addedBy: userId });
     const shared = INTERNAL_SONGS.filter((other) => other.id !== song.id && store.matches(other.name, normalizeSongQuery(alias), "ongeki", true));
@@ -1043,6 +1072,7 @@ module.exports = {
   levelCommandTarget,
   searchSongs,
   searchSongClues,
+  parseAliasWriteInput,
   parseChartInfoQuery,
   songHasChartDifficulty,
   searchChartInfo,

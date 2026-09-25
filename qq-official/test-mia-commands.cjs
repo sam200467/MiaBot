@@ -775,8 +775,8 @@ test("rinnet 绑定：验证码格式连错三次就停下，凭据不进回复"
 // ── 别名 ────────────────────────────────────────────────────────────
 test("删除别名的白名单：没有 / 是本人 / 是别人", async () => {
   const mk = (ids) => setup({ aliasDeleteOpenids: ids });
-  const cmd = parseCommand("/删除别名 id870 | 八爪鱼");
-  const argv = ["/删除别名 id870 | 八爪鱼"];
+  const cmd = parseCommand("/删除别名 id870 八爪鱼");
+  const argv = ["/删除别名 id870 八爪鱼"];
 
   // 名单为空 → 谁都不能删
   {
@@ -799,10 +799,24 @@ test("删除别名的白名单：没有 / 是本人 / 是别人", async () => {
   }
 });
 
-test("别名缺竖线：给用法提示", async () => {
+test("别名用空格分隔：ID 和带空格的曲名都能加", async () => {
+  await run({}, {}, async ({ commands, sent }) => {
+    await commands.handleCommand(c2cEvent("/添加别名 id870 八爪鱼"), parseCommand("/添加别名 id870 八爪鱼"));
+    assert.match(sent.at(-1).text, /八爪鱼 → id870/);
+    await commands.handleCommand(c2cEvent("/添加别名 VIIIbit Explorer 八比特"), parseCommand("/添加别名 VIIIbit Explorer 八比特"));
+    assert.match(sent.at(-1).text, /八比特 → id870/);
+    assert.deepEqual(core.getAliasStore().list("VIIIbit Explorer", "ongeki"), ["八爪鱼", "八比特"]);
+
+    // 旧的竖线写法继续兼容，群里已有的肌肉记忆不会突然失效
+    await commands.handleCommand(c2cEvent("/添加别名 id870 | 旧写法"), parseCommand("/添加别名 id870 | 旧写法"));
+    assert.match(sent.at(-1).text, /旧写法 → id870/);
+  });
+});
+
+test("别名缺第二个参数：给空格用法提示", async () => {
   await run({}, {}, async ({ commands, sent }) => {
     await commands.handleCommand(c2cEvent("/添加别名 id870"), parseCommand("/添加别名 id870"));
-    assert.match(sent[sent.length - 1].text, /竖线/);
+    assert.match(sent[sent.length - 1].text, /空格/);
   });
 });
 

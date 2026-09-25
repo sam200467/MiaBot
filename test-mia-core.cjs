@@ -201,14 +201,18 @@ assert.equal(core.selectBinding({ email: "o@x", password: "p" }).dataSource, "ot
   core.setAliasStore(new SongAliasStore(path.join(aliasDir, "aliases.json"), core.normalizeSongQuery));
   const run = (name, query) => core.resolveCapability({}, "free", name, query, () => {}, null);
 
-  // 两个参数靠竖线分开；模型漏了分隔符要给用法，不能自己瞎猜哪半是曲名
-  assert.match((await run("aliasadd", "八爪鱼")).text, /竖线/);
-  assert.match((await run("aliasadd", "id870 | 八爪鱼")).text, /^已添加别名：八爪鱼 → id870/);
+  // 两个参数靠空格分开；模型漏了别名要给用法，不能自己瞎猜哪半是曲名
+  assert.match((await run("aliasadd", "八爪鱼")).text, /空格/);
+  assert.match((await run("aliasadd", "id870 八爪鱼")).text, /^已添加别名：八爪鱼 → id870/);
   assert.equal(core.getAliasStore().list("VIIIbit Explorer", "ongeki").includes("八爪鱼"), true, "别名要真的落进存储");
+  // 曲名自己带空格时，程序要按曲库认出完整曲名，而不是把第一个词当曲名
+  assert.match((await run("aliasadd", "VIIIbit Explorer 八比特")).text, /^已添加别名：八比特 → id870/);
   // 重复添加不算错，但不能谎报「已添加」
-  assert.match((await run("aliasadd", "id870 | 八爪鱼")).text, /^这首歌已有该别名/);
+  assert.match((await run("aliasadd", "id870 八爪鱼")).text, /^这首歌已有该别名/);
+  // 旧竖线写法继续兼容
+  assert.match((await run("aliasadd", "id870 | 旧写法")).text, /^已添加别名：旧写法 → id870/);
   // 存储层的校验错误要透出来，不能吞掉
-  assert.match((await run("aliasadd", "id870 | 870")).text, /纯数字/);
+  assert.match((await run("aliasadd", "id870 870")).text, /纯数字/);
 
   assert.match((await run("aliases", "id870")).lines.join("\n"), /八爪鱼/);
   assert.match((await run("whatis", "八爪鱼")).lines.join("\n"), /id870/);
@@ -224,8 +228,8 @@ assert.equal(core.selectBinding({ email: "o@x", password: "p" }).dataSource, "ot
   // 模型连这个工具名都看不到，所以任何人都不可能用 @消息 删掉别名。
   assert.equal(core.CAPABILITY_SPECS.some((spec) => spec.name === "aliasdelete"), false,
     "aliasdelete 一旦进清单，闲聊就等于开了一个绕开白名单的删别名入口");
-  assert.equal((await run("aliasdelete", "id870 | 八爪鱼")).kind, "notice");
-  assert.deepEqual(core.getAliasStore().list("VIIIbit Explorer", "ongeki"), ["八爪鱼"], "被拒的删除不能动存储");
+  assert.equal((await run("aliasdelete", "id870 八爪鱼")).kind, "notice");
+  assert.deepEqual(core.getAliasStore().list("VIIIbit Explorer", "ongeki"), ["八爪鱼", "八比特", "旧写法"], "被拒的删除不能动存储");
 
   // ── 别名 → 正式曲名（聊天侧曲库查询的前置解析）────────────────────
   // 宿主曲库是 ongeki-music-internal.json 的小 id，聊天侧是 chat-core 的水鱼编号，

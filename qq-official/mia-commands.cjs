@@ -540,10 +540,10 @@ function createMiaCommands(options = {}) {
 
     let query = input, alias = "";
     if (["aliasadd", "aliasdelete"].includes(name)) {
-      const divider = input.indexOf("|");
-      if (divider < 0) return send(event, T.aliasNeedPipe);
-      query = input.slice(0, divider).trim();
-      alias = input.slice(divider + 1).trim();
+      const parsed = core.parseAliasWriteInput(input);
+      if (!parsed) return send(event, T.aliasNeedSpace);
+      query = parsed.query;
+      alias = parsed.alias;
     }
     const matches = core.searchSongs(query);
     if (matches.length !== 1) {
