@@ -806,6 +806,34 @@ test("别名缺竖线：给用法提示", async () => {
   });
 });
 
+test("/是什么歌 支持部分曲名、焔/焰异体和原有别名，并列出多首候选", async () => {
+  await run({}, {}, async ({ commands, sent }) => {
+    const ask = async (query) => {
+      const input = "/是什么歌 " + query;
+      await commands.handleCommand(groupEvent(input), parseCommand(input));
+      return sent.at(-1).text;
+    };
+
+    assert.match(await ask("冬花"), /id1076.*耐冬花麗/, "部分正式曲名应能反查");
+    assert.match(await ask("光焰"), /id728.*光焔のラテラルアーク/, "简体异体写法应找到正式曲名");
+
+    const multiple = await ask("光");
+    assert.match(multiple, /id222.*光線チューニング/);
+    assert.match(multiple, /id728.*光焔のラテラルアーク/, "多个曲名命中时应列出候选");
+
+    const store = core.getAliasStore();
+    store.add({ title: "VIIIbit Explorer", game: "ongeki", alias: "测试短名" });
+    store.add({ title: "光焔のラテラルアーク", game: "ongeki", alias: "测试短名扩展" });
+    const exactAlias = await ask("测试短名");
+    assert.match(exactAlias, /id870.*VIIIbit Explorer/, "原有别名反查仍有效");
+    assert.doesNotMatch(exactAlias, /id728/, "完整别名应优先于其他别名的部分命中");
+    store.add({ title: "VIIIbit Explorer", game: "ongeki", alias: "共同叫法" });
+    store.add({ title: "光焔のラテラルアーク", game: "ongeki", alias: "共同叫法" });
+    const shared = await ask("共同叫法");
+    assert.match(shared, /id870.*VIIIbit Explorer/);
+    assert.match(shared, /id728.*光焔のラテラルアーク/, "一个别名指向多首时不可只选一首");
+  });
+});
 // ── 状态 ────────────────────────────────────────────────────────────
 test("状态：读传输层的连接状态，措辞是美亚的", async () => {
   await run({}, {}, async ({ commands, sent }) => {

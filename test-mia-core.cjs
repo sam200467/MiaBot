@@ -25,6 +25,12 @@ assert.throws(() => core.calculateSingleRating(14.25, 1000000, "none", "none"), 
 assert.ok(core.searchSongs("愛").length > 0);
 assert.deepEqual(core.searchSongs("愛"), core.searchSongs("爱"));
 assert.equal(core.searchSongs("id870")[0].id, 870);
+assert.deepEqual(core.searchSongs("冬花").map((song) => song.id), [1076], "部分曲名应能定位歌曲");
+for (const query of ["光焔", "光焰", "光燄"]) {
+  assert.deepEqual(core.searchSongs(query).map((song) => song.id), [728], query + " 应命中同一首歌");
+  assert.deepEqual(core.searchChartInfo(query + " master").matches.map((match) => match.song.id), [728],
+    query + " 的谱面分析也应命中同一首歌");
+}
 
 // 自动补全
 assert.equal(core.songAutocomplete("song", "id870")[0].value, "id870");
@@ -206,6 +212,11 @@ assert.equal(core.selectBinding({ email: "o@x", password: "p" }).dataSource, "ot
 
   assert.match((await run("aliases", "id870")).lines.join("\n"), /八爪鱼/);
   assert.match((await run("whatis", "八爪鱼")).lines.join("\n"), /id870/);
+  assert.match((await run("whatis", "冬花")).lines.join("\n"), /id1076/, "是什么歌应支持部分正式曲名");
+  assert.match((await run("whatis", "光焰")).lines.join("\n"), /id728/, "是什么歌应支持焔/焰异体字");
+  const whatisMulti = await run("whatis", "光");
+  assert.match(whatisMulti.lines.join("\n"), /id222/);
+  assert.match(whatisMulti.lines.join("\n"), /id728/, "多个曲名命中时应列出候选");
   assert.match((await run("whatis", "查无此别名")).header, /没有找到/);
   assert.match((await run("aliases", "zzz查无此曲")).header, /没有找到/);
 

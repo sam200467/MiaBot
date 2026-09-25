@@ -530,13 +530,11 @@ function createMiaCommands(options = {}) {
     // 人工复核后才进正式库；对美亚来说那是多余的一层，用户看不出为什么要等复核。
     // 梨绪不受影响（它的命令表和这个文件是两份）。
     if (name === "whatis") {
-      // 宿主曲库只有音击，作用域固定 "ongeki"：别的游戏专属别名不该在这条命令里命中。
+      // 与单曲等功能共用曲库检索：别名、部分曲名、简繁及日文异体字都可作为线索。
       // 反查是给人看的，候选全都列出来（解析路径才要求唯一）。
-      const found = core.normalizeSongQuery(input) ? core.getAliasStore().names(input, "ongeki") : [];
-      const matches = core.INTERNAL_SONGS.filter((song) =>
-        found.some((hit) => core.normalizeSongQuery(hit.title) === core.normalizeSongQuery(song.name)));
+      const matches = core.searchSongClues(input);
       return sendLines(event,
-        matches.length ? "喵哼哼，这个叫法指的是下面这些歌：" : "唔，美亚没翻到这个叫法。",
+        matches.length ? "喵哼哼，找到下面这些歌：" : "唔，美亚没翻到这首歌。",
         core.songMatchLines(matches));
     }
 

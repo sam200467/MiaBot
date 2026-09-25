@@ -7,7 +7,7 @@ const { botSongId } = require("./song-id.cjs");
 // 两级归一化。**符号不能在唯一那一级里抹掉**：曲名里真的有符号，而 `∀` 这种
 // 整条曲名就是一个符号的，抹完是空串 —— 空串 includes 一切，查询词抹成空串又会被
 // 下面判成「没给线索」，于是这首歌谁也搜不到。所以第一级保留符号。
-const normalize = value => String(value || "").normalize("NFKC").toLowerCase()
+const normalize = value => core.normalizeSongQuery(value)
   .replace(/[ぁ-ゖ]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60))
   .replace(/[\s\p{P}]/gu, "");
 // 第二级再去掉符号，也就是原来的行为：用户通常不会照着打「!」「☆」，

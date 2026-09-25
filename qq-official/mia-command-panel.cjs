@@ -70,7 +70,7 @@ const DESCRIPTIONS = Object.freeze({
   aliasadd: "给一首歌加个别名",
   aliasdelete: "删别名（只对指定账号开放）",
   aliases: "这首歌都有哪些叫法",
-  whatis: "按别名反查是哪首歌",
+  whatis: "按别名或部分曲名查歌",
   status: "美亚现在忙不忙",
   unbind: "解开当前数据源的绑定",
   cancel: "中断正在进行的操作",

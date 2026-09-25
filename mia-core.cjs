@@ -65,7 +65,9 @@ function normalizeSongQuery(value) {
     .normalize("NFKC")
     .replace(/[\s　]+/g, " ")
     .trim()
-    .toLowerCase());
+    .toLowerCase())
+    // OpenCC 的简繁表未涵盖「焔 / 燄 / 焰」这组异体字。
+    .replace(/[焔燄]/g, "焰");
 }
 
 function normalizeLevelCommandQuery(value) {
@@ -164,6 +166,19 @@ function searchSongs(query) {
     .filter(({ song, title }) => title.includes(needle) || songAliases.matches(song.name, needle, "ongeki"))
     .map(({ song }) => song)
     .sort((a, b) => Number(a.id) - Number(b.id));
+}
+
+// /是什么歌 同时接受曲名片段和别名；别名沿用反查原有的“精确优先”规则。
+function searchSongClues(query) {
+  const raw = String(query || "").normalize("NFKC").trim();
+  if (!raw) return [];
+  if (/^(?:id\s*)?\d+$/i.test(raw)) return searchSongs(raw);
+  const needle = normalizeSongQuery(raw);
+  const aliasTitles = new Set(songAliases.names(raw, "ongeki").map((hit) => normalizeSongQuery(hit.title)));
+  return searchSongs(raw).filter((song) => {
+    const title = normalizeSongQuery(song.name);
+    return title.includes(needle) || aliasTitles.has(title);
+  });
 }
 
 const CHART_INFO_DIFFICULTY_ALIASES = Object.freeze(new Map([
@@ -744,7 +759,7 @@ const CAPABILITY_SPECS = Object.freeze([
   // **删除刻意不在这里** —— 它只认白名单里的那一个账号，而且只走命令格式，
   // 所以留在各入口的命令路径上（QQ 侧见 aliasDeleteQqs），模型永远碰不到它。
   { name: "aliases", label: "查看某首歌的全部别名", argHint: "曲名、已有别名或 Song ID", needsBinding: false },
-  { name: "whatis", label: "按别名反查是哪些歌", argHint: "别名，只给一部分也能查", needsBinding: false },
+  { name: "whatis", label: "按别名或部分曲名查歌", argHint: "别名、部分曲名或 Song ID", needsBinding: false },
   { name: "aliasadd", label: "给歌曲添加别名", argHint: "曲目和别名用竖线分开，例如 id870 | 八爪鱼", needsBinding: false },
   // argHint 里那段约束是防寒暄误触发的：没有它，模型会把「在吗」当成问状态，
   // 回一串运维数据，比人设答一句「好得很」体验差得多。
@@ -965,9 +980,8 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
   if (spec.name === "aliases" || spec.name === "whatis") {
     const store = coreCall("getAliasStore");
     if (spec.name === "whatis") {
-      const hit = normalizeSongQuery(q) ? store.lookup(q, "ongeki") : null;
-      const matches = hit ? INTERNAL_SONGS.filter((song) => normalizeSongQuery(song.name) === normalizeSongQuery(hit.title)) : [];
-      return { kind: "lines", header: matches.length ? "匹配到以下别名对应的曲目：" : "没有找到这个别名。", lines: songMatchLines(matches), footer: "" };
+      const matches = searchSongClues(q);
+      return { kind: "lines", header: matches.length ? "匹配到以下曲目：" : "没有找到曲目。", lines: songMatchLines(matches), footer: "" };
     }
     const matches = searchSongs(q);
     if (matches.length !== 1) {
@@ -1028,6 +1042,7 @@ module.exports = {
   normalizeLevelCommandQuery,
   levelCommandTarget,
   searchSongs,
+  searchSongClues,
   parseChartInfoQuery,
   songHasChartDifficulty,
   searchChartInfo,

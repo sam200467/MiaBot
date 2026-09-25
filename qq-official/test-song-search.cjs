@@ -47,6 +47,13 @@ test("去掉符号仍能搜到：用户通常不会照着打「!」「☆」", (
   assert.ok(histories.matches.some(m => m.meta.name === "ヒストリー×ブレイカー"), "× 少打了也要搜到");
 });
 
+test("简体焰能找到标题写作焔的歌，符号曲名仍可检索", () => {
+  const result = search("光焰");
+  assert.equal(result.total, 1);
+  assert.equal(result.matches[0].meta.name, "光焔のラテラルアーク");
+  assert.match(reply("光焰"), /id728   光焔のラテラルアーク/);
+  assert.equal(search("∀").matches[0].meta.name, "∀");
+});
 test("分页完整且没有重复，不把不合法页静默替换", () => {
   const first = search("a");
   assert.ok(first.total > 8);
