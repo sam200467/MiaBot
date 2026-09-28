@@ -12,6 +12,18 @@ const ACCOUNT = { accessToken: "AT1", refreshToken: "RT1" };
 const CARD = { id: 7, extId: 44153, luid: "00000000000000004453", default: true };
 const PROFILE = { userName: "リネット玩家", level: 12, playCount: 34, lastPlayDate: "2026-09-21" };
 
+test("音击档案使用官网卡面头像和转生等级，缺失字段保持为空", () => {
+  const profile = rinnet.normalizeProfile(ok({ ...PROFILE, cardId: 123, reincarnationNum: 2 }));
+  assert.equal(profile.level, 212);
+  assert.equal(profile.avatarUrl, "https://rinnet.stehp.cn/assets/ongeki/card-icon/UI_Card_Icon_000123.webp");
+  assert.equal(profile.lastPlayTime, "2026-09-21");
+  assert.equal(profile.dataSource, "rinnet");
+
+  const missing = rinnet.normalizeProfile({ userName: "无头像日期", level: 8, cardId: 0 });
+  assert.equal(missing.avatarUrl, "");
+  assert.equal(missing.lastPlayTime, "");
+});
+
 // routes: 键是精确路由（含 query），值是 body 或 (opts) => body/{status, body}。
 function fakeServer(routes) {
   const calls = [];

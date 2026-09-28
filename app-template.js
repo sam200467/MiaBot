@@ -1436,7 +1436,11 @@ function markFailed(key) {
 
 async function downloadJacket(key, url) {
   try {
-    const response = await fetchWithTimeout(url, {}, 15000);
+    // RinNET's icon CDN rejects requests without the portal Referer. The
+    // renderer loads the cached file, so it never needs to contact that CDN.
+    const rinnetAvatar = /^https:\/\/rinnet\.stehp\.cn\/assets\/ongeki\/card-icon\/UI_Card_Icon_\d+\.webp$/i.test(url);
+    const response = await fetchWithTimeout(url,
+      rinnetAvatar ? { headers: { Referer: "https://portal.naominet.live/" } } : {}, 15000);
     if (!response.ok) return "";
     const buffer = Buffer.from(await response.arrayBuffer());
     // 太小多半是错误页，存下来只会让下次继续用错图
@@ -1448,7 +1452,7 @@ async function downloadJacket(key, url) {
   } catch { return ""; }
 }
 
-// 头像也是公网图（默认头像在 u.otogame.net）。地址跟着人走，所以键由 URL 派生：
+// 头像也是公网图。地址跟着人走，所以键由 URL 派生：
 // 不求哈希强度，只要稳定、可当文件名。
 function avatarCacheKey(url) {
   let hash = 0;
@@ -1515,6 +1519,11 @@ async function localizeJackets(data) {
       saved++;
     }
   }));
+  // RinNET's CDN also blocks direct <img> requests. If caching failed, use
+  // the local placeholder immediately instead of waiting for a browser 403.
+  if (data.profile?.dataSource === "rinnet" && /^https:\/\/rinnet\.stehp\.cn\/assets\/ongeki\/card-icon\//i.test(data.profile.avatarUrl)) {
+    data.profile.avatarUrl = data.profile.avatarFallbackUrl;
+  }
   console.log(`  本地图缓存：命中 ${hit} 张，本次补下 ${saved} 张，仍缺 ${groups.size - saved} 张` +
     (skipped ? `（其中 ${skipped} 张刚失败过，两小时内不再重试）` : "") + "，缺的走公网，拉不动就出占位图");
   return data;
@@ -1605,8 +1614,7 @@ function songJacketPlaceholder(title, songId) {
   return "data:image/svg+xml;base64," + Buffer.from(svg, "utf8").toString("base64");
 }
 
-// 头像的兜底图。rinnet 档案里没有头像字段，默认头像又是公网 URL（u.otogame.net），
-// 拉不动时用它顶上，别让玩家头像位置空着。
+// 头像的兜底图。头像 ID 缺失或公网图拉不动时，别让玩家头像位置空着。
 function avatarPlaceholderUrl(playerName) {
   const initial = svgEscape(String(playerName || "").trim().slice(0, 1) || "?");
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#7760c6"/><stop offset="1" stop-color="#62c8de"/></linearGradient></defs><rect width="160" height="160" rx="14" fill="url(#g)"/><text x="80" y="108" text-anchor="middle" font-family="sans-serif" font-size="72" fill="white">${initial}</text></svg>`;
@@ -1615,7 +1623,8 @@ function avatarPlaceholderUrl(playerName) {
 
 // 带头像的三个主题（分表、牌子、等级）共用：头像 URL 是公网的，兜底图跟着一起给。
 function withAvatarFallback(profile) {
-  return { ...profile, avatarFallbackUrl: avatarPlaceholderUrl(profile?.playerName) };
+  const fallback = avatarPlaceholderUrl(profile?.playerName);
+  return { ...profile, avatarUrl: profile?.avatarUrl || fallback, avatarFallbackUrl: fallback };
 }
 
 function buildSongDetailThemeData(internalSong, recordData = {}, playerName = "") {
@@ -3196,7 +3205,7 @@ async function runCompletionJobData(job) {
   let profile;
   let recordsByDifficulty;
   if (job.playerData?.source === "rinnet") {
-    profile = { ...job.playerData.profile, avatarUrl: job.playerData.profile.avatarUrl || DEFAULT_ONGEKI_AVATAR_URL };
+    profile = { ...job.playerData.profile };
     if (!Array.isArray(job.playerData.records)) throw new Error("rinnet 完成度快照不完整");
     recordsByDifficulty = Object.fromEntries([0, 1, 2, 3].map(d => [d, job.playerData.records.filter(row => row.levelInfo.difficulty === d)]));
   } else if (process.env.ONGEKI_FAKE === "1") {
@@ -3248,7 +3257,7 @@ async function runLevelScoreJobData(job) {
   let profile;
   let records;
   if (job.playerData?.source === "rinnet") {
-    profile = { ...job.playerData.profile, avatarUrl: job.playerData.profile.avatarUrl || DEFAULT_ONGEKI_AVATAR_URL };
+    profile = { ...job.playerData.profile };
     if (!Array.isArray(job.playerData.records)) throw new Error("rinnet 等级快照不完整");
     records = job.playerData.records;
   } else if (process.env.ONGEKI_FAKE === "1") {
@@ -3305,7 +3314,7 @@ async function runJobData(job) {
   if (job.playerData?.source === "rinnet") {
     if (!Array.isArray(job.playerData.rating?.best_rating_list)) throw new Error("rinnet 分表快照不完整");
     jsonText = JSON.stringify({ data: job.playerData.rating });
-    profile = { ...job.playerData.profile, avatarUrl: job.playerData.profile.avatarUrl || DEFAULT_ONGEKI_AVATAR_URL };
+    profile = { ...job.playerData.profile };
   } else if (fake) {
     jsonText = fs.existsSync(RATING_JSON_PATH) ? fs.readFileSync(RATING_JSON_PATH, "utf8") : fakeRatingJson();
     profile = {

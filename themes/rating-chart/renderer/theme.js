@@ -255,10 +255,6 @@ botName.textContent = data.generatorName || "MiaBot";
 
 generatorName.append(botName);
 
-$("play-count").textContent =
-  `Total plays count: ${comma(data.profile.playCount)}`;
-
-
 /* 总游玩次数 */
 $("play-count").textContent =
   `Total plays count: ${comma(data.profile.playCount)}`;
@@ -266,27 +262,23 @@ $("play-count").textContent =
 
 /* 最后游玩时间 */
 const lastPlay = $("last-play");
-
-lastPlay.textContent = "Last play time:";
-
-const value = document.createElement("div");
-value.className = "last-play-value";
-
-/* 假设原始格式：
-   2026-01-01 12:00:00
-*/
-const parts = String(data.profile.lastPlayTime || "")
-  .trim()
-  .split(/\s+/);
-
-const date = document.createElement("span");
-date.textContent = parts[0] || "";
-
-const time = document.createElement("span");
-time.textContent = parts[1] || "";
-
-value.append(date, time);
-lastPlay.append(value);
+const lastPlayTime = String(data.profile.lastPlayTime || "").trim();
+if (data.profile.dataSource === "rinnet" && !lastPlayTime) {
+  lastPlay.remove();
+  $("play-count").classList.add("solo");
+} else {
+  lastPlay.textContent = "Last play time:";
+  const value = document.createElement("div");
+  value.className = "last-play-value";
+  const iso = lastPlayTime.match(/^(\d{4}-\d{2}-\d{2})[T\s]+(\d{2}:\d{2}(?::\d{2})?)/);
+  const parts = iso ? [iso[1], iso[2]] : lastPlayTime.split(/\s+/);
+  const date = document.createElement("span");
+  date.textContent = parts[0] || "";
+  const time = document.createElement("span");
+  time.textContent = parts[1] || "";
+  value.append(date, time);
+  lastPlay.append(value);
+}
 
     renderGrid("best-grid", data.best, normalCard, 50);
     renderGrid("new-grid", data.new, normalCard, 10);

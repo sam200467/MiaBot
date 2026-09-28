@@ -608,8 +608,8 @@ body {
 .play-count {
   position: absolute;
 
-  left: 2950px;
-  top: 1500px;
+  left: 3015px;
+  top: 1540px;
 
   color: #0719ff;
 
@@ -624,6 +624,10 @@ body {
   paint-order: stroke fill;
 }
 
+.play-count.solo {
+  top: 1595px;
+}
+
 
 /* =========================
    右下：Last play time
@@ -632,10 +636,10 @@ body {
 .last-play {
   position: absolute;
 
-  left: 2950px;
-  top: 1580px;
+  left: 3015px;
+  top: 1650px;
 
-  width: 650px;
+  width: 585px;
 
   color: #0719ff;
 

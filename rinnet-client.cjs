@@ -81,9 +81,15 @@ function findCard(cards, number) {
 function normalizeProfile(raw) {
   const p = unwrap(raw);
   if (!p || typeof p.userName !== "string" || !p.userName.trim()) fail("NO_PROFILE", "这张卡还没有可读取的音击档案，请先在 rinnet 网站确认。");
-  return { playerName: p.userName, level: Number(p.level) || 0,
-    playCount: Number(p.playCount) || 0, lastPlayTime: String(p.lastPlayDate || ""),
-    avatarUrl: "", dataSource: "rinnet" };
+  // The portal's dashboard adds reincarnations to the displayed level and
+  // builds the avatar URL from the card icon ID in this same profile response.
+  const cardId = Number(p.cardId);
+  const iconId = p.cardId != null && Number.isSafeInteger(cardId) && cardId > 0
+    ? String(cardId).padStart(6, "0") : "";
+  return { playerName: p.userName, level: (Number(p.level) || 0) + 100 * (Number(p.reincarnationNum) || 0),
+    playCount: Number(p.playCount) || 0, lastPlayTime: String(p.lastPlayDate ?? "").trim(),
+    avatarUrl: iconId ? `https://rinnet.stehp.cn/assets/ongeki/card-icon/UI_Card_Icon_${iconId}.webp` : "",
+    dataSource: "rinnet" };
 }
 function normalizeScores(raw, expectedSongId) {
   const rows = unwrap(raw);

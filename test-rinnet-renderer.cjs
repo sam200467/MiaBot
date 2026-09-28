@@ -45,6 +45,8 @@ test("rinnet 快照贯穿分表、单曲、牌子、等级任务，不回退到�
     const playerData = { source: "rinnet", profile, rating: ratingData({ old50: [row], new10: [row], pScore: [row] }), song: { found: true, songNo: 870, scores: normalizeScores([row]) } };
     await app.runJobData({ saveDir, playerData });
     assert.equal(app.captured.chart.generatorName, "MiaBot · rinnet");
+    assert.match(app.captured.chart.profile.avatarUrl, /^data:image\/svg\+xml;base64,/);
+    assert.equal(app.captured.chart.profile.dataSource, "rinnet");
     assert.equal(app.captured.chart.best[0].score, row.techScoreMax);
     assert.ok(app.captured.chart.best[0].jacketUrl);
     await app.runSongDetailJobData({ saveDir, playerData, songId: 870, playerName: profile.playerName });
@@ -68,6 +70,33 @@ test("rinnet 快照贯穿分表、单曲、牌子、等级任务，不回退到�
     assert.equal(app.captured.plate.summary.master.fullBell, 1);
     assert.equal(app.captured.plate.profile.playerName, profile.playerName);
   } finally { fs.rmSync(saveDir, { recursive: true, force: true }); }
+});
+
+test("rinnet 头像带官网 Referer 下载并改用本地缓存", async () => {
+  const app = compileApp();
+  const profile = normalizeProfile({ userName: "头像测试", level: 8, cardId: 100003 });
+  const fallback = "data:image/svg+xml;base64,dGVzdA==";
+  const data = { profile: { ...profile, avatarFallbackUrl: fallback } };
+  const unavailable = normalizeProfile({ userName: "另一个头像", level: 8, cardId: 100004 });
+  const missing = { profile: { ...unavailable, avatarFallbackUrl: fallback } };
+  const originalFetch = global.fetch;
+  const requested = [];
+  global.fetch = async (url, options) => {
+    assert.equal(options.headers.Referer, "https://portal.naominet.live/");
+    requested.push(url);
+    return url === profile.avatarUrl
+      ? { ok: true, headers: { get: () => "image/webp" }, arrayBuffer: async () => Buffer.alloc(2048, 7) }
+      : { ok: false };
+  };
+  try {
+    await app.localizeJackets(data);
+    await app.localizeJackets(missing);
+  }
+  finally { global.fetch = originalFetch; }
+  assert.deepEqual(requested, [profile.avatarUrl, unavailable.avatarUrl]);
+  assert.match(data.profile.avatarUrl, /^file:\/\//);
+  assert.equal(fs.existsSync(new URL(data.profile.avatarUrl)), true);
+  assert.equal(missing.profile.avatarUrl, fallback);
 });
 
 // 曲绘是公网图，国内时通时不通。缓存逻辑决定了这件事的代价：
