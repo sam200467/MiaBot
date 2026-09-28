@@ -74,6 +74,32 @@ body {
   user-select: none;
 }
 
+/* The source overlay has two old color swatches under the first P50 slots.
+   Restore the concert background beneath the dynamic score cards. */
+.overlay-retouch {
+  position: absolute;
+  z-index: 1;
+  left: 2040px;
+  top: 190px;
+  width: 697px;
+  height: 223px;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image:
+    linear-gradient(to right, transparent, #000 60px, #000 calc(100% - 60px), transparent),
+    linear-gradient(to bottom, transparent, #000 46px, #000 calc(100% - 40px), transparent);
+  mask-composite: intersect;
+}
+
+.overlay-retouch img {
+  position: absolute;
+  left: -2040px;
+  top: -190px;
+  width: 3600px;
+  height: 1800px;
+  max-width: none;
+}
+
 .player-block,
 .rating-block,
 .footer,

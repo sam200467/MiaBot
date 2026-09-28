@@ -357,9 +357,15 @@ async function waitForRender(cdp, timeoutMs = 120000) {
 }
 
 async function main() {
-  const outputPath = path.resolve(process.argv[2] || DEFAULT_OUTPUT);
+  const args = process.argv.slice(2);
+  const outputPath = path.resolve(args.find((arg) => arg !== "--empty-p50") || DEFAULT_OUTPUT);
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   const data = buildPreviewData();
+  if (args.includes("--empty-p50")) {
+    data.platinum = [];
+    data.summary.rating = Math.max(0, Number(data.summary.rating || 0) - Number(data.summary.pScoreRating || 0));
+    data.summary.pScoreRating = 0;
+  }
   fs.writeFileSync(DATA_JS_PATH, `window.__THEME_DATA__ = ${JSON.stringify(data, null, 2)};\n`, "utf8");
 
   let launched;

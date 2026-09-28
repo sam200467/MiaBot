@@ -105,6 +105,7 @@ const runtimeThemeFiles = [
   "shared/fonts/FOT-GMARUGOPRO-DB.OTF",
   "shared/fonts/ResourceHanRoundedCN-Medium.ttf",
   "rating-chart/assets/overlay.png",
+  "rating-chart/assets/overlay-retouch.png",
   "rating-chart/assets/basic_plate.png",
   "rating-chart/assets/advanced_plate.png",
   "rating-chart/assets/expert_plate.png",

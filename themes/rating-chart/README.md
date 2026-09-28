@@ -1,6 +1,6 @@
 # B50 + N10 + P50 分表主题
 
-这是正式使用的 3600×1800 本地渲染主题。`renderer` 直接使用 `assets/overlay.png` 作为最终静态底图，不会改动底图中的高斯模糊或其它设计。
+这是正式使用的 3600×1800 本地渲染主题。`renderer` 使用 `assets/overlay.png` 作为静态底图，并在 P50 前两个卡位下叠加 `assets/overlay-retouch.png` 的局部画面，遮住原底图残留的两块纯色色块；其余设计保持原样。
 
 ## 目录职责
 
@@ -21,6 +21,8 @@ node .\themes\rating-chart\tools\render-preview.js
 ```
 
 默认输出为 `themes/rating-chart/previews/ongeki-theme-preview.png`。预览脚本会把临时数据写入 `renderer/preview-data.js`，渲染结束后删除。参考数据快照保存在 `examples/preview-data.js`。
+
+加上 `--empty-p50` 可生成 P50 为空的预览，用于检查底图不会露出空框。
 
 ## CSS 实时调试器
 
