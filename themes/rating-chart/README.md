@@ -2,6 +2,8 @@
 
 这是正式使用的 3600×1800 本地渲染主题。`renderer` 使用 `assets/overlay.png` 作为静态底图，并在 P50 前两个卡位下叠加 `assets/overlay-retouch.png` 的局部画面，遮住原底图残留的两块纯色色块；其余设计保持原样。
 
+这两张图片属于部署者自备素材，不在公开源码仓库内。在新机器构建出图核心前，需将它们放入本主题的 `assets/` 目录；仅拉取 GitHub 源码不会包含本次修补图。已生成的服务器更新包则把修补图内嵌在 `ongeki-core.exe` 中。
+
 ## 目录职责
 
 - `renderer/`：程序实际执行的 HTML、CSS、JavaScript。
