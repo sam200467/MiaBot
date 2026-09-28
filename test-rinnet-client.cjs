@@ -154,6 +154,8 @@ test("ratingData：B50/N10/P50 归一化，定数取自本地曲库", () => {
   assert.equal(data.best_rating_list[0].rating, expected);
   assert.equal(data.best_new_rating_list[0].rating, Math.floor(expected / 5) * 5, "N10 截断到 0.005 的倍数");
   assert.equal(data.p_score_rating_list[0].rating, Math.floor(4 * 14.6 * 14.6 + 1e-9), "P 分按星数×定数²");
+  assert.equal(data.p_score_rating_list[0].platinum_score_max, 2000, "斜杠左侧使用已取得的白金分");
+  assert.equal(data.p_score_rating_list[0].platinum_score_theory, 3316, "斜杠右侧为该谱面 1658 个音符×2");
   assert.equal(data.best_rating_list[0].song_id, 870);
   assert.equal(data.best_rating_list[0].is_all_break, true);
   assert.equal(data.rating, data.best_rating + data.best_new_rating + data.p_score_rating);

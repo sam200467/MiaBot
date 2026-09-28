@@ -140,13 +140,20 @@ function ratingData(raw) {
       const song = byId.get(item.musicId), pos = item.difficulty === 10 ? 4 : item.difficulty;
       const constant = Number(song?.const?.[pos]);
       if (!song || !(constant > 0)) fail("CATALOG", "这份 rinnet 分表的谱面定数还不在本地曲库里，需要更新曲库后再查。");
+      // RinNET supplies the earned P score, but not the chart's theoretical max.
+      // Each note can contribute two Platinum Score points.
+      const noteTotal = Number(song.noteTotal?.[pos]);
+      if (kind === "platinum" && (!Number.isSafeInteger(noteTotal) || noteTotal <= 0)) {
+        fail("CATALOG", "这份 rinnet 分表的白金分理论值还不在本地曲库里，需要更新曲库后再查。");
+      }
       let rating = technicalRating(constant, item);
       if (kind === "new") rating = Math.floor(rating / 5) * 5;
       if (kind === "platinum") rating = Math.floor(item.platinumScoreStar * constant * constant + 1e-9);
       return { song_id: item.musicId, dataSource: "rinnet", music: { name: song.name, artist: song.artistName, music_id: String(item.musicId) },
         difficulty_id: item.difficulty, score: item.techScoreMax, rating,
         is_all_break: item.isAllBreak, is_full_combo: item.isFullCombo, is_full_bell: item.isFullBell,
-        platinum_score_star: item.platinumScoreStar, platinum_score_max: item.platinumScoreMax };
+        platinum_score_star: item.platinumScoreStar, platinum_score_max: item.platinumScoreMax,
+        ...(kind === "platinum" ? { platinum_score_theory: noteTotal * 2 } : {}) };
     });
   }
   const best = list(value.old50, "best", 50), newest = list(value.new10, "new", 10), platinum = list(value.pScore, "platinum", 50);
