@@ -74,7 +74,7 @@ npm test
 
 测试使用本地 mock，不会连接真实 QQ 开放平台，也不会消耗模型 API 额度。测试准备脚本会临时生成无版权内容的占位图片，并在测试结束后删除。
 
-大饼数据源的曲库外歌曲定数补齐、曲绘缓存与核心更新包用法见 [`OTOGAME_FALLBACK.md`](OTOGAME_FALLBACK.md)。
+大饼分表定数一律反推、曲绘缓存与核心更新包用法见 [`OTOGAME_FALLBACK.md`](OTOGAME_FALLBACK.md)。
 
 ## 外部素材
 

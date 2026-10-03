@@ -2,7 +2,7 @@
 const fs = require("node:fs"), path = require("node:path"), crypto = require("node:crypto");
 const assert = require("node:assert/strict"), {spawnSync} = require("node:child_process");
 const root = path.resolve(__dirname, "..");
-const name = process.argv[2] || "MiaBot-otogame-fallback-update-20261003";
+const name = process.argv[2] || "MiaBot-otogame-inferred-update-20261003";
 assert.match(name, /^[A-Za-z0-9._-]+$/);
 const pkg = path.join(root, "server-updates", name);
 const hash = data => crypto.createHash("sha256").update(data).digest("hex");
@@ -11,7 +11,8 @@ const manifest = JSON.parse(fs.readFileSync(path.join(pkg, "manifest.json"), "ut
 assert.equal(manifest.kind, "core-only");
 assert.equal(manifest.liveVerified, false);
 assert.equal(manifest.verificationStatus, "pending-server-validation");
-assert.equal(manifest.version, "4.1.3-otogame-fallback");
+assert.equal(manifest.version, "4.1.4-otogame-inferred");
+assert.equal(manifest.constantSource, "server-rating-inference-only");
 assert.equal(manifest.files.length, 1);
 assert.equal(manifest.files[0].path, "qq-official/ongeki-core.exe");
 const sourceCore = path.join(pkg, "payload", "qq-official", "ongeki-core.exe");
@@ -19,7 +20,7 @@ assert.equal(fs.statSync(sourceCore).size, manifest.files[0].bytes);
 assert.equal(fileHash(sourceCore), manifest.files[0].sha256);
 const selftest = spawnSync(sourceCore, ["--selftest"], {encoding:"utf8", windowsHide:true, timeout:120000});
 assert.equal(selftest.status, 0, selftest.stdout + selftest.stderr);
-assert.match(selftest.stdout, /SELFTEST OK v4\.1\.3-otogame-fallback/);
+assert.match(selftest.stdout, /SELFTEST OK v4\.1\.4-otogame-inferred/);
 const outputRoot = path.join(root, "output");
 fs.mkdirSync(outputRoot, {recursive:true});
 const temp = fs.mkdtempSync(path.join(outputRoot, "verify-core-update-"));

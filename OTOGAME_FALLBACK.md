@@ -1,14 +1,14 @@
-# 大饼曲库外歌曲的分表补齐
+# 大饼分表定数一律反推
 
-版本：`4.1.3-otogame-fallback`（2026-10-03）。适用于 `u.otogame.net` 的 B50 / N10 / P50 分表。
+版本：`4.1.4-otogame-inferred`（2026-10-03）。适用于 `u.otogame.net` 的 B50 / N10 / P50 分表。
 
-本地曲库缺少歌曲或对应难度定数时，核心根据服务器的单曲 Rating、成绩、AB / FC / FB 标记或白金星数计算定数候选。`music.level_info.level` 是显示等级枚举，不能直接当作定数。
+所有大饼分表谱面一律根据服务器的单曲 Rating、成绩、AB / FC / FB 标记或白金星数计算定数候选，不采用本地内部曲库或补充曲库的定数。本地数据过旧不会影响分表定数。`music.level_info.level` 是显示等级枚举，不能直接当作定数。
 
 - B50 使用技术分分段插值及评级、达成奖励。
 - N10 使用技术分 Rating 除以 5 后截断的单曲贡献。
 - P50 使用 `floor(白金星数 × 定数²)`。
 
-枚举一位小数定数，并核对显示等级。同一资源哈希、同一难度在多个榜单出现时取候选交集；严格匹配无解时，允许每条原始整数 Rating 相差 ±1。只有候选唯一才采用，歧义和冲突仍会报错。本地定数保持优先，不修改公共曲库。
+枚举一位小数定数，并核对显示等级。同一资源哈希、同一难度在多个榜单出现时取候选交集；严格匹配无解时，允许每条原始整数 Rating 相差 ±1。只有候选唯一才采用，歧义和冲突仍会报错，不回退到本地定数，也不修改公共曲库。本地曲库仍用于歌曲识别、缓存 ID 和其他功能；rinnet 分表继续沿用原来的本地定数来源。
 
 曲库外歌曲按 `otogame-{32位资源哈希}` 缓存曲绘，三榜共享下载结果。URL 沿用大饼前端的资源地址：
 
@@ -20,7 +20,9 @@ https://oss-hd1.bemanicn.com/SDDT/cover/{music.music_id}.webp-thumbnail
 
 ## 验证状态
 
-本次完整项目测试 281 项通过，核心构建与自测通过。`test-otogame-renderer.cjs` 覆盖三榜独立还原、技术分奖励、末位容差、歧义与冲突、不同资源和难度的隔离、本地定数优先，以及曲绘下载与缓存复用。
+本次完整项目测试 284 项通过，包含大饼与 rinnet 的回归测试。
+
+`test-otogame-renderer.cjs` 覆盖三榜独立还原、技术分奖励、末位容差、歧义与冲突、不同资源和难度的隔离、忽略过旧的本地定数、不回退本地定数、rinnet 行为保留、演示数据，以及曲绘下载与缓存复用。
 
 更新包的实际核心替换、备份、回退、配置与数据保留、自定义核心路径、校验失败和越界路径拒绝均已在临时部署目录中验证。ZIP 内文件也已逐一核对大小和 SHA256。
 
@@ -34,10 +36,10 @@ https://oss-hd1.bemanicn.com/SDDT/cover/{music.music_id}.webp-thumbnail
 npm ci
 npm test
 npm run build:core
-node tools/build-core-update.cjs MiaBot-otogame-fallback-update-20261003 --skip-live-verification
-node tools/verify-core-update.cjs MiaBot-otogame-fallback-update-20261003
-Compress-Archive -Path server-updates/MiaBot-otogame-fallback-update-20261003 -DestinationPath server-updates/MiaBot-otogame-fallback-update-20261003.zip
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/verify-core-update-zip.ps1 -Name MiaBot-otogame-fallback-update-20261003
+node tools/build-core-update.cjs MiaBot-otogame-inferred-update-20261003 --skip-live-verification
+node tools/verify-core-update.cjs MiaBot-otogame-inferred-update-20261003
+Compress-Archive -Path server-updates/MiaBot-otogame-inferred-update-20261003 -DestinationPath server-updates/MiaBot-otogame-inferred-update-20261003.zip
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/verify-core-update-zip.ps1 -Name MiaBot-otogame-inferred-update-20261003
 ```
 
 `--skip-live-verification` 会明确标记 `liveVerified: false` 和 `pending-server-validation`，不会伪造实账号验证结果。包名对应输出目录必须不存在；已有包不会被构建器覆盖。构建产物、日志、个人配置和账号数据不提交 Git。

@@ -1,7 +1,7 @@
 "use strict";
 const fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");
 const root=path.resolve(__dirname,"..");
-const name=process.argv[2]||"MiaBot-otogame-fallback-update-20261003";
+const name=process.argv[2]||"MiaBot-otogame-inferred-update-20261003";
 if(!/^[A-Za-z0-9._-]+$/.test(name))throw new Error("Invalid package name");
 const skipLiveVerification=process.argv.includes("--skip-live-verification");
 let liveVerified=false;
@@ -20,15 +20,16 @@ fs.writeFileSync(path.join(payload,"ongeki-core.exe"),bytes);
 const hash=crypto.createHash("sha256").update(bytes).digest("hex");
 const version=fs.readFileSync(path.join(root,"app-template.js"),"utf8").match(/const VERSION\s*=\s*"([^"]+)"/)?.[1];
 if(!version)throw new Error("Missing core version");
-fs.writeFileSync(path.join(out,"manifest.json"),JSON.stringify({name,version,kind:"core-only",platform:"win32-x64",dataSource:"u.otogame.net",liveVerified,verificationStatus:liveVerified?"passed":"pending-server-validation",files:[{path:"qq-official/ongeki-core.exe",bytes:bytes.length,sha256:hash}]},null,2)+"\n");
+fs.writeFileSync(path.join(out,"manifest.json"),JSON.stringify({name,version,kind:"core-only",platform:"win32-x64",dataSource:"u.otogame.net",constantSource:"server-rating-inference-only",liveVerified,verificationStatus:liveVerified?"passed":"pending-server-validation",files:[{path:"qq-official/ongeki-core.exe",bytes:bytes.length,sha256:hash}]},null,2)+"\n");
 for(const file of ["Apply-Update.ps1","Restore-Backup.ps1"])fs.copyFileSync(path.join(__dirname,"core-update",file),path.join(out,file));
 fs.writeFileSync(path.join(out,"Apply-Update.cmd"),'@echo off\r\nif "%~1"=="" (\r\n powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Apply-Update.ps1"\r\n) else (\r\n powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Apply-Update.ps1" -TargetRoot "%~1"\r\n)\r\nif errorlevel 1 (echo UPDATE FAILED. Read the error above.)\r\npause\r\n');
 const readme=[
-"MiaBot 大饼新歌分表补丁（2026-10-03）",
+"MiaBot 大饼分表定数一律反推更新（2026-10-03）",
 "适用于已部署的 Windows x64 MiaBot，只替换出图核心。默认部署根目录：C:\\MiaBot\\deploy-windows-server。",
 "",
 "本次变化",
-"本地缺少谱面定数时，根据大饼三榜的 Rating、成绩、达成标记或白金星数还原定数。严格匹配失败时允许原始 Rating ±1，仍须候选唯一并通过等级与跨榜校验。",
+"大饼分表所有谱面一律根据三榜的 Rating、成绩、达成标记或白金星数还原定数，不采用本地内部或补充曲库的定数。严格匹配失败时允许原始 Rating ±1，仍须候选唯一并通过等级与跨榜校验。",
+"反推失败、数据冲突或存在歧义时中止生成，不回退本地定数。rinnet 维持既有行为。本地曲库仍用于歌曲识别和其他功能。",
 "曲库外新歌的曲绘按大饼资源哈希下载并缓存。",
 liveVerified?"零号车辆的真实大饼成绩、缺失定数补齐、曲绘下载及分表出图已通过联调。":"按用户要求制作待服务器联调包，尚未用正确大饼账号验证零号车辆。请由服务器使用者进行实账号验收。",
 "",

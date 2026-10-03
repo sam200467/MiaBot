@@ -67,7 +67,7 @@ const BROWSER_CANDIDATES = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
 ];
-const VERSION = "4.1.3-otogame-fallback";
+const VERSION = "4.1.4-otogame-inferred";
 
 // 开发模式（node ongenki-exe.js 直跑）时用 cwd，exe 模式用 exe 所在目录；
 // GUI 会把核心解压到临时目录运行，用 ONGEKI_APP_DIR 指回 GUI 所在目录（配置文件放那里）
@@ -1113,7 +1113,7 @@ function getThemeConstant(song, difficultyId) {
 }
 
 // 大饼的 level_info.level 是显示等级枚举（如 21=14），不是定数。
-// 接口没有直接给定数时，只在 Rating 的整数计算能唯一确定一位小数时补齐。
+// 大饼分表一律由 Rating 还原定数，只有整数计算能唯一确定一位小数时采用。
 // N10 的单曲贡献已经除以 5；P50 是 floor(星数 * 定数平方)。
 function otogameChartIdentity(item) {
   if (item?.dataSource === "rinnet") return null;
@@ -1204,10 +1204,14 @@ function mapThemeRatingItem(item, catalogIndex, remoteConstants = new Map()) {
   const difficultyId = Number(item.difficulty_id ?? music?.level_info?.difficulty ?? 3);
   const song = findThemeSong(catalogIndex, title, artist, difficultyId);
   const internalSong = findThemeInternalSong(catalogIndex, item, title, artist, difficultyId);
-  const constant = getThemeInternalConstant(internalSong, difficultyId) ?? getThemeConstant(song, difficultyId)
-    ?? remoteConstants.get(otogameChartIdentity(item));
+  // 本地曲库可能过旧：大饼只接受反推结果，本地只用于歌曲识别及其他元数据。
+  // rinnet 维持既有的本地定数来源。
+  const constant = item.dataSource === "rinnet"
+    ? getThemeInternalConstant(internalSong, difficultyId) ?? getThemeConstant(song, difficultyId)
+    : remoteConstants.get(otogameChartIdentity(item));
   if (!Number.isFinite(constant)) {
-    throw new Error(`曲目“${title}”的 ${themeChartKey(difficultyId) || difficultyId} 定数未找到，已中止生成`);
+    const reason = item.dataSource === "rinnet" ? "" : "：大饼数据无法唯一反推";
+    throw new Error(`曲目“${title}”的 ${themeChartKey(difficultyId) || difficultyId} 定数未找到${reason}，已中止生成`);
   }
   const coverId = music.music_id || item.resource_id || item.music_resource_id;
   if (!coverId) throw new Error(`曲目“${title}”缺少曲绘资源 ID，已中止生成`);
@@ -2842,14 +2846,14 @@ function fakeRatingJson() {
       best_new_rating: 14850,
       p_score_rating: 10000,
       best_rating_list: [
-        fakeItem("Ai C", "Feryquitous", "bbee74ade736fd083c014d6eddf9b5c5", 3, 1003567, 16537),
-        fakeItem("U.A.D", "HAYAKO", "74aac83fa9cfbecb1c1afa60df980b8c", 3, 1006474, 16431),
+        fakeItem("Ai C", "Feryquitous", "bbee74ade736fd083c014d6eddf9b5c5", 3, 1003567, 16587),
+        fakeItem("U.A.D", "HAYAKO", "74aac83fa9cfbecb1c1afa60df980b8c", 3, 1006474, 16481),
       ],
       best_new_rating_list: [
-        fakeItem("Synthesis.", "tn-shi", "b45e7a0bf17f5a273ef7f01e8e407199", 3, 991031, 15801),
+        fakeItem("Synthesis.", "tn-shi", "b45e7a0bf17f5a273ef7f01e8e407199", 3, 991031, 2960),
       ],
       p_score_rating_list: [
-        fakeItem("Don't Fight The Music", "黒魔", "5eda3df824b1e22c2184faa52741599c", 3, 989088, 15615),
+        { ...fakeItem("Don't Fight The Music", "黒魔", "5eda3df824b1e22c2184faa52741599c", 3, 989088, 985), platinum_score_star: 4 },
       ],
     },
     timestamp: 1234567890,

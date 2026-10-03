@@ -12,14 +12,15 @@ test.after(() => fs.rmSync(cacheRoot, { recursive: true, force: true }));
 const file = path.join(__dirname, "app-template.js");
 let source = fs.readFileSync(file, "utf8");
 const localSong = { id: 870, name: "本地测试曲", const: [1, 5, 10, 14.6, -1] };
-for (const [marker, value] of [["SONG_CATALOG", []], ["INTERNAL_SONG_CATALOG", [localSong]], ["SDDT_EXTRAS", {}]]) {
+const supplementSong = { name: "补充曲库测试曲", EXP: { const: 14.6 } };
+for (const [marker, value] of [["SONG_CATALOG", [supplementSong]], ["INTERNAL_SONG_CATALOG", [localSong]], ["SDDT_EXTRAS", {}]]) {
   source = source.replace('"__' + marker + '_JSON__"', () => JSON.stringify(JSON.stringify(value)));
 }
 const loaded = new Module(file, module);
 loaded.filename = file;
 loaded.paths = module.paths;
 loaded._compile(source.slice(0, source.lastIndexOf("\nmain().catch")) + `
-  module.exports = { buildLocalThemeData, collectJacketItems, localizeJackets };
+  module.exports = { buildLocalThemeData, collectJacketItems, localizeJackets, fakeRatingJson };
 `, file);
 const app = loaded.exports;
 const hash = "0123456789abcdef0123456789abcdef";
@@ -110,14 +111,42 @@ test("大饼无法唯一确定、等级冲突或榜单冲突时不填猜测值",
   assert.throws(() => build([], [], [row({ platinum_score_star: 0, rating: 0 })]), /定数未找到/);
 });
 
-test("同资源不同难度、同名不同资源不互借定数；只在本地缺失时补齐", () => {
+test("同资源不同难度、同名不同资源不互借定数", () => {
   const lunatic = row({ difficulty_id: 10, rating: 0, music: { music_id: hash, name: "曲库外新歌测试", level_info: { difficulty: 10, level: 17 } } });
   assert.throws(() => build([row()], [], [lunatic]), /lunatic 定数未找到/);
   const other = row({ rating: 0, music: { music_id: "ffffffffffffffffffffffffffffffff", name: "曲库外新歌测试", level_info: { difficulty: 2, level: 17 } } });
   assert.throws(() => build([row()], [], [other]), /定数未找到/);
+});
+
+test("大饼三榜一律反推，忽略内部及补充曲库中过旧的定数", () => {
   const local = row({ music_id: 870, difficulty_id: 3,
     music: { music_id: hash, name: localSong.name, level_info: { difficulty: 3, level: 17 } } });
-  assert.equal(build([local]).best[0].constant, 14.6);
+  const data = build([local], [{...local, rating:2940}], [{...local, rating:625}]);
+  for (const item of [data.best[0],data.new[0],data.platinum[0]]) {
+    assert.equal(item.constant,12.5);
+    assert.equal(item.songId,870,"本地歌曲 ID 仍可用于元数据和缓存");
+  }
+  const supplement = row({music:{music_id:hash,name:supplementSong.name,level_info:{difficulty:2,level:17}}});
+  assert.equal(build([supplement]).best[0].constant,12.5);
+  for (const input of [local, supplement]) {
+    assert.throws(() => build([{...input,rating:null}]),/大饼数据无法唯一反推/);
+    assert.throws(() => build([input],[],[{...input,rating:650}]),/大饼数据无法唯一反推/);
+    assert.throws(() => build([],[],[{...input,rating:52,platinum_score_star:1,
+      music:{...input.music,level_info:{...input.music.level_info,level:7}}}]),/大饼数据无法唯一反推/);
+  }
+});
+
+test("rinnet 保持本地定数，不走大饼的强制反推", () => {
+  const local = row({dataSource:"rinnet",music_id:870,difficulty_id:3,rating:null,
+    music:{music_id:hash,name:localSong.name,level_info:{difficulty:3,level:17}}});
+  assert.equal(build([local]).best[0].constant,14.6);
+});
+
+test("演示分表的技术 Rating、N10 贡献及白金星数可以独立反推", () => {
+  const data = app.buildLocalThemeData(app.fakeRatingJson(),{playerName:"演示测试"});
+  assert.deepEqual(data.best.map(item=>item.constant),[14.8,14.5]);
+  assert.equal(data.new[0].constant,13.8);
+  assert.equal(data.platinum[0].constant,15.7);
 });
 
 test("曲库外曲绘：按哈希下载一次，三榜共用缓存，拒绝不安全缓存键", async () => {
