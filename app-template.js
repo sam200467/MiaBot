@@ -67,7 +67,7 @@ const BROWSER_CANDIDATES = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
 ];
-const VERSION = "4.1.2-unplayed-fade";
+const VERSION = "4.1.3-otogame-fallback";
 
 // 开发模式（node ongenki-exe.js 直跑）时用 cwd，exe 模式用 exe 所在目录；
 // GUI 会把核心解压到临时目录运行，用 ONGEKI_APP_DIR 指回 GUI 所在目录（配置文件放那里）
@@ -1112,14 +1112,100 @@ function getThemeConstant(song, difficultyId) {
   return themeChartConstant(chart) ?? themeDirectConstant(song, key);
 }
 
-function mapThemeRatingItem(item, catalogIndex) {
+// 大饼的 level_info.level 是显示等级枚举（如 21=14），不是定数。
+// 接口没有直接给定数时，只在 Rating 的整数计算能唯一确定一位小数时补齐。
+// N10 的单曲贡献已经除以 5；P50 是 floor(星数 * 定数平方)。
+function otogameChartIdentity(item) {
+  if (item?.dataSource === "rinnet") return null;
+  const resourceId = item?.music?.music_id;
+  const rawDifficulty = item?.difficulty_id ?? item?.music?.level_info?.difficulty;
+  const difficulty = Number(rawDifficulty);
+  const musicDifficulty = item?.music?.level_info?.difficulty;
+  if (typeof resourceId !== "string" || !/^[a-f0-9]{32}$/i.test(resourceId) ||
+      rawDifficulty === null || rawDifficulty === undefined || rawDifficulty === "" || !themeChartKey(difficulty) ||
+      musicDifficulty != null && Number(musicDifficulty) !== difficulty) return null;
+  return `${resourceId}:${difficulty}`;
+}
+
+function otogameTechnicalRating(constantTenths, item) {
+  const constant = constantTenths * 100;
+  const score = Number(item.score);
+  if (score <= 800000) return Math.max(0, Math.floor((constant - 6000) * (score - 500000) / 300000));
+  const bands = [[800000, -6000], [900000, -4000], [970000, 0], [990000, 750],
+    [1000000, 1250], [1007500, 1750], [1010000, 2000]];
+  const hi = bands.findIndex(([target]) => score <= target);
+  const [loScore, loBonus] = bands[hi - 1];
+  const [hiScore, hiBonus] = bands[hi];
+  const rankBonus = score >= 1007500 ? 300 : score >= 1000000 ? 200 : score >= 990000 ? 100 : 0;
+  const comboBonus = item.is_all_break ? (score === 1010000 ? 350 : 300) : item.is_full_combo ? 100 : 0;
+  return Math.max(0, constant + loBonus + Math.floor((hiBonus - loBonus) * (score - loScore) / (hiScore - loScore))
+    + rankBonus + comboBonus + (item.is_full_bell ? 50 : 0));
+}
+
+function otogameConstantCandidates(item, kind, tolerance = 0) {
+  const numeric = value => (typeof value === "number" || typeof value === "string" && value.trim() !== "")
+    && Number.isFinite(Number(value));
+  if (!numeric(item.rating) || !Number.isSafeInteger(Number(item.rating)) || Number(item.rating) <= 0) return null;
+  const rating = Number(item.rating);
+  if (kind === "platinum") {
+    if (!numeric(item.platinum_score_star) || !Number.isInteger(Number(item.platinum_score_star)) ||
+        Number(item.platinum_score_star) < 1 || Number(item.platinum_score_star) > 5) return null;
+  } else {
+    if (!numeric(item.score) || !Number.isInteger(Number(item.score)) || Number(item.score) <= 500000 || Number(item.score) > 1010000 ||
+        !["is_all_break", "is_full_combo", "is_full_bell"].every(key => typeof item[key] === "boolean")) return null;
+  }
+  const rawLevel = item.music?.level_info?.level;
+  const level = numeric(rawLevel) && Number.isInteger(Number(rawLevel)) ? Number(rawLevel) : null;
+  if (rawLevel != null && (level === null || level < 0 || level > 24)) return [];
+  const displayLevel = level !== null && level >= 0 && level <= 24
+    ? (level <= 7 ? String(level) : level % 2 === 0 ? `${level / 2 + 3}+` : String((level + 7) / 2)) : null;
+  const candidates = [];
+  for (let tenths = 0; tenths <= 159; tenths++) {
+    if (displayLevel !== null && `${Math.floor(tenths / 10)}${tenths % 10 >= 7 ? "+" : ""}` !== displayLevel) continue;
+    const expected = kind === "platinum"
+      ? Math.floor(Number(item.platinum_score_star) * tenths * tenths / 100)
+      : kind === "new" ? Math.floor(otogameTechnicalRating(tenths, item) / 5) : otogameTechnicalRating(tenths, item);
+    if (Math.abs(expected - rating) <= tolerance) candidates.push(tenths);
+  }
+  return candidates;
+}
+
+function buildOtogameRemoteConstants(best, newest, platinum) {
+  const candidatesByChart = new Map();
+  for (const [kind, items] of [["best", best], ["new", newest], ["platinum", platinum]]) {
+    for (const item of items) {
+      const identity = otogameChartIdentity(item);
+      if (!identity) continue;
+      const candidates = otogameConstantCandidates(item, kind);
+      if (candidates === null) continue;
+      const roundedCandidates = otogameConstantCandidates(item, kind, 1);
+      const previous = candidatesByChart.get(identity);
+      candidatesByChart.set(identity, {
+        exact: previous ? previous.exact.filter(value => candidates.includes(value)) : candidates,
+        rounded: previous ? previous.rounded.filter(value => roundedCandidates.includes(value)) : roundedCandidates,
+      });
+    }
+  }
+  const constants = new Map();
+  for (const [identity, { exact, rounded }] of candidatesByChart) {
+    // 先对同一谱面的所有榜单严格匹配；仅当严格交集为空时容许原始 Rating ±1。
+    // N10 的这 1 是除五后的贡献单位，P50 的这 1 是白金 Rating 单位。
+    // 放宽后仍须唯一，不能挑最近值；等级/难度冲突也不能靠容差绕过。
+    const candidates = exact.length === 0 ? rounded : exact;
+    if (candidates.length === 1) constants.set(identity, candidates[0] / 10);
+  }
+  return constants;
+}
+
+function mapThemeRatingItem(item, catalogIndex, remoteConstants = new Map()) {
   const music = item?.music || {};
   const title = music.name || item.music_name || item.title || "未命名曲目";
   const artist = music.artist || item.artist || "";
   const difficultyId = Number(item.difficulty_id ?? music?.level_info?.difficulty ?? 3);
   const song = findThemeSong(catalogIndex, title, artist, difficultyId);
   const internalSong = findThemeInternalSong(catalogIndex, item, title, artist, difficultyId);
-  const constant = getThemeInternalConstant(internalSong, difficultyId) ?? getThemeConstant(song, difficultyId);
+  const constant = getThemeInternalConstant(internalSong, difficultyId) ?? getThemeConstant(song, difficultyId)
+    ?? remoteConstants.get(otogameChartIdentity(item));
   if (!Number.isFinite(constant)) {
     throw new Error(`曲目“${title}”的 ${themeChartKey(difficultyId) || difficultyId} 定数未找到，已中止生成`);
   }
@@ -1144,8 +1230,9 @@ function mapThemeRatingItem(item, catalogIndex) {
     // rinnet 没有曲绘哈希，只能退回曲库里的公网图（GitHub Pages）。拉不动时
     // 主题会换上这张本地生成的占位图，而不是让整张分表失败。
     jacketFallbackUrl: songJacketPlaceholder(title, coverId),
-    // 本地曲库认出来的歌曲 id：曲绘本地缓存拿它当键。认不出来（曲库外的曲子）
-    // 就是 null，那一张不进缓存，照旧走公网 + 占位图兜底。
+    // 曲库外的新歌用大饼资源哈希单独缓存，避免和本地歌曲 ID 混用。
+    jacketCacheKey: !internalSong && item.dataSource !== "rinnet" && /^[a-f0-9]{32}$/i.test(String(coverId))
+      ? `otogame-${coverId}` : null,
     songId: internalSong ? internalSong.id : null,
   };
 }
@@ -1288,7 +1375,8 @@ function buildLocalThemeData(jsonText, profile) {
   }
   const catalogIndex = buildThemeCatalogIndex();
   const { root, best, newest, platinum } = unwrapThemeRating(payload);
-  const mapAll = (items) => items.map((item) => mapThemeRatingItem(item, catalogIndex));
+  const remoteConstants = buildOtogameRemoteConstants(best, newest, platinum);
+  const mapAll = (items) => items.map((item) => mapThemeRatingItem(item, catalogIndex, remoteConstants));
   return {
     generatedAt: new Date().toISOString(),
     generatorName: profile.dataSource === "rinnet" ? "MiaBot · rinnet" : "MiaBot",
@@ -1403,7 +1491,7 @@ function findCachedJacket(songId) {
   return "";
 }
 
-// 主题数据里凡是「带 songId 又有公网 jacketUrl」的对象，都是可缓存的曲绘。
+// 带歌曲 ID 或大饼资源哈希缓存键、且有公网 jacketUrl 的对象，都是可缓存的曲绘。
 // 四种主题（分表/单曲/牌子/等级）的数据形状不同，但这一点是共同的。
 function collectJacketItems(value, found = []) {
   if (Array.isArray(value)) {
@@ -1411,8 +1499,10 @@ function collectJacketItems(value, found = []) {
     return found;
   }
   if (!value || typeof value !== "object") return found;
-  const songId = Number(value.songId ?? value.song_id);
-  if (Number.isInteger(songId) && songId > 0 &&
+  const localId = Number(value.songId ?? value.song_id);
+  const songId = Number.isInteger(localId) && localId > 0 ? localId
+    : /^otogame-[a-f0-9]{32}$/i.test(value.jacketCacheKey || "") ? value.jacketCacheKey : null;
+  if (songId !== null &&
       typeof value.jacketUrl === "string" && /^https?:/i.test(value.jacketUrl)) {
     found.push({ holder: value, songId, url: value.jacketUrl });
   }

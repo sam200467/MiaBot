@@ -90,6 +90,7 @@ for (const file of [
   path.join(HERE, "test-public-query.cjs"),
   path.join(ROOT, "test-rinnet-client.cjs"),
   path.join(ROOT, "test-rinnet-renderer.cjs"),
+  path.join(ROOT, "test-otogame-renderer.cjs"),
   path.join(ROOT, "test-data-source-vault.cjs"),
   // 面板那条「命令表和描述必须一一对应」是防漂移的唯一防线，进闸门才有意义
   path.join(HERE, "test-mia-command-panel.cjs"),
