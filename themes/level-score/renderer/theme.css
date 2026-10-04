@@ -18,6 +18,23 @@
   font-display: block;
 }
 
+/* 内置字体都没有带重音的希腊字母（ά、ί、Ἀ…）。Chrome 会把 ά 拆成 α + 重音符号来画，
+   重音却落到下一个字母上（μάγια 变成 μαγ́ια）。所以希腊字母（只限希腊字母）改用字形齐全的
+   Segoe UI，缺字时用 Arial。这两条必须写在同名的 Noto CJK 之后，Chrome 才会先查它们。 */
+@font-face {
+  font-family: "Noto CJK";
+  src: local("Segoe UI"), local("SegoeUI"), local("Arial"), local("ArialMT");
+  font-weight: 400;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+}
+
+@font-face {
+  font-family: "Noto CJK";
+  src: local("Segoe UI Bold"), local("SegoeUI-Bold"), local("Arial Bold"), local("Arial-BoldMT");
+  font-weight: 700;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+}
+
 @font-face {
   font-family: "Resource Han Rounded";
   src: url("../../shared/fonts/ResourceHanRoundedCN-Medium.ttf") format("truetype");
@@ -436,10 +453,13 @@ h1 {
 
 .score.theory-score { color: #d83c91; }
 
-.title { 
-  width: 173px; 
-  height: 25px; 
-  margin: 0 auto; 
+.title {
+  width: 173px;
+  /* 行高仍是 25px。多出的 4px 内边距只用来扩大 overflow 的裁切范围，g、γ 这类下伸笔画才不会
+     被切掉；负的下外边距把这 4px 抵消，后面的排版不受影响。 */
+  height: 29px;
+  padding-bottom: 4px;
+  margin: 0 auto -4px;
   overflow: hidden;
 
   color: #363943;

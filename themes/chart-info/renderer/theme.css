@@ -30,6 +30,32 @@
   font-display: block;
 }
 
+/* 内置字体都没有带重音的希腊字母（ά、ί、Ἀ…）。Chrome 会把 ά 拆成 α + 重音符号来画，
+   重音却落到下一个字母上（μάγια 变成 μαγ́ια）。所以希腊字母（只限希腊字母）改用字形齐全的
+   Segoe UI，缺字时用 Arial。这几条必须写在同名字体之后，Chrome 才会先查它们。 */
+@font-face {
+  font-family: "Gakusan Maru";
+  src: local("Segoe UI Bold"), local("SegoeUI-Bold"), local("Arial Bold"), local("Arial-BoldMT");
+  font-weight: 700;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+  /* 学参丸ゴ的字面大（x 高 0.62em，Segoe UI 只有 0.50em），不放大的话希腊字母会显得偏小。 */
+  size-adjust: 120%;
+}
+
+@font-face {
+  font-family: "Noto CJK";
+  src: local("Segoe UI"), local("SegoeUI"), local("Arial"), local("ArialMT");
+  font-weight: 400;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+}
+
+@font-face {
+  font-family: "Noto CJK";
+  src: local("Segoe UI Bold"), local("SegoeUI-Bold"), local("Arial Bold"), local("Arial-BoldMT");
+  font-weight: 700;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+}
+
 * { box-sizing: border-box; }
 
 html, body {

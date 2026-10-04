@@ -18,6 +18,23 @@
   font-display: block;
 }
 
+/* 内置字体都没有带重音的希腊字母（ά、ί、Ἀ…）。Chrome 会把 ά 拆成 α + 重音符号来画，
+   重音却落到下一个字母上（μάγια 变成 μαγ́ια）。所以希腊字母（只限希腊字母）改用字形齐全的
+   Segoe UI，缺字时用 Arial。这两条必须写在同名的 Noto CJK 之后，Chrome 才会先查它们。 */
+@font-face {
+  font-family: "Noto CJK";
+  src: local("Segoe UI"), local("SegoeUI"), local("Arial"), local("ArialMT");
+  font-weight: 400;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+}
+
+@font-face {
+  font-family: "Noto CJK";
+  src: local("Segoe UI Bold"), local("SegoeUI-Bold"), local("Arial Bold"), local("Arial-BoldMT");
+  font-weight: 700;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+}
+
 @font-face {
   font-family: "Noto Symbols";
   src: url("../../shared/fonts/NotoSansSymbols2-Regular.ttf") format("truetype");
@@ -424,7 +441,10 @@ body {
 .normal-card .title {
   left: 84px;
   right: 70px;
-  top: 32px;
+  /* 文字仍从 32px 起排。上下内边距只用来扩大 overflow 的裁切范围，
+     g、y、γ 这类下伸笔画和文字阴影才不会被切掉。 */
+  top: 29px;
+  padding: 3px 0 6px;
   overflow: hidden;
   color: #fff;
   font: 700 20px/1.1 "Noto CJK", sans-serif;

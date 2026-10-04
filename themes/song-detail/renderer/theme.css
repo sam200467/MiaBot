@@ -18,6 +18,25 @@
   font-display: block;
 }
 
+/* 内置字体都没有带重音的希腊字母（ά、ί、Ἀ…）。Chrome 会把 ά 拆成 α + 重音符号来画，
+   重音却落到下一个字母上（μάγια 变成 μαγ́ια）。所以希腊字母（只限希腊字母）改用字形齐全的
+   Segoe UI，缺字时用 Arial。这两条必须写在同名字体之后，Chrome 才会先查它们。 */
+@font-face {
+  font-family: "Gakusan Maru";
+  src: local("Segoe UI Bold"), local("SegoeUI-Bold"), local("Arial Bold"), local("Arial-BoldMT");
+  font-weight: 700;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+  /* 学参丸ゴ的字面大（x 高 0.62em，Segoe UI 只有 0.50em），不放大的话希腊字母会显得偏小。 */
+  size-adjust: 120%;
+}
+
+@font-face {
+  font-family: "Noto CJK";
+  src: local("Segoe UI Bold"), local("SegoeUI-Bold"), local("Arial Bold"), local("Arial-BoldMT");
+  font-weight: 700;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+}
+
 :root {
   color-scheme: light;
 }
@@ -102,7 +121,10 @@ body {
 }
 
 .song-title {
-  top: 86px;
+  /* 文字仍从 (466px, 86px) 起排。左、上的内边距只用来扩大 overflow 的裁切范围，
+     8px 白色描边和希腊字母的重音、气息符号才不会被切掉。 */
+  top: 80px;
+  padding: 6px 0 0 6px;
   font-size: 35px;
 }
 
@@ -110,6 +132,8 @@ body {
 .artist::after {
   position: absolute;
   inset: 0;
+  /* 和本体的内边距保持一致，叠上去的黑描边才对得齐。 */
+  padding: inherit;
   overflow: hidden;
   content: attr(data-text);
   color: #000;
@@ -122,8 +146,8 @@ body {
 }
 
 .song-title {
-  left: 466px;
-  width: 520px;
+  left: 460px;
+  width: 526px;
 }
 
 .artist {
