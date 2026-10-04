@@ -107,7 +107,7 @@ test("rinnet 头像带官网 Referer 下载并改用本地缓存", async () => {
 
 // 曲绘是公网图，国内时通时不通。缓存逻辑决定了这件事的代价：
 // 命中就用本地文件（不联网），没命中才去下，下不动的记一笔免得次次白等。
-test("曲绘缓存：命中走本地文件，拉不动的记一笔并保留公网地址", async () => {
+test("曲绘缓存：命中走本地文件，拉不动的记一笔并使用本地占位图", async () => {
   const app = compileApp();
   const cacheDir = path.join(process.env.ONGEKI_APP_DIR, "jacket-cache");
   fs.mkdirSync(cacheDir, { recursive: true });
@@ -128,8 +128,8 @@ test("曲绘缓存：命中走本地文件，拉不动的记一笔并保留公�
   } finally { console.log = realLog; }
 
   assert.equal(data.best[0].jacketUrl, pathToFileURL(cached).href, "命中缓存要换成 file:// 路径");
-  assert.equal(data.new[0].jacketUrl, dead, "下不到就保持公网地址，交给主题降级");
-  assert.equal(data.profile.avatarUrl, dead, "头像同理");
+  assert.match(data.new[0].jacketUrl, /^data:image\//, "失败曲绘直接使用本地占位图");
+  assert.match(data.profile.avatarUrl, /^data:image\//, "头像同理");
   assert.ok(fs.existsSync(path.join(cacheDir, "999.miss")), "拉不动的要留标记");
   assert.match(lines.join("\n"), /命中 1 张/);
 

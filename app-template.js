@@ -67,7 +67,7 @@ const BROWSER_CANDIDATES = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
 ];
-const VERSION = "4.1.5-server-constants";
+const VERSION = "4.1.6-render-timeout";
 
 // 开发模式（node ongenki-exe.js 直跑）时用 cwd，exe 模式用 exe 所在目录；
 // GUI 会把核心解压到临时目录运行，用 ONGEKI_APP_DIR 指回 GUI 所在目录（配置文件放那里）
@@ -82,18 +82,26 @@ const RATING_JSON_PATH = path.join(appDir, "ongeki-rating.json");
 /* ------------------------------------------------------------------ */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 30000, consume) {
   const controller = new AbortController();
   let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
+  let timer;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+      reject(new Error("请求超时"));
+    }, timeoutMs);
+  });
   try {
     const finalOptions = { ...options, signal: controller.signal };
     // 外网请求走代理（本机 Edge 调试端口等回环地址除外）
     if (proxyDispatcher && !isLoopbackUrl(url)) finalOptions.dispatcher = proxyDispatcher;
-    return await fetch(url, finalOptions);
+    // 正文读取也必须在截止时间内，收到响应头不代表下载完成。
+    return await Promise.race([deadline, (async () => {
+      const response = await fetch(url, finalOptions);
+      return consume ? await consume(response) : response;
+    })()]);
   } catch (e) {
     const cause = e?.cause;
     const abortLike = e?.name === "AbortError" || cause?.name === "AbortError" ||
@@ -163,23 +171,31 @@ function killBrowser(proc) {
 /* CDP 客户端（Chrome DevTools Protocol，连接 Edge 自动化）               */
 /* ------------------------------------------------------------------ */
 class CDP {
-  constructor(wsUrl) {
+  constructor(wsUrl, { commandTimeoutMs = 30000 } = {}) {
     this.wsUrl = wsUrl;
     this.ws = null;
     this.id = 0;
     this.pending = new Map();
+    this.commandTimeoutMs = commandTimeoutMs;
   }
 
   async connect() {
     this.ws = new WebSocket(this.wsUrl);
     await new Promise((resolve, reject) => {
-      this.ws.addEventListener("open", resolve, { once: true });
-      this.ws.addEventListener("error", () => reject(new Error("无法连接浏览器调试端口")), { once: true });
+      const timer = setTimeout(() => {
+        reject(new Error("连接浏览器调试端口超时"));
+        this.close();
+      }, 10000);
+      this.ws.addEventListener("open", () => { clearTimeout(timer); resolve(); }, { once: true });
+      this.ws.addEventListener("error", () => { clearTimeout(timer); reject(new Error("无法连接浏览器调试端口")); }, { once: true });
     });
+    this.ws.addEventListener("close", () => this.rejectPending("浏览器连接已关闭"));
+    this.ws.addEventListener("error", () => this.rejectPending("浏览器连接出错"));
     this.ws.addEventListener("message", (ev) => {
       const msg = JSON.parse(ev.data);
       if (msg.id && this.pending.has(msg.id)) {
-        const { resolve, reject } = this.pending.get(msg.id);
+        const { resolve, reject, timer } = this.pending.get(msg.id);
+        clearTimeout(timer);
         this.pending.delete(msg.id);
         if (msg.error) reject(new Error(`CDP 错误: ${msg.error.message}`));
         else resolve(msg.result);
@@ -190,8 +206,13 @@ class CDP {
   send(method, params = {}) {
     return new Promise((resolve, reject) => {
       const id = ++this.id;
-      this.pending.set(id, { resolve, reject });
-      this.ws.send(JSON.stringify({ id, method, params }));
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`浏览器命令 ${method} 超时（${this.commandTimeoutMs / 1000} 秒）`));
+      }, this.commandTimeoutMs);
+      this.pending.set(id, { resolve, reject, timer });
+      try { this.ws.send(JSON.stringify({ id, method, params })); }
+      catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error); }
     });
   }
 
@@ -235,7 +256,16 @@ class CDP {
     }
   }
 
+  rejectPending(message) {
+    for (const { reject, timer } of this.pending.values()) {
+      clearTimeout(timer);
+      reject(new Error(message));
+    }
+    this.pending.clear();
+  }
+
   close() {
+    this.rejectPending("浏览器连接已关闭");
     try { this.ws?.close(); } catch {}
   }
 }
@@ -276,7 +306,7 @@ async function launchEdge({ headless }) {
   for (let i = 0; i < 20 && !target; i++) {
     await sleep(500);
     try {
-      const list = await (await fetchWithTimeout(`http://127.0.0.1:${port}/json/list`, {}, 5000)).json();
+      const list = await fetchWithTimeout(`http://127.0.0.1:${port}/json/list`, {}, 5000, response => response.json());
       target = list.find((t) => t.type === "page");
     } catch {}
   }
@@ -391,50 +421,44 @@ function describeApiFailure(status, text) {
 }
 
 async function apiRating(token) {
-  const res = await fetchWithTimeout(RATING_URL, {
+  return fetchWithTimeout(RATING_URL, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-  }, 30000);
-  return { status: res.status, text: await res.text() };
+  }, 30000, async res => ({ status: res.status, text: await res.text() }));
 }
 
 async function apiProfile(token) {
-  const res = await fetchWithTimeout(PROFILE_URL, {
+  return fetchWithTimeout(PROFILE_URL, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-  }, 30000);
-  return { status: res.status, text: await res.text() };
+  }, 30000, async res => ({ status: res.status, text: await res.text() }));
 }
 
 async function apiRecordList(token, params) {
   const query = new URLSearchParams(params).toString();
-  const res = await fetchWithTimeout(`${RECORD_URL}?${query}`, {
+  return fetchWithTimeout(`${RECORD_URL}?${query}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-  }, 30000);
-  return { status: res.status, text: await res.text() };
+  }, 30000, async res => ({ status: res.status, text: await res.text() }));
 }
 
 async function apiRecordDetail(token, musicId) {
-  const res = await fetchWithTimeout(`${RECORD_URL}/${encodeURIComponent(musicId)}`, {
+  return fetchWithTimeout(`${RECORD_URL}/${encodeURIComponent(musicId)}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-  }, 30000);
-  return { status: res.status, text: await res.text() };
+  }, 30000, async res => ({ status: res.status, text: await res.text() }));
 }
 
 async function apiRefresh(refreshToken) {
-  const res = await fetchWithTimeout(REFRESH_URL, {
+  return fetchWithTimeout(REFRESH_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     // 认证接口用 snake_case 字段
     body: JSON.stringify({ refresh_token: refreshToken }),
-  }, 30000);
-  return { status: res.status, text: await res.text() };
+  }, 30000, async res => ({ status: res.status, text: await res.text() }));
 }
 
 // 用 access token 换 ID token（游戏 API 认证用的是 ID token）
 async function apiGetIdToken(accessToken) {
-  const res = await fetchWithTimeout(ID_TOKEN_URL, {
+  return fetchWithTimeout(ID_TOKEN_URL, {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
-  }, 30000);
-  return { status: res.status, text: await res.text() };
+  }, 30000, async res => ({ status: res.status, text: await res.text() }));
 }
 
 async function browserLogin() {
@@ -607,10 +631,9 @@ async function browserCredentialLogin(email, password, options = {}) {
   let activeBrowser = null;
 
   const attempt = async (headless) => {
-    const redirectResponse = await fetchWithTimeout(`${API_BASE}/aime/user/redirect`, {
+    const redirectData = await fetchWithTimeout(`${API_BASE}/aime/user/redirect`, {
       headers: { Accept: "application/json", "User-Agent": UA },
-    }, 30000);
-    const redirectData = await redirectResponse.json();
+    }, 30000, response => response.json());
     const authorizeUrl = redirectData?.data?.redirect;
     if (!authorizeUrl) {
       throw new Error("无法获取授权链接: " + JSON.stringify(redirectData).slice(0, 200));
@@ -1531,18 +1554,21 @@ function markFailed(key) {
   try { fs.writeFileSync(path.join(JACKET_CACHE_DIR, key + ".miss"), ""); } catch {}
 }
 
-async function downloadJacket(key, url) {
+async function downloadJacket(key, url, timeoutMs = 15000) {
   try {
     // RinNET's icon CDN rejects requests without the portal Referer. The
     // renderer loads the cached file, so it never needs to contact that CDN.
     const rinnetAvatar = /^https:\/\/rinnet\.stehp\.cn\/assets\/ongeki\/card-icon\/UI_Card_Icon_\d+\.webp$/i.test(url);
-    const response = await fetchWithTimeout(url,
-      rinnetAvatar ? { headers: { Referer: "https://portal.naominet.live/" } } : {}, 15000);
-    if (!response.ok) return "";
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const result = await fetchWithTimeout(url,
+      rinnetAvatar ? { headers: { Referer: "https://portal.naominet.live/" } } : {}, timeoutMs, async response => {
+        if (!response.ok) { await response.body?.cancel(); return null; }
+        return { contentType: response.headers.get("content-type"), buffer: Buffer.from(await response.arrayBuffer()) };
+      });
+    if (!result) return "";
+    const { buffer, contentType } = result;
     // 太小多半是错误页，存下来只会让下次继续用错图
     if (buffer.length < 1024) return "";
-    const file = path.join(JACKET_CACHE_DIR, key + jacketCacheExtension(response.headers.get("content-type")));
+    const file = path.join(JACKET_CACHE_DIR, key + jacketCacheExtension(contentType));
     fs.writeFileSync(file, buffer);
     try { fs.rmSync(path.join(JACKET_CACHE_DIR, key + ".miss"), { force: true }); } catch {}
     return file;
@@ -1559,19 +1585,28 @@ function avatarCacheKey(url) {
 }
 
 // 把主题数据里的曲绘与头像换成能用的 URL：命中缓存的走本地文件，缺的现补，
-// 补不上的保持公网 URL 由主题降级。返回值就是传进来的那份数据。
+// 补不上的直接用本地占位图，避免浏览器再次等待同一个失败图源。
 async function localizeJackets(data) {
   const items = collectJacketItems(data);
   const avatarUrl = typeof data?.profile?.avatarUrl === "string" && /^https?:/i.test(data.profile.avatarUrl)
     ? data.profile.avatarUrl : "";
   if (!items.length && !avatarUrl) return data;
-  try { fs.mkdirSync(JACKET_CACHE_DIR, { recursive: true }); } catch { return data; }
+  const fallbackFor = item => /^(?:data:image\/|file:)/i.test(item.holder.jacketFallbackUrl || "")
+    ? item.holder.jacketFallbackUrl : songJacketPlaceholder(item.holder.title, item.songId);
+  const avatarFallback = /^(?:data:image\/|file:)/i.test(data.profile?.avatarFallbackUrl || "")
+    ? data.profile.avatarFallbackUrl : avatarPlaceholderUrl(data.profile?.playerName || data.profile?.userName);
+  try { fs.mkdirSync(JACKET_CACHE_DIR, { recursive: true }); } catch {
+    for (const item of items) item.holder.jacketUrl = fallbackFor(item);
+    if (avatarUrl) data.profile.avatarUrl = avatarFallback;
+    return data;
+  }
 
   // 同一张图可能在多个榜里出现，只下一张，下好后一起换上
   const groups = new Map();
-  const miss = (key, url, apply) => {
-    const group = groups.get(key) || { key, url, apply: [] };
+  const miss = (key, url, apply, fallback) => {
+    const group = groups.get(key) || { key, url, apply: [], fallback: [], saved: false };
     group.apply.push(apply);
+    group.fallback.push(() => apply(fallback));
     groups.set(key, group);
   };
   let hit = 0;
@@ -1582,7 +1617,7 @@ async function localizeJackets(data) {
       hit++;
       continue;
     }
-    miss(item.songId, item.url, (local) => { item.holder.jacketUrl = local; });
+    miss(item.songId, item.url, (local) => { item.holder.jacketUrl = local; }, fallbackFor(item));
   }
   if (avatarUrl) {
     const key = avatarCacheKey(avatarUrl);
@@ -1591,7 +1626,7 @@ async function localizeJackets(data) {
       data.profile.avatarUrl = pathToFileURL(cached).href;
       hit++;
     } else {
-      miss(key, avatarUrl, (local) => { data.profile.avatarUrl = local; });
+      miss(key, avatarUrl, (local) => { data.profile.avatarUrl = local; }, avatarFallback);
     }
   }
   if (!groups.size) {
@@ -1609,20 +1644,19 @@ async function localizeJackets(data) {
   await Promise.all(Array.from({ length: JACKET_DOWNLOAD_CONCURRENCY }, async () => {
     while (queue.length && Date.now() < deadline) {
       const group = queue.shift();
-      const file = await downloadJacket(group.key, group.url);
+      const file = await downloadJacket(group.key, group.url, Math.max(1, Math.min(15000, deadline - Date.now())));
       if (!file) { markFailed(group.key); continue; }
       const local = pathToFileURL(file).href;
       for (const apply of group.apply) apply(local);
+      group.saved = true;
       saved++;
     }
   }));
-  // RinNET's CDN also blocks direct <img> requests. If caching failed, use
-  // the local placeholder immediately instead of waiting for a browser 403.
-  if (data.profile?.dataSource === "rinnet" && /^https:\/\/rinnet\.stehp\.cn\/assets\/ongeki\/card-icon\//i.test(data.profile.avatarUrl)) {
-    data.profile.avatarUrl = data.profile.avatarFallbackUrl;
+  for (const group of groups.values()) {
+    if (!group.saved) for (const fallback of group.fallback) fallback();
   }
   console.log(`  本地图缓存：命中 ${hit} 张，本次补下 ${saved} 张，仍缺 ${groups.size - saved} 张` +
-    (skipped ? `（其中 ${skipped} 张刚失败过，两小时内不再重试）` : "") + "，缺的走公网，拉不动就出占位图");
+    (skipped ? `（其中 ${skipped} 张刚失败过，两小时内不再重试）` : "") + "，缺的已换成本地占位图");
   return data;
 }
 

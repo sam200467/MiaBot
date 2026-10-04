@@ -2,7 +2,7 @@
 const fs = require("node:fs"), path = require("node:path"), crypto = require("node:crypto");
 const assert = require("node:assert/strict"), {spawnSync} = require("node:child_process");
 const root = path.resolve(__dirname, "..");
-const name = process.argv[2] || "MiaBot-server-constants-update-20261004";
+const name = process.argv[2] || "MiaBot-render-timeout-update-20261004";
 assert.match(name, /^[A-Za-z0-9._-]+$/);
 const pkg = path.join(root, "server-updates", name);
 const hash = data => crypto.createHash("sha256").update(data).digest("hex");
@@ -11,7 +11,7 @@ const manifest = JSON.parse(fs.readFileSync(path.join(pkg, "manifest.json"), "ut
 assert.equal(manifest.kind, "core-and-entry");
 assert.equal(manifest.liveVerified, false);
 assert.equal(manifest.verificationStatus, "pending-server-validation");
-assert.equal(manifest.version, "4.1.5-server-constants");
+assert.equal(manifest.version, "4.1.6-render-timeout");
 assert.deepEqual(manifest.dataSources,["u.otogame.net","rinnet"]);
 assert.deepEqual(manifest.constantSources,{otogame:"server-rating-inference-only",rinnet:"server-music-catalog-only"});
 assert.equal(manifest.files.length, 2);
@@ -22,7 +22,7 @@ assert.equal(fs.statSync(sourceCore).size, manifest.files[0].bytes);
 assert.equal(fileHash(sourceCore), manifest.files[0].sha256);
 const selftest = spawnSync(sourceCore, ["--selftest"], {encoding:"utf8", windowsHide:true, timeout:120000});
 assert.equal(selftest.status, 0, selftest.stdout + selftest.stderr);
-assert.match(selftest.stdout, /SELFTEST OK v4\.1\.5-server-constants/);
+assert.match(selftest.stdout, /SELFTEST OK v4\.1\.6-render-timeout/);
 const sourceEntry = path.join(pkg,"payload/qq-official/mia-entry.cjs");
 assert.equal(fs.statSync(sourceEntry).size,manifest.files[1].bytes);
 assert.equal(fileHash(sourceEntry),manifest.files[1].sha256);

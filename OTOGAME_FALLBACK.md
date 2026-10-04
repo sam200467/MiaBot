@@ -1,6 +1,12 @@
 # 双数据源分表使用服务器定数
 
-版本：`4.1.5-server-constants`（2026-10-04）。适用于大饼与 rinnet 的 B50 / N10 / P50 分表。
+版本：`4.1.6-render-timeout`（2026-10-04）。适用于大饼与 rinnet 的 B50 / N10 / P50 分表。
+
+## 分表下载超时修复
+
+此前下载超时在收到 HTTP 响应头后解除，图片或 API 正文停滞会一直等待。现在曲绘和大饼 API 的超时覆盖完整正文读取；整批曲绘与头像共享 20 秒预算，每个请求的剩余时间受该预算约束。缓存命中仍使用本地图片，失败、近期失败及预算内未开始的图片直接使用本地占位图，浏览器不再重试相同公网图源。浏览器命令新增超时，连接关闭会结束未完成的命令。
+
+20 秒是补图预算，登录、成绩接口和浏览器渲染另有耗时。这能修复已复现的正文卡死问题，尚不能凭本地测试判断用户服务器是否还存在登录或接口阶段的问题。
 
 所有大饼分表谱面一律根据服务器的单曲 Rating、成绩、AB / FC / FB 标记或白金星数计算定数候选，不采用本地内部曲库或补充曲库的定数。本地数据过旧不会影响分表定数。`music.level_info.level` 是显示等级枚举，不能直接当作定数。
 
@@ -32,7 +38,9 @@ https://oss-hd1.bemanicn.com/SDDT/cover/{music.music_id}.webp-thumbnail
 
 ## 验证状态
 
-本次完整项目测试 287 项通过，核心自测、入口语法及双文件安装与回退检查通过；注入第二个文件的替换失败后，安装和回退事务都能恢复原来的配对版本。
+完整项目测试 291 项通过，核心自测、入口语法及双文件安装与回退检查通过；注入第二个文件的替换失败后，安装和回退事务都能恢复原来的配对版本。
+
+`test-render-network.cjs` 使用本地 HTTP 服务复现响应头成功但正文永不完成，验证图片与 API 超时、批量下载预算、占位图和浏览器命令超时。`node tools/verify-render-network.cjs` 使用同样的故障图源运行真实浏览器渲染；为了加速测试，仅在该测试中将补图预算缩短为 250 毫秒。真实账号数据未参与这项检查。
 
 `test-otogame-renderer.cjs`、`test-rinnet-client.cjs` 与 `test-rinnet-renderer.cjs` 覆盖定数来源、过旧的本地值、读取失败与格式校验、三榜计算、曲库外歌曲、演示数据和曲绘缓存。rinnet 测试还验证两次查询之间服务器定数变化会生效。
 
@@ -48,10 +56,10 @@ https://oss-hd1.bemanicn.com/SDDT/cover/{music.music_id}.webp-thumbnail
 npm ci
 npm test
 npm run build:core
-node tools/build-core-update.cjs MiaBot-server-constants-update-20261004 --skip-live-verification
-node tools/verify-core-update.cjs MiaBot-server-constants-update-20261004
-Compress-Archive -Path server-updates/MiaBot-server-constants-update-20261004 -DestinationPath server-updates/MiaBot-server-constants-update-20261004.zip
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/verify-core-update-zip.ps1 -Name MiaBot-server-constants-update-20261004
+node tools/build-core-update.cjs MiaBot-render-timeout-update-20261004 --skip-live-verification
+node tools/verify-core-update.cjs MiaBot-render-timeout-update-20261004
+Compress-Archive -Path server-updates/MiaBot-render-timeout-update-20261004 -DestinationPath server-updates/MiaBot-render-timeout-update-20261004.zip
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/verify-core-update-zip.ps1 -Name MiaBot-render-timeout-update-20261004
 ```
 
 `--skip-live-verification` 会明确标记 `liveVerified: false` 和 `pending-server-validation`，不会伪造实账号验证结果。包名对应输出目录必须不存在；已有包不会被构建器覆盖。构建产物、日志、个人配置和账号数据不提交 Git。

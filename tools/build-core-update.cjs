@@ -2,13 +2,13 @@
 const fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");
 const {execFileSync}=require("node:child_process");
 const root=path.resolve(__dirname,"..");
-const name=process.argv[2]||"MiaBot-server-constants-update-20261004";
+const name=process.argv[2]||"MiaBot-render-timeout-update-20261004";
 if(!/^[A-Za-z0-9._-]+$/.test(name))throw new Error("Invalid package name");
 const skipLiveVerification=process.argv.includes("--skip-live-verification");
 let liveVerified=false;
 if(!skipLiveVerification){
   const proof=JSON.parse(fs.readFileSync(path.join(root,"output","otogame-live-20261003","verification.json"),"utf8"));
-  liveVerified=proof.passed===true&&proof.version==="4.1.5-server-constants"&&proof.sources?.includes("u.otogame.net")&&proof.sources?.includes("rinnet");
+  liveVerified=proof.passed===true&&proof.version==="4.1.6-render-timeout"&&proof.sources?.includes("u.otogame.net")&&proof.sources?.includes("rinnet");
   if(!liveVerified)throw new Error("两数据源实账号联调尚未通过；制作待联调包时显式使用 --skip-live-verification");
 }
 const out=path.join(root,"server-updates",name);
@@ -30,10 +30,11 @@ fs.writeFileSync(path.join(out,"manifest.json"),JSON.stringify({name,version,kin
 for(const file of ["Apply-Update.ps1","Restore-Backup.ps1"])fs.copyFileSync(path.join(__dirname,"core-update",file),path.join(out,file));
 fs.writeFileSync(path.join(out,"Apply-Update.cmd"),'@echo off\r\nif "%~1"=="" (\r\n powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Apply-Update.ps1"\r\n) else (\r\n powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Apply-Update.ps1" -TargetRoot "%~1"\r\n)\r\nif errorlevel 1 (echo UPDATE FAILED. Read the error above.)\r\npause\r\n');
 const readme=[
-"MiaBot 双数据源分表定数更新（2026-10-04，v4.1.5）",
+"MiaBot 分表下载超时修复（2026-10-04，v4.1.6）",
 "适用于已部署的 Windows x64 MiaBot，同时更新 QQ 入口与出图核心。默认部署根目录：C:\\MiaBot\\deploy-windows-server。",
 "",
 "本次变化",
+"修复图片及大饼 API 收到响应头后正文传输卡住时，超时提前解除的问题。整批曲绘和头像共享 20 秒下载预算，单次请求包含正文读取；失败、跳过或预算内未开始的图片直接显示本地占位图，浏览器不再重复等待失败图源。浏览器命令也增加超时及断线清理。",
 "大饼分表所有谱面一律根据三榜的 Rating、成绩、达成标记或白金星数还原定数，不采用本地内部或补充曲库的定数。严格匹配失败时允许原始 Rating ±1，仍须候选唯一并通过等级与跨榜校验。",
 "rinnet 的新版接口没有独立单曲 Rating，因此每次分表读取服务器 musicList 中的当前定数。缺失、无效或读取失败时中止，不回退本地定数。技术分、N10 截断及 P50 计算保持 rinnet 口径。",
 "两数据源均不采用本地分表定数。本地曲库仍用于其他功能和音符数量；rinnet P50 的理论分仍需有效音符数量。本地缺少曲绘时使用占位图。",
@@ -47,6 +48,7 @@ liveVerified?"两数据源实账号联调已通过。":"按用户要求制作待
 "加 -CheckOnly 可仅检查，不修改部署文件。",
 "3. 看到 UPDATE COMPLETE 后，用原启动方式启动机器人，再恢复自动重启任务。",
 "4. 分别用大饼和 rinnet 数据源发 /分表，核对服务器定数。其中大饼还需确认含零号车辆的分表正常生成。",
+"曲绘源较慢时，首次出图可能有占位图；已成功缓存的图片仍直接读取本地。20 秒仅是补图预算，不是登录、读取成绩及出图的总耗时上限。",
 "5. 核对新歌定数、成绩与曲绘；重复查询，确认曲绘缓存可复用。记录报错文字和所用指令即可，反馈时不要附带密码或令牌。",
 "此补丁补齐分表中的曲库外歌曲，不会使新歌自动进入本地单曲搜索、定数表或牌子列表。",
 "",
