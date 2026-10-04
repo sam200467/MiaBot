@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { executeQuery, validateQuery, formatResult } = require("./public-query.cjs");
+const { executeQuery, validateQuery, formatResult, queryMismatch, characterMentions } = require("./public-query.cjs");
 const catalog = require("../ongeki-song-catalog.json");
 const characters = require("../chat-core/knowledge/ongeki-characters.json");
 const filter = (field, op, value) => ({ field, op, value });
@@ -45,6 +45,53 @@ test("美亚对战曲包含 both，排除纯歌手；支持中文名与短名消
   assert.ok(mia.songs.some(s => s.role === "both" && titles.has(s.title)));
   assert.throws(() => run([filter("opponent", "eq", "柏木")]), /完整|角色/);
   assert.ok(run([filter("opponent", "eq", "葵")]).total);
+});
+
+test("角色称呼：简繁日写法和单独的名字都认得，不从别的词里误认", () => {
+  const names = text => characterMentions(text, { self: "柏木 美亜" }).flatMap(m => m.names);
+  for (const [text, expected] of [
+    ["刹那的曲子有哪些", ["皇城 セツナ"]], ["セツナちゃんの曲", ["皇城 セツナ"]],
+    ["彩華学姐的曲子", ["早乙女 彩華"]], ["彩华学姐的曲子都有哪些", ["早乙女 彩華"]],
+    ["高濑梨绪的个人曲", ["高瀬 梨緒"]], ["I like Takase Rio", ["高瀬 梨緒"]], ["あかりの曲", ["星咲 あかり"]],
+    ["茜的个人曲", ["逢坂 茜"]], ["美亚的歌有哪些", ["柏木 美亜"]],
+    // 开头喊一声「美亚，」只是在叫机器人，不是在问她
+    ["美亚，梨绪有哪些歌", ["高瀬 梨緒"]],
+    ["向日葵的歌", []], ["scenario", []], ["ドラムの曲", []], ["MiaBot 你好", []],
+  ]) assert.deepEqual(names(text), expected, text);
+  // 模型写日文汉字或单独的名字也能落到唯一角色，不必绕一圈追问
+  for (const [value, name] of [["彩華", "早乙女 彩華"], ["セツナ", "皇城 セツナ"], ["美亜", "柏木 美亜"], ["咲姫", "柏木 咲姫"], ["梨緒", "高瀬 梨緒"]]) {
+    assert.equal(validateQuery({ filters: [filter("originalFor", "eq", value)] }).filters[0].value, name, value);
+  }
+});
+
+test("角色曲：没说关系按原创曲，个人曲要明说；查询里的角色必须是原话里的人", () => {
+  const check = (text, ...filters) => queryMismatch(validateQuery({ filters, select: ["title"] }), text, { self: "柏木 美亜" });
+  // 线上截图里的两次错误：刹那被换成日向千夏，「梨绪有哪些歌」被查成个人曲
+  assert.match(check("刹那的曲子有哪些", filter("originalFor", "eq", "日向 千夏")), /刹那.*皇城 セツナ.*日向 千夏/);
+  assert.match(check("梨绪有哪些歌", filter("personalFor", "eq", "梨绪")), /个人曲.*originalFor/);
+  assert.match(check("梨绪有哪些歌", filter("singer", "eq", "梨绪")), /originalFor/);
+  assert.match(check("梨绪的个人曲是哪首", filter("originalFor", "eq", "梨绪")), /personalFor/);
+  assert.match(check("梨绪唱过哪些歌", filter("originalFor", "eq", "梨绪")), /singer/);
+  assert.match(check("不是个人曲，是原创曲，梨绪的", filter("personalFor", "eq", "梨绪")), /personalFor/);
+  for (const [text, ...filters] of [
+    ["刹那的曲子有哪些", filter("originalFor", "eq", "刹那")],
+    ["彩华学姐的曲子都有哪些", filter("originalFor", "eq", "早乙女 彩華")],
+    ["梨绪的个人曲是哪首", filter("personalFor", "eq", "梨绪")],
+    ["梨绪唱过哪些歌", filter("singer", "eq", "梨绪")],
+    ["對戰相手是梨緒的歌", filter("opponent", "eq", "梨緒")],
+    ["梨绪原创曲以外的歌", filter("singer", "eq", "梨绪")],
+    ["你的歌有哪些", filter("originalFor", "eq", "美亚")],
+    ["有哪些歌的对战相手是你自己？", filter("opponent", "eq", "美亚")],
+    // 单字名不在严格识别里，但原话里确实写着，不能误判成换了人
+    ["茜和梨绪合唱的歌", filter("singer", "eq", "茜"), filter("singer", "eq", "梨绪")],
+    // 代词指回上文的角色；客串角色没有原创曲，不强行改成原创曲
+    ["那她的个人曲呢", filter("personalFor", "eq", "梨绪")],
+    ["初音未来有哪些歌", filter("opponent", "eq", "初音ミク")],
+  ]) assert.equal(check(text, ...filters), "", text);
+  const setsuna = characters.characters.find(c => c.name === "皇城 セツナ");
+  const catalogTitles = new Set(catalog.songs.map(s => s.meta.name));
+  const titles = new Set(all({ filters: [filter("originalFor", "eq", "刹那")] }).map(e => e.title));
+  assert.deepEqual([...titles].sort(), setsuna.songs.filter(s => s.original && catalogTitles.has(s.title)).map(s => s.title).sort());
 });
 
 test("组合筛选针对同一张谱面；等级与定数分别比较", () => {

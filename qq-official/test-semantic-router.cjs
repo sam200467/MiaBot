@@ -91,6 +91,31 @@ test("角色自己指代有身份上下文；漏查对战关系时可以修正",
   assert.match(result.text, /对战相手＝柏木 美亜/);
   assert.doesNotMatch(result.text, /绑定/);
 });
+test("角色的歌：认出的角色交给模型；换错人、错查个人曲都被复核拦下", async () => {
+  // 线上原样复现：刹那被查成日向 千夏，「梨绪有哪些歌」被查成个人曲
+  const setsuna = scriptedRoute([queryDecision("originalFor", "eq", "日向 千夏"), queryDecision("originalFor", "eq", "皇城 セツナ")]);
+  const fixed = await routeIntent({ settings, specs, messages: [{ role: "user", content: "刹那的曲子有哪些" }], fetchImpl: setsuna.fetchImpl });
+  assert.match(setsuna.calls[0].messages[0].content, /「刹那」＝皇城 セツナ/);
+  assert.match(setsuna.calls[1].messages[0].content, /日向 千夏原话没有提到/);
+  assert.match(fixed.text, /原创曲归属角色＝皇城 セツナ/);
+  assert.doesNotMatch(fixed.text, /日向 千夏/);
+  const rio = scriptedRoute([queryDecision("personalFor", "eq", "高瀬 梨緒"), queryDecision("originalFor", "eq", "高瀬 梨緒")]);
+  const original = await routeIntent({ settings, specs, messages: [{ role: "user", content: "梨绪有哪些歌" }], fetchImpl: rio.fetchImpl });
+  assert.match(rio.calls[1].messages[0].content, /原话没有要「个人曲」/);
+  assert.match(original.text, /原创曲归属角色＝高瀬 梨緒/);
+  assert.doesNotMatch(original.text, /个人曲/);
+  // 复核还坚持错的角色：不发结果，宁可说没核对好
+  const stubborn = scriptedRoute([queryDecision("originalFor", "eq", "日向 千夏")]);
+  const refused = await routeIntent({ settings, specs, messages: [{ role: "user", content: "刹那的曲子有哪些" }], fetchImpl: stubborn.fetchImpl });
+  assert.equal(stubborn.calls.length, 3);
+  assert.equal(refused.queryState, null); assert.match(refused.text, /核对/); assert.doesNotMatch(refused.text, /《/);
+  // 本来就对的那条不多花一次调用
+  const ayaka = scriptedRoute([queryDecision("originalFor", "eq", "早乙女 彩華")]);
+  const ok = await routeIntent({ settings, specs, messages: [{ role: "user", content: "彩华学姐的曲子都有哪些" }], fetchImpl: ayaka.fetchImpl });
+  assert.equal(ayaka.calls.length, 2);
+  assert.match(ok.text, /原创曲归属角色＝早乙女 彩華/); assert.match(ok.text, /26 首/);
+});
+
 test("误判聊天的公共数据库问题获得复核，感想仍可正常聊天", async () => {
   const model = scriptedRoute([{ route: "chat" }, queryDecision("bpm", "gte", 200, { mode: "count" })]);
   const result = await routeIntent({ settings, specs, messages: [{ role: "user", content: "BPM至少200的有多少首" }], fetchImpl: model.fetchImpl });

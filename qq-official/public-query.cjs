@@ -9,8 +9,84 @@ const path = require("node:path");
 const songSearch = require("./song-search.cjs");
 const { botSongId } = require("./song-id.cjs");
 const { randomInt } = require("node:crypto");
+const { Converter } = require("opencc-js");
 const characters = loadCharacters(path.join(__dirname, "../chat-core"));
 const textKey = value => String(value ?? "").normalize("NFKC").toLowerCase().trim();
+// One key for 彩華/彩华, 美亜/美亚, 梨緒/梨绪, 咲姫/咲姬. OpenCC's jp→cn table
+// leaves 姫 alone and turns 緒 into 緖, so those two are patched by hand.
+const toSimplified = Converter({ from: "jp", to: "cn" });
+const foldHan = value => toSimplified(String(value ?? "").normalize("NFKC").toLowerCase()).replace(/[緒緖]/g, "绪").replace(/姫/g, "姬");
+const characterKey = value => foldHan(value).replace(/\s+/g, "");
+const characterByName = new Map((characters?.characters || []).map(c => [c.name, c]));
+const namesByAlias = new Map();
+const addAlias = (alias, name) => {
+  const key = characterKey(alias);
+  if (!key) return;
+  if (!namesByAlias.has(key)) namesByAlias.set(key, new Set());
+  namesByAlias.get(key).add(name);
+};
+for (const c of characterByName.values()) for (const alias of [c.name, ...(c.aliases || [])]) addAlias(alias, c.name);
+// Players call the cast by given name alone (セツナ, あかり), which the generated
+// alias lists only partly cover. A given name another character owns stays out.
+for (const c of characterByName.values()) {
+  const given = c.cast ? c.name.split(/\s+/)[1] : "";
+  if (characterKey(given).length >= 2 && !namesByAlias.has(characterKey(given))) addAlias(given, c.name);
+}
+const aliasKeysByName = new Map();
+for (const [key, names] of namesByAlias) for (const name of names) {
+  if (!aliasKeysByName.has(name)) aliasKeysByName.set(name, []);
+  aliasKeysByName.get(name).push(key);
+}
+const isLatinKey = key => /^[a-z0-9]+$/.test(key);
+const latinWords = value => foldHan(value).match(/[a-z0-9]+/g) || [];
+const KATAKANA = /[\p{Script=Katakana}ー]/u, HIRAGANA = /\p{Script=Hiragana}/u, HAN = /\p{Script=Han}/u;
+const sameKana = (a, b) => KATAKANA.test(a) && KATAKANA.test(b) || HIRAGANA.test(a) && HIRAGANA.test(b);
+// Latin aliases match whole words only: "rio" is not inside "scenario" and
+// "mia" is not inside "MiaBot". Both "takase rio" and "takaserio" match.
+function latinKeysIn(value) {
+  const words = latinWords(value), found = new Set();
+  for (let i = 0; i < words.length; i++) {
+    for (let j = i, joined = ""; j < words.length && joined.length < 40; j++) {
+      joined += words[j];
+      if (namesByAlias.has(joined)) found.add(joined);
+    }
+  }
+  return found;
+}
+const cjkAliasKeys = [...namesByAlias.keys()].filter(key => !isLatinKey(key)).sort((a, b) => b.length - a.length);
+// A leading "美亚，" only addresses the bot; it is not a character in the request.
+function withoutVocative(text, self) {
+  const folded = foldHan(text), match = folded.match(/^\s*([^，,、：:！!~～\s]+)[，,、：:！!~～\s]+(?=\S)/);
+  return match && self && namesByAlias.get(characterKey(match[1]))?.has(self) ? folded.slice(match[0].length) : text;
+}
+// Characters the user's own words name, in order of appearance. Longest alias
+// wins, so 高濑梨绪 is one mention; a kana alias must not continue a word in
+// the same script (ラム in ドラム). One-character cast names (葵, 茜) count only
+// as 「葵的」/「葵酱」, never inside another word such as 向日葵.
+function characterMentions(text, { self } = {}) {
+  const request = withoutVocative(String(text ?? ""), self);
+  const compact = characterKey(request), taken = [], found = [];
+  for (const key of cjkAliasKeys) {
+    const names = [...namesByAlias.get(key)];
+    if (key.length === 1 && !(HAN.test(key) && names.every(name => characterByName.get(name)?.cast))) continue;
+    for (let at = compact.indexOf(key); at >= 0; at = compact.indexOf(key, at + 1)) {
+      const end = at + key.length, before = compact[at - 1] || "", after = compact[end] || "";
+      if (sameKana(key[0], before) || sameKana(key.at(-1), after) && !/^(?:の|ちゃん|さん|くん|さま|たち|と|が|は|も|を|に|や)/.test(compact.slice(end))) continue;
+      if (key.length === 1 && (HAN.test(before) || !/^[的酱]$/.test(after))) continue;
+      if (taken.some(([s, e]) => at < e && s < end)) continue;
+      taken.push([at, end]);
+      found.push({ at, alias: key, names });
+    }
+  }
+  for (const key of latinKeysIn(request)) found.push({ at: Infinity, alias: key, names: [...namesByAlias.get(key)] });
+  const seen = new Set();
+  return found.sort((a, b) => a.at - b.at).filter(m => !seen.has(m.names.join()) && seen.add(m.names.join())).map(({ alias, names }) => ({ alias, names }));
+}
+// Looser than characterMentions: any alias of this character anywhere in the text.
+function textNamesCharacter(text, name) {
+  const compact = characterKey(text), latin = latinKeysIn(text);
+  return (aliasKeysByName.get(name) || []).some(key => isLatinKey(key) ? latin.has(key) : compact.includes(key));
+}
 const DIFFICULTIES = ["BAS", "ADV", "EXP", "MAS", "LUN"];
 const PAGE_SIZE = 8;
 const fields = {
@@ -70,10 +146,9 @@ function scalar(field, value) {
     if (spec.type === "level" && !/^(?:[1-9]|1[0-5])\+?$/.test(value)) reject("显示等级用 13 或 13+ 这样的写法，不能混成定数");
     if (spec.type === "date" && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value)) reject("日期需要 YYYY-MM-DD");
     if (spec.type === "character") {
-      const key = textKey(value).replace(/\s/g, "");
-      const candidates = (characters?.characters || []).filter(c => [c.name, ...(c.aliases || [])].some(a => textKey(a).replace(/\s/g, "") === key));
-      if (candidates.length !== 1) reject("角色索引里没能唯一确认这个名字，需要更完整的角色称呼");
-      value = candidates[0].name;
+      const names = namesByAlias.get(characterKey(value));
+      if (names?.size !== 1) reject("角色索引里没能唯一确认这个名字，需要更完整的角色称呼");
+      value = [...names][0];
     }
   }
   return value;
@@ -264,9 +339,56 @@ function formatResult(result) {
   return lines.join("\n");
 }
 
+// Words that name a relation. 「梨绪有哪些歌」 names none, and then the answer is
+// her original songs: 个人曲 is a single song per character and must be asked for.
+const RELATION_CUES = {
+  personalFor: /个人曲|个人歌|个人单曲|角色曲|角色歌|キャラソン|キャラクターソング|character\s*song/g,
+  originalFor: /原创|オリジナル|original/g,
+  singer: /唱|歌手|vocal|ボーカル/g,
+  opponent: /相手|对手|对战(?!属性|等级)|boss|ボス/g,
+};
+const RELATION_NAMES = { personalFor: "个人曲", originalFor: "原创曲", singer: "演唱", opponent: "对战相手" };
+function relationCues(text) {
+  const folded = foldHan(text), asked = new Set(), negated = new Set();
+  for (const [field, pattern] of Object.entries(RELATION_CUES)) for (const match of folded.matchAll(pattern)) {
+    const clause = folded.slice(0, match.index).split(/[，,。；;！!？?]|而是|改成|换成/).at(-1);
+    const denied = /不是|不要|不用|不按|并非|别(?!的)|除了|除去/.test(clause) || /^[曲歌]?(?:以外|之外)/.test(folded.slice(match.index + match[0].length));
+    (denied ? negated : asked).add(field);
+  }
+  return { asked, negated };
+}
+const ANAPHORA = /她|他|它|祂|这位|那位|这个人|那个人|此人|这个角色|那个角色|该角色|同一个?角色|上面那|刚才那|前面那/;
+// The model maps names to characters with no roster in front of it, so a valid
+// but wrong name (刹那 → 日向 千夏) used to pass. Each character field must name
+// someone the user mentioned, unless the request points back with a pronoun.
+function characterMismatch(query, text, self) {
+  const used = query.filters.filter(f => fields[f.field].type === "character");
+  if (!used.length) return "";
+  const mentions = characterMentions(text, { self }), named = new Set(mentions.flatMap(m => m.names));
+  if (named.size && !ANAPHORA.test(foldHan(text))) {
+    for (const name of used.flatMap(f => [].concat(f.value))) {
+      if (named.has(name) || name === self && /你|妳|您/.test(text) || textNamesCharacter(text, name)) continue;
+      return `原话提到的角色是${mentions.map(m => `「${m.alias}」＝${m.names.join("或")}`).join("、")}，查询里的${name}原话没有提到；角色字段只能用原话里的角色，不能换成别人`;
+    }
+  }
+  const { asked, negated } = relationCues(text), relations = new Set(used.map(f => f.field));
+  if (relations.has("personalFor") && !asked.has("personalFor")) return "原话没有要「个人曲」：问某角色的歌/曲子按原创曲 originalFor 查（含 solo 版）；personalFor 只用于明确问个人曲，每个角色至多一首";
+  if (asked.size === 1) {
+    const [want] = asked;
+    if (!relations.has(want) && !query.select.includes(want)) return `原话问的是${RELATION_NAMES[want]}，角色关系必须用 ${want}，不能换成其他关系`;
+  }
+  // 「除了个人曲还有哪些歌」 still means originals; 「原创曲以外的」 does not.
+  if (!asked.size && !negated.has("originalFor")) {
+    const hasOriginals = name => characterByName.get(name)?.cast && characterByName.get(name).songs.some(s => s.original);
+    const other = used.find(f => f.field !== "originalFor" && [].concat(f.value).some(hasOriginals));
+    if (other) return `原话没说是哪种关系：问某角色的歌/曲子默认按原创曲 originalFor 查（含 solo 版），不能改用${RELATION_NAMES[other.field]} ${other.field}；演唱、对战相手、个人曲都要原话明确提到才用`;
+  }
+  return "";
+}
+
 // Deterministic checks for high-impact semantic distinctions. Broader meaning
 // is reviewed by the model against the original request before this executor.
-function queryMismatch(query, text) {
+function queryMismatch(query, text, { self } = {}) {
   const request = selectionIntent(text);
   if (request.kind && query.selection.kind !== request.kind) return `用户要求${request.kind === "random" ? "随机选取" : "只取前几项"}，必须保留 selection.kind=${request.kind}，不能退化为整页列表`;
   if (request.count && (query.selection.kind === "all" || query.selection.count !== request.count)) return `用户只要${request.count}项，selection.count必须保留这个数量`;
@@ -285,7 +407,7 @@ function queryMismatch(query, text) {
   }
   if (expected && title.length && !title.some(f => f.op === expected)) return `用户要求歌名 ${expected} 匹配，不能改成其他比较方式或模糊搜索`;
   if (/对战相手|對戰相手/.test(text) && !query.filters.some(f => f.field === "opponent") && !query.select.includes("opponent")) return "用户问对战相手，查询必须筛选或返回 opponent，不能只查演唱者";
-  return "";
+  return characterMismatch(query, text, self);
 }
 
 function selectionIntent(raw) {
@@ -304,4 +426,4 @@ function selectionIntent(raw) {
     entity: countMatch ? countMatch[2] === "首" ? "songs" : /张|張/.test(countMatch[2]) ? "charts" : undefined : undefined,
     excludePrevious: /换一批|換一批|换两|换二|换[\d]+|不要刚才|排除刚才|(?:上次|上一批|刚才).{0,6}(?:不重复|别重复)|(?:不|别).{0,4}(?:上次|上一批|刚才).{0,3}重复/.test(text) };
 }
-module.exports = { SCHEMA, QueryError, validateQuery, executeQuery, formatResult, describeQuery, queryMismatch, selectionIntent };
+module.exports = { SCHEMA, QueryError, validateQuery, executeQuery, formatResult, describeQuery, queryMismatch, selectionIntent, characterMentions };
