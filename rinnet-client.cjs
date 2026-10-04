@@ -16,7 +16,7 @@ function fail(code, message) { throw new RinnetError(code, message); }
 function diagnosticText(error) {
   const d = error instanceof RinnetError ? error.diagnostic : null;
   const codes = new Set(["NETWORK", "RATE_LIMIT", "FORMAT", "AUTH", "HTTP", "REJECTED", "TOTP_INVALID", "TOTP_LOCKED", "NO_PROFILE", "NO_CARD", "CARD_NOT_OWNED", "CARD_FORMAT", "LEGACY_RATING", "NO_RATING", "CATALOG", "DEFAULT_CARD", "CARD_CHANGED", "CREDENTIALS", "BANNED", "EULA", "SERVER"]);
-  const routes = new Set(["api/auth/signin", "api/auth/signin/totp", "api/auth/refresh", "api/user/me", "api/game/ongeki/profile", "api/game/ongeki/newRating", "api/game/ongeki/export", "api/game/ongeki/song/:id"]);
+  const routes = new Set(["api/auth/signin", "api/auth/signin/totp", "api/auth/refresh", "api/user/me", "api/game/ongeki/profile", "api/game/ongeki/newRating", "api/game/ongeki/data/musicList", "api/game/ongeki/export", "api/game/ongeki/song/:id"]);
   return "code=" + (error instanceof RinnetError && codes.has(error.code) ? error.code : "OTHER") +
     " route=" + (routes.has(d?.route) ? d.route : "unknown") +
     " http=" + (Number.isInteger(d?.http) ? d.http : "unknown") +
@@ -131,25 +131,55 @@ function technicalRating(constant, item) {
   const combo = item.isAllBreak ? (s >= 1010000 ? 350 : 300) : item.isFullCombo ? 100 : 0;
   return Math.max(0, c + loBonus + Math.floor((hiBonus - loBonus) * (s - loScore) / (hiScore - loScore)) + rankBonus + combo + (item.isFullBell ? 50 : 0));
 }
-function ratingData(raw) {
+// RinNET newRating contains scores, not independently calculated per-chart Rating.
+// The portal gets level0..level4 from its server musicList (e.g. "14,60" = 14.6).
+// Never calculate from the bundled catalog and then pretend to infer a constant.
+function serverMusicIndex(raw) {
+  const value = unwrap(raw);
+  const rows = !raw?.status && Array.isArray(value?.data) ? value.data : value;
+  if (!Array.isArray(rows)) fail("FORMAT", "rinnet 服务器曲库格式异常，不能核对当前定数。");
+  const index = new Map();
+  for (const song of rows) {
+    const id = Number(song?.id);
+    if (song?.id == null || !Number.isSafeInteger(id) || id <= 0 || index.has(id)) {
+      fail("FORMAT", "rinnet 服务器曲库的歌曲 ID 无效或重复，不能核对当前定数。");
+    }
+    index.set(id, song);
+  }
+  return index;
+}
+function serverChartConstant(song, difficulty) {
+  const field = difficulty === 10 ? "level4" : "level" + difficulty;
+  const raw = song?.[field];
+  const parts = typeof raw === "string" && raw.match(/^\s*(\d{1,2})\s*,\s*(\d{1,2})\s*$/);
+  if (!parts) fail("CATALOG", "rinnet 服务器曲库没有该谱面的有效定数，这次不回退本地数据。");
+  const hundredths = Number(parts[1]) * 100 + Number(parts[2]);
+  if (hundredths <= 0 || hundredths > 1590 || hundredths % 10 !== 0) {
+    fail("CATALOG", "rinnet 服务器曲库的谱面定数格式异常，这次不回退本地数据。");
+  }
+  return hundredths / 100;
+}
+function ratingData(raw, rawMusicCatalog) {
   const value = unwrap(raw);
   if (!value || !Array.isArray(value.old50) || !Array.isArray(value.new10) || !Array.isArray(value.pScore)) fail("FORMAT", "rinnet 没有返回新版 B50、N10 和 P50 数据，请在网站确认音击版本。");
+  const remoteSongs = serverMusicIndex(rawMusicCatalog);
   function list(rows, kind, max) {
     if (rows.length > max) fail("FORMAT", "rinnet 的分表数量与预期不一致，这次先不出图啦。");
     return normalizeScores(rows).map(item => {
-      const song = byId.get(item.musicId), pos = item.difficulty === 10 ? 4 : item.difficulty;
-      const constant = Number(song?.const?.[pos]);
-      if (!song || !(constant > 0)) fail("CATALOG", "这份 rinnet 分表的谱面定数还不在本地曲库里，需要更新曲库后再查。");
+      const song = remoteSongs.get(item.musicId), pos = item.difficulty === 10 ? 4 : item.difficulty;
+      const constant = serverChartConstant(song, item.difficulty);
+      if (typeof song.name !== "string" || !song.name.trim()) fail("FORMAT", "rinnet 服务器曲库缺少歌曲名称，不能核对这份分表。");
       // RinNET supplies the earned P score, but not the chart's theoretical max.
       // Each note can contribute two Platinum Score points.
-      const noteTotal = Number(song.noteTotal?.[pos]);
+      const noteTotal = Number(song.noteTotal?.[pos] ?? byId.get(item.musicId)?.noteTotal?.[pos]);
       if (kind === "platinum" && (!Number.isSafeInteger(noteTotal) || noteTotal <= 0)) {
         fail("CATALOG", "这份 rinnet 分表的白金分理论值还不在本地曲库里，需要更新曲库后再查。");
       }
       let rating = technicalRating(constant, item);
       if (kind === "new") rating = Math.floor(rating / 5) * 5;
       if (kind === "platinum") rating = Math.floor(item.platinumScoreStar * constant * constant + 1e-9);
-      return { song_id: item.musicId, dataSource: "rinnet", music: { name: song.name, artist: song.artistName, music_id: String(item.musicId) },
+      return { song_id: item.musicId, dataSource: "rinnet", chart_constant: constant, constant_source: "rinnet-server-catalog",
+        music: { name: song.name, artist: String(song.artistName || ""), music_id: String(item.musicId) },
         difficulty_id: item.difficulty, score: item.techScoreMax, rating,
         is_all_break: item.isAllBreak, is_full_combo: item.isFullCombo, is_full_bell: item.isFullBell,
         platinum_score_star: item.platinumScoreStar, platinum_score_max: item.platinumScoreMax,
@@ -268,7 +298,9 @@ function createClient({ fetchImpl = httpFetch, proxyUrl = "" } = {}) {
       const scores = normalizeScores(await get("api/game/ongeki/song/" + Number(songId) + "?aimeId=" + encodeURIComponent(binding.aimeId)), songId);
       result.song = { found: scores.some(s => s.techScoreMax > 0), songNo: Number(songId), scores };
     } else if (kind === "chart") {
-      result.rating = ratingData(await get("api/game/ongeki/newRating"));
+      const rawRating = await get("api/game/ongeki/newRating");
+      const rawMusicCatalog = await get("api/game/ongeki/data/musicList");
+      result.rating = ratingData(rawRating, rawMusicCatalog);
     } else {
       const exported = unwrap(await get("api/game/ongeki/export"));
       if (!Array.isArray(exported?.userMusicDetailList)) fail("FORMAT", "rinnet 的全量成绩导出格式与预期不同，这次先不出图，需要适配后再试。");

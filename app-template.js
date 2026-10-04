@@ -67,7 +67,7 @@ const BROWSER_CANDIDATES = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
 ];
-const VERSION = "4.1.4-otogame-inferred";
+const VERSION = "4.1.5-server-constants";
 
 // 开发模式（node ongenki-exe.js 直跑）时用 cwd，exe 模式用 exe 所在目录；
 // GUI 会把核心解压到临时目录运行，用 ONGEKI_APP_DIR 指回 GUI 所在目录（配置文件放那里）
@@ -1204,13 +1204,15 @@ function mapThemeRatingItem(item, catalogIndex, remoteConstants = new Map()) {
   const difficultyId = Number(item.difficulty_id ?? music?.level_info?.difficulty ?? 3);
   const song = findThemeSong(catalogIndex, title, artist, difficultyId);
   const internalSong = findThemeInternalSong(catalogIndex, item, title, artist, difficultyId);
-  // 本地曲库可能过旧：大饼只接受反推结果，本地只用于歌曲识别及其他元数据。
-  // rinnet 维持既有的本地定数来源。
+  // 大饼只接受反推结果；rinnet 只接受入口从服务器曲库读取的定数。
+  // 本地曲库只用于歌曲识别及其他元数据，不能作为定数兜底。
   const constant = item.dataSource === "rinnet"
-    ? getThemeInternalConstant(internalSong, difficultyId) ?? getThemeConstant(song, difficultyId)
+    ? item.constant_source === "rinnet-server-catalog" && typeof item.chart_constant === "number" &&
+      item.chart_constant > 0 && item.chart_constant <= 15.9 && Number.isInteger(item.chart_constant * 10)
+      ? item.chart_constant : undefined
     : remoteConstants.get(otogameChartIdentity(item));
   if (!Number.isFinite(constant)) {
-    const reason = item.dataSource === "rinnet" ? "" : "：大饼数据无法唯一反推";
+    const reason = item.dataSource === "rinnet" ? "：缺少有效的 rinnet 服务器定数，请同时更新 QQ 入口与核心" : "：大饼数据无法唯一反推";
     throw new Error(`曲目“${title}”的 ${themeChartKey(difficultyId) || difficultyId} 定数未找到${reason}，已中止生成`);
   }
   const coverId = music.music_id || item.resource_id || item.music_resource_id;
@@ -1229,7 +1231,8 @@ function mapThemeRatingItem(item, catalogIndex, remoteConstants = new Map()) {
     platinumScoreMax: Number(item.platinum_score_max || 0),
     platinumScoreTheory: Number(item.platinum_score_theory || 0),
     jacketUrl: item.dataSource === "rinnet"
-      ? levelScoreJacket(catalogIndex, { song: internalSong, songId: internalSong.id, difficultyId }, new Map())
+      ? internalSong ? levelScoreJacket(catalogIndex, { song: internalSong, songId: internalSong.id, difficultyId }, new Map())
+        : songJacketPlaceholder(title, coverId)
       : `${OTG_CDN_URL}/SDDT/cover/${encodeURIComponent(coverId)}.webp-thumbnail`,
     // rinnet 没有曲绘哈希，只能退回曲库里的公网图（GitHub Pages）。拉不动时
     // 主题会换上这张本地生成的占位图，而不是让整张分表失败。

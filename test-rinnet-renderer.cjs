@@ -42,12 +42,16 @@ test("rinnet 快照贯穿分表、单曲、牌子、等级任务，不回退到�
   try {
     const row = { musicId: 870, level: 3, techScoreMax: 1009000, isAllBreak: true, isFullBell: true, platinumScoreMax: 3220, platinumScoreStar: 4 };
     const profile = normalizeProfile({ userName: "RinNET测试玩家", level: 12 });
-    const playerData = { source: "rinnet", profile, rating: ratingData({ old50: [row], new10: [row], pScore: [row] }), song: { found: true, songNo: 870, scores: normalizeScores([row]) } };
+    const remoteMusic = [{id:870,name:"VIIIbit Explorer",artistName:"Lime",level3:"14,80"}];
+    const playerData = { source: "rinnet", profile, rating: ratingData({ old50: [row], new10: [row], pScore: [row] },remoteMusic), song: { found: true, songNo: 870, scores: normalizeScores([row]) } };
     await app.runJobData({ saveDir, playerData });
     assert.equal(app.captured.chart.generatorName, "MiaBot · rinnet");
     assert.match(app.captured.chart.profile.avatarUrl, /^data:image\/svg\+xml;base64,/);
     assert.equal(app.captured.chart.profile.dataSource, "rinnet");
     assert.equal(app.captured.chart.best[0].score, row.techScoreMax);
+    assert.equal(app.captured.chart.best[0].constant,14.8,"忽略本地 14.6 定数");
+    assert.equal(app.captured.chart.new[0].constant,14.8);
+    assert.equal(app.captured.chart.platinum[0].constant,14.8);
     assert.equal(app.captured.chart.platinum[0].platinumScoreMax, 3220);
     assert.equal(app.captured.chart.platinum[0].platinumScoreTheory, 3316);
     assert.ok(app.captured.chart.best[0].jacketUrl);

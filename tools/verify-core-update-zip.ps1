@@ -21,8 +21,8 @@ foreach ($file in Get-ChildItem -LiteralPath $package -File -Recurse) {
     $relative = $file.FullName.Substring($package.Length + 1).Replace('\', '/')
     $expected[$Name + '/' + $relative] = $file
 }
-# The builder creates six files. A separately generated validation note is optional.
-if ($expected.Count -lt 6 -or $expected.Count -gt 7) { throw 'Unexpected package file count; inspect for extra files.' }
+$baseCount = if ($manifest.kind -eq 'core-and-entry') { 7 } else { 6 }
+if ($expected.Count -lt $baseCount -or $expected.Count -gt ($baseCount + 1)) { throw 'Unexpected package file count; inspect for extra files.' }
 [Reflection.Assembly]::LoadWithPartialName('System.IO.Compression.FileSystem') | Out-Null
 $archive = [IO.Compression.ZipFile]::OpenRead($zipPath)
 $seen = @{}

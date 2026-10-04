@@ -11,6 +11,7 @@ const ok = (data) => ({ status: { code: 92001 }, data });
 const ACCOUNT = { accessToken: "AT1", refreshToken: "RT1" };
 const CARD = { id: 7, extId: 44153, luid: "00000000000000004453", default: true };
 const PROFILE = { userName: "リネット玩家", level: 12, playCount: 34, lastPlayDate: "2026-09-21" };
+const REMOTE_MUSIC = { id:870,name:"VIIIbit Explorer",artistName:"Lime",level3:"14,80",level4:"13,70" };
 
 test("音击档案使用官网卡面头像和转生等级，缺失字段保持为空", () => {
   const profile = rinnet.normalizeProfile(ok({ ...PROFILE, cardId: 123, reincarnationNum: 2 }));
@@ -147,20 +148,46 @@ test("技术 Rating：分段、加成与大饼口径一致", () => {
   assert.equal(rinnet.technicalRating(10.0, { techScoreMax: 700000 }), Math.floor(4000 * 200000 / 300000));
 });
 
-test("ratingData：B50/N10/P50 归一化，定数取自本地曲库", () => {
+test("ratingData：B50/N10/P50 使用服务器定数，即使本地定数不同", () => {
   const row = { musicId: 870, level: 3, techScoreMax: 1009000, isAllBreak: true, isFullCombo: true, isFullBell: true, platinumScoreMax: 2000, platinumScoreStar: 4 };
-  const data = rinnet.ratingData(ok({ old50: [row], new10: [row], pScore: [row] }));
-  const expected = rinnet.technicalRating(14.6, { techScoreMax: 1009000, isAllBreak: true, isFullCombo: true, isFullBell: true });
+  const data = rinnet.ratingData(ok({ old50: [row], new10: [row], pScore: [row] }), ok([REMOTE_MUSIC]));
+  const expected = 17350; // 14.8 + 插值 1.9 + SSS+ 0.3 + AB 0.3 + FB 0.05
   assert.equal(data.best_rating_list[0].rating, expected);
   assert.equal(data.best_new_rating_list[0].rating, Math.floor(expected / 5) * 5, "N10 截断到 0.005 的倍数");
-  assert.equal(data.p_score_rating_list[0].rating, Math.floor(4 * 14.6 * 14.6 + 1e-9), "P 分按星数×定数²");
+  assert.equal(data.p_score_rating_list[0].rating,876, "P 分按服务器定数 14.8 与星数计算");
+  for (const list of [data.best_rating_list,data.best_new_rating_list,data.p_score_rating_list]) {
+    assert.equal(list[0].chart_constant,14.8);
+    assert.equal(list[0].constant_source,"rinnet-server-catalog");
+  }
   assert.equal(data.p_score_rating_list[0].platinum_score_max, 2000, "斜杠左侧使用已取得的白金分");
   assert.equal(data.p_score_rating_list[0].platinum_score_theory, 3316, "斜杠右侧为该谱面 1658 个音符×2");
   assert.equal(data.best_rating_list[0].song_id, 870);
   assert.equal(data.best_rating_list[0].is_all_break, true);
   assert.equal(data.rating, data.best_rating + data.best_new_rating + data.p_score_rating);
+  assert.equal(rinnet.ratingData(ok({old50:[row],new10:[],pScore:[]}),{data:[REMOTE_MUSIC]}).best_rating_list[0].chart_constant,14.8);
   assert.throws(() => rinnet.ratingData(ok({ old50: [row] })), /新版 B50、N10 和 P50/);
-  assert.throws(() => rinnet.ratingData(ok({ old50: [{ ...row, musicId: 99999999 }], new10: [row], pScore: [row] })), /不在本地曲库/);
+  assert.throws(() => rinnet.ratingData(ok({ old50: [{ ...row, musicId: 99999999 }], new10: [], pScore: [] }),[REMOTE_MUSIC]), /服务器曲库/);
+});
+
+test("rinnet 服务器曲库缺失、重复或定数格式无效时不回退本地", () => {
+  const rating = {old50:[{musicId:870,level:3,techScoreMax:1009000}],new10:[],pScore:[]};
+  for (const catalog of [undefined,{},[REMOTE_MUSIC,REMOTE_MUSIC]]) {
+    assert.throws(()=>rinnet.ratingData(rating,catalog),/服务器曲库/);
+  }
+  for (const level3 of [undefined,null,"14+","14,6","14,100","14,60 trailing","0,00","16,00",14.6]) {
+    assert.throws(()=>rinnet.ratingData(rating,[{...REMOTE_MUSIC,level3}]),/不回退本地/);
+  }
+});
+
+test("rinnet 曲库外歌曲可用服务器名称和定数；LUNATIC 使用 level4", () => {
+  const rating = {old50:[{musicId:99999999,level:10,techScoreMax:1010000,isAllBreak:true}],new10:[],pScore:[]};
+  const song = {...REMOTE_MUSIC,id:99999999,name:"服务器新歌",level4:"13,70"};
+  const data = rinnet.ratingData(rating,[song]);
+  assert.equal(data.best_rating_list[0].chart_constant,13.7);
+  assert.equal(data.best_rating_list[0].rating,16350);
+  assert.equal(data.best_rating_list[0].music.name,"服务器新歌");
+  // 白金理论分仍需要音符数，不能把个人白金分当理论分。
+  assert.throws(()=>rinnet.ratingData({...rating,pScore:rating.old50},[song]),/白金分理论值/);
 });
 
 test("成绩行校验：难度、分数区间、目标曲目不符都拒绝出图", () => {
@@ -243,6 +270,7 @@ function snapshotServer(overrides = {}) {
     "api/game/ongeki/profile?aimeId=44153": ok(PROFILE),
     "api/game/ongeki/song/870?aimeId=44153": ok([{ musicId: 870, level: 3, techScoreMax: 1000737 }]),
     "api/game/ongeki/newRating": ok({ old50: [], new10: [], pScore: [] }),
+    "api/game/ongeki/data/musicList": ok([REMOTE_MUSIC]),
     "api/game/ongeki/export": exportBody,
     ...overrides,
   });
@@ -271,6 +299,27 @@ test("分表快照：绑定卡不是默认卡时拒绝，默认卡才读 newRati
   const result = await client.snapshot({ ...BINDING }, "chart", null, async () => {});
   assert.deepEqual(result.rating.best_rating_list, []);
   assert.ok(server.calls.some((c) => c.route === "api/game/ongeki/newRating"));
+  assert.ok(server.calls.some((c) => c.route === "api/game/ongeki/data/musicList"));
+});
+
+test("rinnet 每次分表重新读取服务器曲库，不复用过旧定数；读取失败直接报错", async () => {
+  let level3 = "14,80";
+  const row = {musicId:870,level:3,techScoreMax:1009000};
+  const server = snapshotServer({
+    "api/game/ongeki/newRating":ok({old50:[row],new10:[],pScore:[]}),
+    "api/game/ongeki/data/musicList":()=>ok([{...REMOTE_MUSIC,level3}])
+  });
+  const client = rinnet.createClient({fetchImpl:server.fetchImpl});
+  assert.equal((await client.snapshot({...BINDING},"chart",null,async()=>{})).rating.best_rating_list[0].chart_constant,14.8);
+  level3 = "14,90";
+  assert.equal((await client.snapshot({...BINDING},"chart",null,async()=>{})).rating.best_rating_list[0].chart_constant,14.9);
+  assert.equal(server.calls.filter(c=>c.route==="api/game/ongeki/data/musicList").length,2);
+  const broken = rinnet.createClient({fetchImpl:snapshotServer({"api/game/ongeki/data/musicList":{http:503,body:ok([])}}).fetchImpl});
+  await assert.rejects(()=>broken.snapshot({...BINDING},"chart",null,async()=>{}),error=>{
+    assert.equal(error.code,"HTTP");
+    assert.match(rinnet.diagnosticText(error),/route=api\/game\/ongeki\/data\/musicList/);
+    return true;
+  });
 });
 
 test("真实门户约定：新版分表 94001 走旧版提示，94041 提示分表缺失", async () => {

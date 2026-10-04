@@ -136,10 +136,19 @@ test("大饼三榜一律反推，忽略内部及补充曲库中过旧的定数",
   }
 });
 
-test("rinnet 保持本地定数，不走大饼的强制反推", () => {
+test("rinnet 只采用服务器定数，不回退本地也不走大饼反推", () => {
   const local = row({dataSource:"rinnet",music_id:870,difficulty_id:3,rating:null,
     music:{music_id:hash,name:localSong.name,level_info:{difficulty:3,level:17}}});
-  assert.equal(build([local]).best[0].constant,14.6);
+  assert.throws(()=>build([local]),/缺少有效的 rinnet 服务器定数/);
+  assert.equal(build([{...local,chart_constant:14.8,constant_source:"rinnet-server-catalog"}]).best[0].constant,14.8);
+  assert.throws(()=>build([{...local,chart_constant:14.8,constant_source:"local"}]),/服务器定数/);
+  assert.throws(()=>build([{...local,chart_constant:14.81,constant_source:"rinnet-server-catalog"}]),/服务器定数/);
+  const unknown = {...local,song_id:99999999,music_id:99999999,music:{music_id:"99999999",name:"rinnet 新歌"},
+    chart_constant:14.8,constant_source:"rinnet-server-catalog"};
+  const mapped = build([unknown]).best[0];
+  assert.equal(mapped.constant,14.8);
+  assert.equal(mapped.songId,null);
+  assert.match(mapped.jacketUrl,/^data:image\/svg\+xml;base64,/);
 });
 
 test("演示分表的技术 Rating、N10 贡献及白金星数可以独立反推", () => {
