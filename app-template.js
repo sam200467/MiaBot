@@ -67,7 +67,7 @@ const BROWSER_CANDIDATES = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
 ];
-const VERSION = "4.1.6-render-timeout";
+const VERSION = "4.1.7-otogame-new-song";
 
 // 开发模式（node ongenki-exe.js 直跑）时用 cwd，exe 模式用 exe 所在目录；
 // GUI 会把核心解压到临时目录运行，用 ONGEKI_APP_DIR 指回 GUI 所在目录（配置文件放那里）
@@ -1138,16 +1138,21 @@ function getThemeConstant(song, difficultyId) {
 // 大饼的 level_info.level 是显示等级枚举（如 21=14），不是定数。
 // 大饼分表一律由 Rating 还原定数，只有整数计算能唯一确定一位小数时采用。
 // N10 的单曲贡献已经除以 5；P50 是 floor(星数 * 定数平方)。
+// 面板刚收录的新歌可能还没有曲绘资源哈希（前端对空 music_id 显示默认曲绘），
+// 这时退回“曲名 + 曲师 + 难度”作为同一谱面的标识，仍不与有哈希的谱面混用。
 function otogameChartIdentity(item) {
   if (item?.dataSource === "rinnet") return null;
   const resourceId = item?.music?.music_id;
   const rawDifficulty = item?.difficulty_id ?? item?.music?.level_info?.difficulty;
   const difficulty = Number(rawDifficulty);
   const musicDifficulty = item?.music?.level_info?.difficulty;
-  if (typeof resourceId !== "string" || !/^[a-f0-9]{32}$/i.test(resourceId) ||
-      rawDifficulty === null || rawDifficulty === undefined || rawDifficulty === "" || !themeChartKey(difficulty) ||
+  if (rawDifficulty === null || rawDifficulty === undefined || rawDifficulty === "" || !themeChartKey(difficulty) ||
       musicDifficulty != null && Number(musicDifficulty) !== difficulty) return null;
-  return `${resourceId}:${difficulty}`;
+  if (typeof resourceId === "string" && /^[a-f0-9]{32}$/i.test(resourceId)) return `${resourceId}:${difficulty}`;
+  if (resourceId !== null && resourceId !== undefined && resourceId !== "") return null;
+  const title = themeNormalizeTitle(item?.music?.name || item?.music_name || item?.title || "");
+  if (!title) return null;
+  return `title:${title}|${themeNormalizeTitle(item?.music?.artist || item?.artist || "")}:${difficulty}`;
 }
 
 function otogameTechnicalRating(constantTenths, item) {
@@ -1177,9 +1182,12 @@ function otogameConstantCandidates(item, kind, tolerance = 0) {
     if (!numeric(item.score) || !Number.isInteger(Number(item.score)) || Number(item.score) <= 500000 || Number(item.score) > 1010000 ||
         !["is_all_break", "is_full_combo", "is_full_bell"].every(key => typeof item[key] === "boolean")) return null;
   }
+  // 显示等级枚举：-1 是面板前端显示为“-”的未知等级（新歌尚未录入等级时出现），
+  // 此时不做等级核对，只靠 Rating 枚举；候选仍须唯一。其它越界值视为数据冲突。
   const rawLevel = item.music?.level_info?.level;
-  const level = numeric(rawLevel) && Number.isInteger(Number(rawLevel)) ? Number(rawLevel) : null;
-  if (rawLevel != null && (level === null || level < 0 || level > 24)) return [];
+  let level = numeric(rawLevel) && Number.isInteger(Number(rawLevel)) ? Number(rawLevel) : null;
+  if (level === -1) level = null;
+  else if (rawLevel != null && rawLevel !== "" && (level === null || level < 0 || level > 24)) return [];
   const displayLevel = level !== null && level >= 0 && level <= 24
     ? (level <= 7 ? String(level) : level % 2 === 0 ? `${level / 2 + 3}+` : String((level + 7) / 2)) : null;
   const candidates = [];
@@ -1238,8 +1246,8 @@ function mapThemeRatingItem(item, catalogIndex, remoteConstants = new Map()) {
     const reason = item.dataSource === "rinnet" ? "：缺少有效的 rinnet 服务器定数，请同时更新 QQ 入口与核心" : "：大饼数据无法唯一反推";
     throw new Error(`曲目“${title}”的 ${themeChartKey(difficultyId) || difficultyId} 定数未找到${reason}，已中止生成`);
   }
-  const coverId = music.music_id || item.resource_id || item.music_resource_id;
-  if (!coverId) throw new Error(`曲目“${title}”缺少曲绘资源 ID，已中止生成`);
+  // 缺少曲绘资源 ID 时（面板刚收录的新歌）用本地占位图，不让整张分表失败。
+  const coverId = music.music_id || item.resource_id || item.music_resource_id || "";
   return {
     title,
     artist,
@@ -1256,10 +1264,11 @@ function mapThemeRatingItem(item, catalogIndex, remoteConstants = new Map()) {
     jacketUrl: item.dataSource === "rinnet"
       ? internalSong ? levelScoreJacket(catalogIndex, { song: internalSong, songId: internalSong.id, difficultyId }, new Map())
         : songJacketPlaceholder(title, coverId)
-      : `${OTG_CDN_URL}/SDDT/cover/${encodeURIComponent(coverId)}.webp-thumbnail`,
+      : coverId ? `${OTG_CDN_URL}/SDDT/cover/${encodeURIComponent(coverId)}.webp-thumbnail`
+        : songJacketPlaceholder(title, "NEW"),
     // rinnet 没有曲绘哈希，只能退回曲库里的公网图（GitHub Pages）。拉不动时
     // 主题会换上这张本地生成的占位图，而不是让整张分表失败。
-    jacketFallbackUrl: songJacketPlaceholder(title, coverId),
+    jacketFallbackUrl: songJacketPlaceholder(title, coverId || "NEW"),
     // 曲库外的新歌用大饼资源哈希单独缓存，避免和本地歌曲 ID 混用。
     jacketCacheKey: !internalSong && item.dataSource !== "rinnet" && /^[a-f0-9]{32}$/i.test(String(coverId))
       ? `otogame-${coverId}` : null,

@@ -178,3 +178,31 @@ test("曲库外曲绘：按哈希下载一次，三榜共用缓存，拒绝不�
     assert.equal(app.collectJacketItems({ jacketCacheKey: "otogame-../../escape", jacketUrl: "https://example.com/a" }).length, 0);
   } finally { global.fetch = originalFetch; }
 });
+
+test("面板未录入等级（level -1）或缺少曲绘哈希的新歌仍可反推定数", () => {
+  // 构造数据，不代表“零号車輛”的实际成绩或定数。
+  const unknownLevel = { music_id: hash, name: "零号車輛", artist: "测试", level_info: { difficulty: 3, level: -1 } };
+  const data = build([row({ difficulty_id: 3, music: unknownLevel })],
+    [row({ difficulty_id: 3, rating: 2940, music: unknownLevel })],
+    [row({ difficulty_id: 3, rating: 625, music: unknownLevel })]);
+  for (const item of [data.best[0], data.new[0], data.platinum[0]]) {
+    assert.equal(item.constant, 12.5);
+    assert.equal(item.jacketCacheKey, "otogame-" + hash);
+  }
+  for (const music_id of [null, ""]) {
+    const noHash = { music_id, name: "零号車輛", artist: "测试", level_info: { difficulty: 3, level: -1 } };
+    const mapped = build([row({ difficulty_id: 3, music: noHash })], [], [row({ difficulty_id: 3, rating: 625, music: noHash })]);
+    for (const item of [mapped.best[0], mapped.platinum[0]]) {
+      assert.equal(item.constant, 12.5);
+      assert.equal(item.jacketCacheKey, null);
+      assert.match(item.jacketUrl, /^data:image\/svg\+xml;base64,/);
+    }
+  }
+  // 未知等级不放宽冲突检查：两榜矛盾仍然报错。
+  assert.throws(() => build([row({ difficulty_id: 3, music: unknownLevel })],
+    [], [row({ difficulty_id: 3, rating: 650, music: unknownLevel })]), /定数未找到/);
+  // 无哈希时按曲名区分，不与同难度其它曲目互借。
+  const other = { music_id: null, name: "另一首新歌", artist: "测试", level_info: { difficulty: 3, level: -1 } };
+  assert.throws(() => build([row({ difficulty_id: 3, music: { ...other, name: "零号車輛" } })],
+    [], [row({ difficulty_id: 3, rating: 0, music: other })]), /另一首新歌.*定数未找到/);
+});
