@@ -219,6 +219,12 @@ test('原创曲口径：要同时满足分类=オンゲキ 和 曲绘上有她',
  // 反过来，纯 logo/花纹的曲绘仍然不算原创曲：明里的 Memories of O.N.G.E.K.I. 就是 logo 图
  const akari=originalOf('星咲 あかり');
  for(const title of ['Memories of O.N.G.E.K.I.','RED to RED'])assert.ok(!akari.has(title),title);
+ // 合唱曲的署名里有、曲绘上没有的人只算演唱者：Memorial Soundtrack 的曲绘只画了对战相手
+ for(const [title,owner,guest] of [['いつか花咲くその前に','逢坂 茜','藍原 椿'],['スン(マイル)フラワー～Sun(Mile)Flower','日向 千夏','星咲 あかり']]){
+  assert.ok(originalOf(owner).has(title),title);
+  assert.ok(!originalOf(guest).has(title),title+' 不是'+guest+'的原创曲');
+  assert.ok(characters.characters.find(char=>char.name===guest).songs.some(song=>song.title===title&&song.role==='singer'),guest+' 仍是演唱者');
+ }
  // 检索侧：列表有上限，必须同时给出完整数量，别让模型把列出来的当成全部
  const result=lookup(loadKnowledge(__dirname),{character:'梨绪'});
  assert.equal(result.counts.original,result.original.length+result.originalTruncated);

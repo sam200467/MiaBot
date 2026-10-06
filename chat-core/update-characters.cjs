@@ -100,11 +100,19 @@ function main(){
     for(const match of String(song.artistName||"").matchAll(/([^／、]+?)\(CV[：:]\s*([^)]+)\)/g))
       item.cv[match[1].trim().replace(/[\[\]]/g,"")]=match[2].trim();
   }
-  // 曲绘上有没有她：有演唱者署名的曲子按「曲绘即演唱者」处理；没有署名的（155 首）看人工判定。
+  // 「曲绘即演唱者」的例外：合唱曲里不在曲绘上的演唱者。写错曲名或人名会悄悄不生效，所以直接报错。
+  const offJacket=new Map();
+  for(const [title,slugs] of Object.entries(notes.offJacketSingers?.songs||{})){
+    const item=songs.get(normalize(title)),names=slugs.map(slug=>SLUG[slug]);
+    if(!item||names.some(name=>!item.singers.has(name)))throw new Error("offJacketSingers 与曲库署名对不上："+title);
+    offJacket.set(normalize(title),new Set(names));
+  }
+  // 曲绘上有没有她：有演唱者署名的曲子按「曲绘即演唱者」处理（例外见 offJacketSingers）；没有署名的（155 首）看人工判定。
   // 判定只在「纯设计图/logo（design）」时才排除 —— 换了色调或战斗装的角色很容易被认成别人，
   // 实测过：梨绪的 MEGATON BLAST 重混版、淵底のグレイ・ユークロニア 都被我误判成外注插画。
   // 所以「像别人的插画（guest）」不再当作排除依据，只保留最保险的排除项。
   const onJacket=(item,name)=>{
+    if(offJacket.get(normalize(item.title))?.has(name))return false;
     const verdict=item.jacket;
     if(verdict===null)return item.singers.size>0||item.bosses.has(name);
     if(verdict==="design")return false;

@@ -94,6 +94,14 @@ test("角色曲：没说关系按原创曲，个人曲要明说；查询里的�
   assert.deepEqual([...titles].sort(), setsuna.songs.filter(s => s.original && catalogTitles.has(s.title)).map(s => s.title).sort());
 });
 
+test("合唱曲只算曲绘上那位的原创曲，另一位仍查得到演唱", () => {
+  // 线上截图：「蓝原椿的曲子里bpm最高的」答成了茜的《いつか花咲くその前に》，椿在那首里只是合唱
+  const top = executeQuery({ filters: [filter("originalFor", "eq", "椿")], select: ["title", "bpm"], sort: { field: "bpm", direction: "desc" }, selection: { kind: "first", count: 1 } });
+  assert.notEqual(top.entries[0].title, "いつか花咲くその前に");
+  const has = (field, who) => all({ filters: [filter(field, "eq", who)] }).some(e => e.title === "いつか花咲くその前に");
+  assert.ok(has("originalFor", "茜") && !has("originalFor", "椿") && has("singer", "椿"));
+});
+
 test("组合筛选针对同一张谱面；等级与定数分别比较", () => {
   const entries = all({ filters: [filter("difficulty", "eq", "MAS"), filter("level", "eq", "14"), filter("constant", "gte", 14.4), filter("constant", "lt", 14.7)] });
   assert.ok(entries.length > 0);

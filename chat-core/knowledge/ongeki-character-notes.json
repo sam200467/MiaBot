@@ -191,5 +191,17 @@
    "淵底のグレイ・ユークロニア",
    "MEGATON BLAST (tpz Overcute Remix)"
   ]
+ },
+ "offJacketSingers": {
+  "checkedAt": "2026-10-06",
+  "note": "有演唱者署名的曲子默认「曲绘即演唱者」，署名里的人都算原创曲。这里是例外：ONGEKI Memorial Soundtrack 的合唱曲，曲绘只画了对战相手一人，另一位演唱者不在图上。她仍记为演唱者，只是不算原创曲。起因是「蓝原椿的曲子里 BPM 最高的」答成了茜的《いつか花咲くその前に》。当天把 40 首多人原创曲的曲绘逐张对过，只列有把握的；レーイレーイ ～超絶最強アメちゃん Mix～ 上的黄色吉祥物认不出是不是柚子，按 uncertainResolved 的惯例不排除。",
+  "songs": {
+   "いつか花咲くその前に": [
+    "tsubaki"
+   ],
+   "スン(マイル)フラワー～Sun(Mile)Flower": [
+    "akari"
+   ]
+  }
  }
 }
