@@ -345,8 +345,7 @@ function createMiaBot(config, deps = {}) {
           settings, messages, queryState, querySelection, media: message.__media, signal, dispatcher, log,
           specs: commands ? [...core.CAPABILITY_SPECS, songSearch.SEARCH_SPEC] : [],
           targets: (message.__event?.mentionedOpenids || []).map(String).filter(id => id !== botOpenid),
-          validateAction: (action, userText) => action.name === "calculate" && commands?.hasInventedEnum(action.query, userText).length
-            ? "铃铛和连击还没说完整呢。告诉我铃铛是 none 还是 fb、连击是 none / fc / ab / ab-plus 吧。" : "",
+          validateAction: (action, userText) => (action.name === "calculate" && commands?.calculateRoutingProblem(action.query, userText)) || "",
           ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
         }),
       images: (message) => message.__media?.images || [],
@@ -373,18 +372,18 @@ function createMiaBot(config, deps = {}) {
           // fb / fc / ab / none 这些字样。拿模型给的标记去用户原话里找，
           // 找不到就是它自己补的 —— 拦下，让它回去问。
           //
-          // 只查这两个枚举，**不查数值**：定数和分数用户可能写成全角逗号、千分位、
-          // 「一万分」之类，逐字比对会误伤；而枚举用户几乎总是原样打出来。
-          // 代价不对称：多问一句只是烦，拿编来的参数算出一个像真的数才是错。
-          const invented = action.name === "calculate"
-            ? commands.hasInventedEnum(action.query, result?.validationText || message.content) : [];
-          if (invented.length) {
-            // 日志带上「编的是哪几个」和用户原话 —— 误拦的时候，没有这两样根本看不出
+          // 定数和技术分也要在原话里找得到（2026-10-08 起）：实测模型把「鸟加」编成了
+          // 1008999。全角、千分位、「100万」这些写法核对前都折算过，剩下读不懂的写法
+          // 代价只是多问一句 —— 多问一句只是烦，拿编来的参数算出一个像真的数才是错。
+          // 核过是用户说的之后，再查分数和灯打不打得出来（AB+ 只有 1010000 之类）。
+          const problem = action.name === "calculate"
+            ? commands.calculateRoutingProblem(action.query, result?.validationText || message.content) : "";
+          if (problem) {
+            // 日志带上判定结果和用户原话 —— 误拦的时候，没有这两样根本看不出
             // 是模型真编了，还是判据把它正常写的值当成了编的。
-            log("模型给 calculate 补了用户没说过的东西，已拦下｜查的=" + action.query +
-              "｜判为编的=" + invented.join(",") + "｜用户原话=" + String(message.content || "").slice(0, 60));
-            await send(e, "诶——？铃铛和连击你还没说呢，美亚不能替你猜呀。\n" +
-              "告诉美亚铃铛是 none 还是 fb、连击是 none / fc / ab / ab-plus，美亚马上给你算。");
+            log("calculate 参数没过程序侧核对，已拦下｜查的=" + action.query +
+              "｜原因=" + problem + "｜用户原话=" + String(message.content || "").slice(0, 60));
+            await send(e, problem);
             return { handled: true };
           }
           // 只认本条消息真的 @ 过的人：模型给别的编号一律作废、退回查自己。

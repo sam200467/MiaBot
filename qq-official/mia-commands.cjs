@@ -289,6 +289,12 @@ function createMiaCommands(options = {}) {
   // 「定数 14.2，技术分 1000737」切出来也是 4 段，但「定数」「技术分」是标签不是值，
   // 按段数算会把半套参数误判成齐的。（这条是测试里抓出来的。）
   function hasFullCalculateArgs(query) {
+    // 理论值把分数和两盏灯锁死了（技术分 1010000 ⇔ AB+，且必然 FB）：给了 1010000 或 AB+，
+    // 剩下的项都推得出来。对不上的组合（AB+ 配 1000000 之类）也要放给核心去报矛盾，
+    // 不能拿「四样不齐」把一句写错的话挡回去 —— 用户该知道的是哪里不可能，不是格式。
+    const parsed = core.parseCalculateQuery(query);
+    if (parsed.constant !== null && (parsed.score === core.THEORETICAL_SCORE
+        || core.calculateMarkConflict(parsed.score, parsed.bell, parsed.combo))) return true;
     const q = String(query || "").replace(/(\d)[,，](\d)/g, "$1$2");
     const numbers = (q.match(/\d+(?:\.\d+)?/g) || []).length;   // 定数 + 技术分
     if (numbers < 2) return false;
@@ -326,6 +332,12 @@ function createMiaCommands(options = {}) {
       CALC_ENUM_SYNONYMS[key].some((word) => source.includes(word))));
   }
 
+  // 原话里说到理论值的痕迹：理论值本身、1010000 这个数、AB+（AB+ ⇔ 1010000）。
+  // 只在模型给的分数正好是 1010000 时才看它，所以「理论上 14.2 打 1000737」这类不会被误放。
+  const THEORETICAL_TRACE = /理[论論]|1010000|101万|101w|ab\s*\+|ab[\s-]?plus/i;
+  const mentionsTheoretical = (userText) =>
+    THEORETICAL_TRACE.test(String(userText || "").normalize("NFKC").replace(/(\d)[,，](\d)/g, "$1$2"));
+
   function hasInventedEnum(query, userText) {
     const q = String(query || "");
     // 只看**真正决定结果**的那两个值，不是模型顺手写的所有标记。
@@ -338,7 +350,51 @@ function createMiaCommands(options = {}) {
       : /\bab\b/i.test(q) ? "ab"
       : /\bfc\b/i.test(q) ? "fc" : "none";
     const described = describedEnums(userText);
+    // 理论值锁死的两盏灯不算编的：用户说「打了理论值」，FB 和 AB+ 是从分数推出来的。
+    // 但分数本身得在原话里有出处 —— 模型把「鸟加」错认成 1010000 再顺手补两盏灯，照样要拦。
+    if (core.parseCalculateQuery(q).score === core.THEORETICAL_SCORE && mentionsTheoretical(userText)) {
+      described.add("fb");
+      described.add("ab-plus");
+    }
     return [bell, combo].filter((value) => !described.has(value));
+  }
+
+  // 用户原话里写出来的数。全角、千分位、「100万 / 100w / 1007.5k」都折算成同一个数。
+  // 千分位只认「逗号后正好三位」，免得把「14.2,1000737」这种逗号分隔的两项粘成一个数。
+  // 带单位的数原值也留着：「1000737 with fb」里的 w 不是「万」。
+  function writtenNumbers(text) {
+    const source = String(text || "").normalize("NFKC").replace(/(\d)[,，](?=\d{3}(?!\d))/g, "$1");
+    return [...source.matchAll(/(\d+(?:\.\d+)?)\s*([万wWkK])?/g)].flatMap(([, digits, unit]) => {
+      const value = Number(digits);
+      return unit ? [value, Math.round(value * (/[kK]/.test(unit) ? 1000 : 10000))] : [value];
+    });
+  }
+
+  // 模型给的定数和技术分，原话里得真写过。实测（2026-10-08，deepseek-flash）：用户只说
+  // 「14.2打了个鸟加，fb」，模型自己编了个 1008999 配 AB+。/计算 的结果里不显示分数，
+  // 这种数要是算出来，用户根本看不出是估的。唯一的例外是理论值：说了「理论值 / AB+」，
+  // 1010000 就是推出来的。（以前这里只查枚举、不查数值，怕全角和千分位误伤；那几种写法
+  // 上面都折算了，剩下读不懂的写法 —— 比如汉字数字 —— 代价只是多问一句。）
+  function inventedCalculateNumbers(query, userText) {
+    const parsed = core.parseCalculateQuery(query);
+    const written = writtenNumbers(userText);
+    const said = (value) => written.some((number) => Math.abs(number - value) < 1e-9);
+    return [
+      parsed.constant !== null && !said(parsed.constant) && "定数",
+      parsed.score !== null && !said(parsed.score)
+        && !(parsed.score === core.THEORETICAL_SCORE && mentionsTheoretical(userText)) && "技术分",
+    ].filter(Boolean);
+  }
+
+  // 闲聊路径上模型给的 /计算 参数，对着用户原话和游戏规则核一遍：有问题返回要回给用户的话，
+  // 没问题返回空串。顺序有讲究 —— 先查是不是编的，再查打不打得出来：拿模型编的数去报矛盾，
+  // 用户只会看到一句「1008999 分配不上 AB+」，可这两样用户一个字都没说过。
+  function calculateRoutingProblem(query, userText) {
+    const numbers = inventedCalculateNumbers(query, userText);
+    if (numbers.length) return T.calculateInventedNumber(numbers);
+    if (hasInventedEnum(query, userText).length) return T.calculateInventedMarks;
+    const parsed = core.parseCalculateQuery(query);
+    return core.calculateMarkConflict(parsed.score, parsed.bell, parsed.combo);
   }
 
   async function runCapability(event, name, query, chatLine = "", target = null) {
@@ -690,7 +746,7 @@ function createMiaCommands(options = {}) {
   return {
     COMMANDS, ALIASES, LOOKUP, parseCommand,
     handleCommand, continueSession, handleBind, handleUnbind,
-    getSession, sessionMatches, expireSessionFor, runCapability, hasInventedEnum,
+    getSession, sessionMatches, expireSessionFor, runCapability, hasInventedEnum, calculateRoutingProblem,
     claimEvent, messageKey,
     statusText, registerCore,
     aliasDeleteOpenids,

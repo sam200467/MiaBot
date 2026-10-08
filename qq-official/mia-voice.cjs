@@ -133,6 +133,11 @@ const MIA_TEMPLATES = Object.freeze({
   calculateIncomplete:
     "诶——？还缺东西呀。算 Rating 要定数、技术分、铃铛、连击，四样都得有。\n" +
     "少一样就会算歪，美亚才不要拿错答案糊弄你呢。",
+  // 闲聊里模型给的 /计算 参数，用户原话里找不到出处（多半是它替用户估的）。
+  calculateInventedNumber: (fields) => fields.join("和") + "要你报具体数字才行呢（比如 " +
+    fields.map((field) => (field === "定数" ? "14.2" : "1007500")).join("、") + "）。" +
+    (fields.includes("技术分") ? "鸟加、SSS 这种评级" : "14+ 这种等级") + "只是一段区间，美亚不替你估。",
+  calculateInventedMarks: "铃铛和连击还没说完整呢。告诉我铃铛是 none 还是 fb、连击是 none / fc / ab / ab-plus 吧。",
 
   // — 图片任务 —
   jobAccepted: [

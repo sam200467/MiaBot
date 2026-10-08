@@ -24,6 +24,11 @@ const cases = [
   ["队列里还剩几个任务", "status"],
   ["算一下14.2打1000737的rating", "clarify"],
   ["14.2，1000737，铃铛fb，连击fc，算rating", "calculate", "fb"],
+  // 理论值 1010000 ⇔ AB+，且必然 FB：给出其中一样就是唯一结果
+  ["我打了14.2的理论值，以及full bell，单曲rating是多少", "calculate", "14.2 1010000 fb ab-plus"],
+  ["定数14.2的谱面我AB+了，单曲rating多少", "calculate", "14.2 1010000 fb ab-plus"],
+  ["14.2打了1000000，fb，ab+，帮我算rating", "clarify"],
+  ["14.2打了个鸟加，fb，帮我算下rating", "clarify"],
   ["帮我查一下他的单曲成绩", "clarify"],
   ["那首的成绩也看看", "song", "サドマミホリック", [
     { role: "user", content: "搜索サドマミホリック" }, { role: "assistant", content: "《サドマミホリック》 MAS 13.5" }]],
@@ -40,7 +45,7 @@ async function main() {
     for (const [text, expected, queryPart, history = []] of cases) {
       const start = Date.now();
       const result = await routeIntent({ settings: bot.settings, specs, messages: [...history, { role: "user", content: text }], signal: AbortSignal.timeout(30000),
-        validateAction: (action, userText) => action.name === "calculate" && bot.commands.hasInventedEnum(action.query, userText).length ? "请补充铃铛和连击" : "" });
+        validateAction: (action, userText) => (action.name === "calculate" && bot.commands.calculateRoutingProblem(action.query, userText)) || "" });
       const actual = result?.action?.name || (result ? "clarify" : "chat");
       const passed = actual === expected && (!queryPart || result?.action?.query?.toLowerCase().includes(queryPart.toLowerCase()));
       results.push({ text, expected, actual, query: result?.action?.query, passed, ms: Date.now() - start });

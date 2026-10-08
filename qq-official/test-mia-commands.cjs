@@ -445,7 +445,7 @@ test("Rating 计算：闲聊路径同样不放行半套参数", async () => {
     // 四样齐（空格或竖线分隔）都要放行。
     // ⚠ 不用逗号做分隔：核心的预处理会把「2,1」当千分位合并成「14.21000737」，
     // 核自己也拒绝那种写法，闸门跟它保持一致就行。
-    for (const query of ["14.2 1000737 fb none", "14.2|1000737|fb|fc", "14.2 1000737 ab-plus none"]) {
+    for (const query of ["14.2 1000737 fb none", "14.2|1000737|fb|fc", "14.2 1010000 fb ab-plus"]) {
       sent.length = 0;
       await commands.runCapability(c2cEvent("x"), "calculate", query);
       assert.match(sent.map((s) => s.text).join("\n"), /基础分/,
@@ -467,6 +467,7 @@ test("模型编的铃铛/连击要能识别出来", async () => {
   // 用户说了 → 放行。⚠ 判据不能是逐字相等：模型会把话**规范化**
   // （「没有」→none、「ab+」→ab-plus、「全连」→fc），逐字比会把这些正常翻译误拦成编的。
   assert.equal(invented("14.2 1000737 fb fc", "14.2 打 1000737，铃铛 fb，连击 fc"), false);
+  // （这组值本身打不出来 —— AB+ 只有 1010000 —— 但这道闸只管「用户说没说过」，矛盾由核心去报）
   assert.equal(invented("14.2 1000737 ab-plus none", "14.2 打 1000737，连击 ab+，铃铛没有"), false);
   assert.equal(invented("14.2 1000737 none none", "14.2 打 1000737，铃铛和连击都没有"), false);
   assert.equal(invented("14.2 1000737 fc none", "14.2 打 1000737，全连，铃铛没开"), false);
@@ -478,6 +479,72 @@ test("模型编的铃铛/连击要能识别出来", async () => {
   // 模型多塞的无害值不该算它编的：实测用户说「铃铛 fb，连击 fc」时模型传的是
   // `14.2 1000737 none fb fc`，那个多出来的 none 核心会忽略，判成「编的」会误拦正常请求。
   assert.equal(invented("14.2 1000737 none fb fc", "算一下 14.2 打 1000737，铃铛 fb，连击 fc"), false);
+
+  // 理论值锁死的两盏灯是推出来的，不是编的。群里实测：「我打了14.2的理论值，以及full bell」
+  // 能算出唯一结果，却被追问连击。
+  assert.equal(invented("14.2 1010000 fb ab-plus", "我打了14.2的理论值，以及full bell，单曲rating是多少"), false);
+  assert.equal(invented("14.2 1010000 fb ab-plus", "14.2 那首打了个理論値"), false);
+  assert.equal(invented("14.2 1010000 fb ab-plus", "14.2 打了 1,010,000 分"), false);
+  assert.equal(invented("14.2 1010000 fb ab-plus", "14.2 那首 AB+ 了，单曲多少"), false, "AB+ 就是理论值，FB 跟着来");
+  // 但分数本身得在原话里有出处：模型把「鸟加」错认成 1010000 再顺手补两盏灯，照样拦
+  assert.equal(invented("14.2 1010000 fb ab-plus", "14.2 打了个鸟加，单曲多少"), true);
+  // 分数不是 1010000 时，「理论」二字推不出任何灯
+  assert.equal(invented("14.2 1000737 fb fc", "理论上 14.2 打 1000737 全连能有多少"), true);
+});
+
+test("闲聊 /计算 参数核对：先查是不是编的，再查打不打得出来", () => {
+  const { commands } = setup();
+  const problem = (q, src) => commands.calculateRoutingProblem(q, src);
+
+  // 群里的两句原话（模型实际给的 query）
+  assert.equal(problem("14.2 1010000 fb ab-plus", "我打了14.2的理论值，以及full bell，单曲rating是多少"), "");
+  assert.match(problem("14.2 1000000 fb ab-plus", "14.2打了1000000，fb，ab+，帮我算rating"), /AB\+ 只在技术分正好 1010000/);
+
+  // 实测：用户只说「鸟加」，模型编了 1008999 配 AB+。要问分数，绝不能拿编的数去报矛盾
+  const bird = problem("14.2 1008999 fb ab-plus", "14.2打了个鸟加，fb，帮我算下rating");
+  assert.match(bird, /技术分要你报具体数字/);
+  assert.doesNotMatch(bird, /1008999|AB\+ 只在/);
+  // 定数也一样：只给了曲名，模型自己记的定数不算数
+  assert.match(problem("14.2 1010000 fb ab-plus", "id870 紫谱打了理论值，单曲多少"), /^定数要你报具体数字/);
+  assert.match(problem("14.7 1000737 fb fc", "14+ 的歌打了 1000737，fb，fc"), /^定数要你报具体数字.*14\+ 这种等级/);
+
+  // 数字的各种写法都要认得：全角、千分位、逗号分隔、万 / w / k
+  for (const src of ["14.2 打了 1000737，fb，fc", "１４．２ 打了 １０００７３７ fb fc", "14.2 打了 1,000,737 fb fc",
+    "14.2,1000737,fb,fc", "14.2 打了100.0737万 fb fc", "14.2 打了 100.0737w fb fc", "14.2, 1000737 with fb and fc"]) {
+    assert.equal(problem("14.2 1000737 fb fc", src), "", src);
+  }
+  assert.equal(problem("14.2 1007500 fb fc", "14.2 打了 1007.5k，fb，fc"), "");
+  // 读不懂的写法只会多问一句，不会算错
+  assert.match(problem("14.2 1000737 fb fc", "14.2 打了一百万零七百三十七 fb fc"), /技术分/);
+  // 理论值的出处：理论值 / 1010000 / AB+ 都算
+  assert.equal(problem("14.2 1010000 fb ab-plus", "14.2 那首 AB+ 了，单曲多少"), "");
+  assert.equal(problem("14.2 1010000 fb ab-plus", "14.2 打了 101万"), "");
+});
+
+test("Rating 计算：理论值自带 FB 和 AB+，打不出来的组合要报出来", async () => {
+  await run({}, {}, async ({ commands, sent }) => {
+    const reply = async (line) => {
+      sent.length = 0;
+      await commands.handleCommand(groupEvent(line), parseCommand(line));
+      return sent.map((s) => s.text).join("\n");
+    };
+    // 1010000 就是 AB+ 且 FB，不用再报两盏灯；写「理论值」三个字也一样
+    assert.match(await reply("/计算 14.2 1010000"), /连击 0\.35（AB\+）= 16\.90/);
+    assert.match(await reply("/计算 14.2 理论值"), /连击 0\.35（AB\+）= 16\.90/);
+    // 群里实测：AB+ 却只有 1000000，照样硬算出 16.05。这种数在游戏里打不出来
+    for (const [line, reason] of [
+      ["/计算 14.2 1000000 fb ab-plus", /AB\+ 只在技术分正好 1010000/],
+      ["/计算 14.2 1000000 ab-plus", /AB\+ 只在技术分正好 1010000/],
+      ["/计算 14.2 1010000 none none", /是理论值/],
+      ["/计算 14.2 1010000 fb fc", /是理论值/],
+    ]) {
+      const text = await reply(line);
+      assert.ok(!/基础分/.test(text), line + " 不该算出 Rating（实际：" + text.slice(0, 60) + "）");
+      assert.match(text, reason, line + " 要说清哪里不可能，而不是只回格式");
+    }
+    // 不能锁死的照旧：普通分数少一盏灯还是要四样齐
+    assert.doesNotMatch(await reply("/计算 14.2 1009990 fb"), /基础分/);
+  });
 });
 
 // ── 幂等闸 ──────────────────────────────────────────────────────────

@@ -21,6 +21,25 @@ assert.equal(example.text, "基础分 15.49 + 成绩加成 0.2（SSS）+ 铃铛 
 assert.equal(core.calculateSingleRating(14.2, 1010000, "fb", "ab-plus").result, "16.90");
 assert.throws(() => core.calculateSingleRating(14.25, 1000000, "none", "none"), /谱面定数/);
 
+// 理论值锁死两盏灯：AB+ ⇔ 1010000，且 1010000 ⇒ FB。打不出来的组合不许硬算出一个数。
+assert.throws(() => core.calculateSingleRating(14.2, 1000000, "fb", "ab-plus"), /AB\+ 只在技术分正好 1010000/, "AB+ 却只有 1000000");
+assert.throws(() => core.calculateSingleRating(14.2, 1009990, "fb", "ab-plus"), /AB\+/, "差 10 分（被弹一次）就不是 AB+ 了");
+for (const [bell, combo] of [["fb", "ab"], ["fb", "fc"], ["fb", "none"], ["none", "ab-plus"], ["none", "none"]]) {
+  assert.throws(() => core.calculateSingleRating(14.2, 1010000, bell, combo), /是理论值/, "1010000 配 " + bell + "/" + combo);
+}
+// 除此之外不拦：灯和分数的其余约束都看谱面，而且灯和最高分不必出自同一局
+assert.equal(core.calculateSingleRating(14.2, 1009990, "fb", "ab").result, "16.84", "被弹一次：AB + FB 照样成立");
+assert.equal(core.calculateSingleRating(14.2, 950000, "fb", "none").result, "13.10", "FB 不看判定");
+assert.equal(core.calculateSingleRating(14.2, 960000, "none", "ab").result, "13.92", "AB 不看铃铛");
+
+// 推导只补理论值锁死的项，别的缺项原样留 null
+assert.deepEqual(core.inferCalculateMarks({ score: 1010000 }), { score: 1010000, bell: "fb", combo: "ab-plus" });
+assert.deepEqual(core.inferCalculateMarks({ combo: "ab-plus" }), { score: 1010000, bell: "fb", combo: "ab-plus" });
+assert.deepEqual(core.inferCalculateMarks({ score: 1000737, combo: "ab" }), { score: 1000737, bell: null, combo: "ab" });
+assert.deepEqual(core.inferCalculateMarks({ score: 1010000, bell: "none" }), { score: 1010000, bell: "none", combo: "ab-plus" },
+  "说了的值不改，矛盾留给 calculateMarkConflict 报");
+assert.equal(core.calculateMarkConflict(null, "fb", "ab-plus"), "", "分数没说就还判断不了");
+
 // 简繁检索互通
 assert.ok(core.searchSongs("愛").length > 0);
 assert.deepEqual(core.searchSongs("愛"), core.searchSongs("爱"));
@@ -132,13 +151,33 @@ assert.equal(core.selectBinding({ email: "o@x", password: "p" }).dataSource, "ot
   assert.equal((await core.resolveCapability({}, "free", "chartinfo", "id870")).kind, "text");
 
   // 算 Rating 不吃位置，自然语序也认；两种写法必须算出同一个结果
-  const positional = await core.resolveCapability({}, "free", "calculate", "14.2 1000737 fb none");
-  const natural = await core.resolveCapability({}, "free", "calculate", "定数14.2，技术分1000737，铃铛fb，连击ab+");
-  assert.equal(positional.text, "基础分 15.49 + 成绩加成 0.2（SSS）+ 铃铛 0.05（FB）+ 连击 0（无）= 15.74");
-  assert.equal(natural.text, "基础分 15.49 + 成绩加成 0.2（SSS）+ 铃铛 0.05（FB）+ 连击 0.35（AB+）= 16.09");
+  const positional = await core.resolveCapability({}, "free", "calculate", "14.2 1000737 fb ab");
+  const natural = await core.resolveCapability({}, "free", "calculate", "定数14.2，技术分1000737，铃铛fb，连击ab");
+  assert.equal(positional.text, "基础分 15.49 + 成绩加成 0.2（SSS）+ 铃铛 0.05（FB）+ 连击 0.3（AB）= 16.04");
+  assert.equal(natural.text, positional.text);
+  assert.equal((await core.resolveCapability({}, "free", "calculate", "14.2 1000737 fb none")).text,
+    "基础分 15.49 + 成绩加成 0.2（SSS）+ 铃铛 0.05（FB）+ 连击 0（无）= 15.74");
   // ab-plus 是帮助文案和语义路由给的写法；曾被 \bab\b 抢先命中、按 AB 少算 0.05
   for (const spelling of ["ab-plus", "abplus", "ab plus", "AB+"]) {
-    assert.match((await core.resolveCapability({}, "free", "calculate", "14.2 1000737 fb " + spelling)).text, /连击 0\.35（AB\+）= 16\.09$/, spelling);
+    assert.match((await core.resolveCapability({}, "free", "calculate", "14.2 1010000 fb " + spelling)).text, /连击 0\.35（AB\+）= 16\.90$/, spelling);
+  }
+  assert.match((await core.resolveCapability({}, "free", "calculate", "定数14.2，技术分1,010,000，铃铛fb，连击ab+")).text, /= 16\.90$/);
+  // 理论值自带 FB 和 AB+：只给 1010000、或只给 AB+，都是唯一结果
+  const theoretical = "基础分 16.20 + 成绩加成 0.3（SSS+）+ 铃铛 0.05（FB）+ 连击 0.35（AB+）= 16.90";
+  for (const query of ["14.2 1010000", "14.2 1010000 fb", "14.2 ab+", "定数 14.2，连击 AB+", "14.2 理论值", "14.2 理論値 fb"]) {
+    assert.equal((await core.resolveCapability({}, "free", "calculate", query)).text, theoretical, query);
+  }
+  // 打不出来的组合要说清哪里不可能，不能硬算（群里实测：/计算 14.2 1000000 fb ab-plus 照样给了 16.05）
+  for (const [query, reason] of [
+    ["14.2 1000000 fb ab-plus", /AB\+ 只在技术分正好 1010000/],
+    ["14.2 1010000 fb none", /是理论值/],
+    ["14.2 1010000 none ab-plus", /是理论值/],
+    ["14.2 1010000 fb ab", /是理论值/],
+    ["14.2 none ab+", /是理论值/],
+  ]) {
+    const reply = (await core.resolveCapability({}, "free", "calculate", query)).text;
+    assert.doesNotMatch(reply, /基础分/, query + " 不该算出 Rating");
+    assert.match(reply, reason, query);
   }
   // 只说「这歌我打了 1000737 分」也能算：铃铛和连击按「无」算，结果里明写出来
   assert.equal((await core.resolveCapability({}, "free", "calculate", "14.2 这歌我打了 1000737 分")).text,

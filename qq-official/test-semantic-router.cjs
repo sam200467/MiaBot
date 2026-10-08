@@ -13,6 +13,48 @@ test("结构校验：拒绝未知工具、空参数和陌生对象", () => {
   assert.equal(validateDecision({ route: "action", action: { name: "calculate", args: { constant: 14.2, score: 1000737, bell: "fb", combo: "fc" } } }, specs).action.query, "14.2 1000737 fb fc");
 });
 
+test("calculate：理论值锁死的灯由程序补齐，缺什么只点名什么", () => {
+  const calc = (args) => validateDecision({ route: "action", action: { name: "calculate", args } }, specs);
+  // 群里实测：「我打了14.2的理论值，以及full bell」—— 模型把 combo 留成 null，被打回追问。
+  // 技术分 1010000 ⇔ AB+，且必然 FB，三样给出任意一样就是唯一结果。
+  for (const args of [
+    { constant: 14.2, score: 1010000, bell: "fb", combo: null },
+    { constant: 14.2, score: 1010000, bell: null, combo: null },
+    { constant: 14.2, score: null, bell: null, combo: "ab-plus" },
+    { constant: 14.2, score: 1010000, bell: "full bell", combo: "AB+" },   // 不认得的写法当没说，照样补得出
+  ]) {
+    assert.equal(calc(args).action?.query, "14.2 1010000 fb ab-plus", JSON.stringify(args));
+  }
+  // 齐了的矛盾组合原样放行：这里还分不清那些值是用户说的还是模型编的，
+  // 矛盾由宿主的 validateAction 在核过出处之后再报（见 test-mia-commands / test-mia-entry）
+  assert.equal(calc({ constant: 14.2, score: 1000000, bell: "fb", combo: "ab-plus" }).action?.query, "14.2 1000000 fb ab-plus");
+  assert.equal(calc({ constant: 14.2, score: 1010000, bell: "none", combo: null }).action?.query, "14.2 1010000 none ab-plus",
+    "说了的值不改，只补没说的");
+  assert.match(calc({ constant: 14.2, score: 1000000, bell: null, combo: "ab-plus" }).text, /还差铃铛/);
+  // 锁不死的照旧追问，并且只点名真正缺的那样
+  const missing = calc({ constant: 14.2, score: 1000737, bell: "fb", combo: null });
+  assert.ok(!missing.action);
+  assert.match(missing.text, /还差连击/);
+  assert.doesNotMatch(missing.text, /铃铛|技术分|定数/);
+  assert.match(calc({ constant: 14.2, score: null, bell: "fb", combo: "fc" }).text, /还差技术分/);
+});
+
+test("calculate：模型把参数写进 query 字符串也认，规则跟 args 一样", () => {
+  // 实测（2026-10-08，deepseek-flash）：提示词要 args，模型几乎总写 query。只认 args 时
+  // 四项全当没说，连「14.2，1000737，铃铛fb，连击fc」都被打回「还需要定数、技术分……」。
+  const calc = (query) => validateDecision({ route: "action", action: { name: "calculate", query } }, specs);
+  assert.equal(calc("14.2 1010000 fb ab-plus").action?.query, "14.2 1010000 fb ab-plus");
+  assert.equal(calc("14.2 1000737 fb fc").action?.query, "14.2 1000737 fb fc");
+  assert.equal(calc("constant=14.2 score=1000737 bell=none combo=ab").action?.query, "14.2 1000737 none ab");
+  assert.equal(calc("14.2 1010000 fb").action?.query, "14.2 1010000 fb ab-plus", "理论值照样补灯");
+  assert.equal(calc("constant=14.2 score=1000000 bell=fb combo=ab-plus").action?.query, "14.2 1000000 fb ab-plus");
+  assert.match(calc("14.2 1000737 fb").text, /还差连击/);
+  assert.match(calc("14.2 1000737 fb null").text, /还差连击/, "模型写 null 就是没说");
+  // 两种都给时以结构化的 args 为准
+  assert.equal(validateDecision({ route: "action", action: { name: "calculate", query: "14.2 1000737 fb fc",
+    args: { constant: 14.2, score: 1000737, bell: "fb", combo: null } } }, specs).action, undefined);
+});
+
 test("plate 空参数是合法的：程序会列出全部版本牌子", () => {
   // 版本名是静态公共资料，说不出版本名时程序会把 11 个版本列出来。原先 plate 和
   // 其他工具一起被「空参数就打回追问」挡住，于是闲聊问「总共有哪些牌子可以拿」
@@ -62,6 +104,13 @@ function scriptedRoute(decisions) {
     return { ok: true, text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(decision) } }] }) };
   } };
 }
+test("calculate：说「理论值」就能算，这条写进了路由提示词", async () => {
+  const model = scriptedRoute([{ route: "action", action: { name: "calculate", args: { constant: 14.2, score: 1010000, bell: "fb", combo: null } } }]);
+  const result = await routeIntent({ settings, specs, messages: [{ role: "user", content: "我打了14.2的理论值，以及full bell，单曲rating是多少" }], fetchImpl: model.fetchImpl });
+  assert.equal(result.action.query, "14.2 1010000 fb ab-plus");
+  assert.match(model.calls[0].messages[0].content, /理论值（理論値）就是技术分 1010000，它与 AB\+ 互为充要条件且必然 FB/,
+    "模型得先知道理论值就是 1010000，否则连分数都填不出来");
+});
 test("复核修正模型丢失的开头条件；不能让旧 songsearch 绕过复核", async () => {
   const model = scriptedRoute([{ route: "action", action: { name: "songsearch", query: "ai" } }, queryDecision("title", "prefix", "ai")]);
   const result = await routeIntent({ settings, specs, messages: [{ role: "user", content: "ai开头的歌有哪些" }], fetchImpl: model.fetchImpl });

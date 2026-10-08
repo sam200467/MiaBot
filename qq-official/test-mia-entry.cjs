@@ -40,7 +40,7 @@ function fakeModel(reply = "喵哼哼，收到啦！", expressionIds = [], actio
     const body = JSON.parse(options.body);
     if (body.messages[0].content.includes("MIA_SEMANTIC_ROUTER_V1")) {
       routeCalls.push(body);
-      const routedAction = action?.name === "calculate" ? { ...action, args: { constant: 14.2, score: 1000737, bell: "fb", combo: "fc" } } : action;
+      const routedAction = action?.name === "calculate" ? { ...action, args: "args" in action ? action.args : { constant: 14.2, score: 1000737, bell: "fb", combo: "fc" } } : action;
       const decision = action?.name === "songsearch"
         ? { route: "query", query: { filters: [{ field: "title", op: /开头/.test(body.messages.at(-1).content) ? "prefix" : "search", value: action.query }], select: ["title", "constant"] } }
         : action ? { route: "action", action: routedAction } : { route: "chat" };
@@ -639,6 +639,63 @@ test("聊天里模型自己补的铃铛/连击：拦下，绝不拿它去算", a
     const text = sentText(mock);
     assert.ok(!/基础分/.test(text), "绝不能算出 Rating（实际：" + text.slice(0, 80) + "）");
     assert.match(text, /铃铛和连击/, "要回去问缺的那两样");
+    await bot.stop(); await mock.stop();
+  } finally { restore(); }
+});
+
+test("聊天里说「理论值」：两盏灯是推出来的，直接算出唯一结果", async () => {
+  // 群里实测：「我打了14.2的理论值，以及full bell，单曲rating是多少」被回成
+  // 「算 Rating 还需要定数、技术分、铃铛和连击」。理论值 1010000 ⇔ AB+，且必然 FB，
+  // 这句话已经够算了。模型的两种输出形状都要能算：照提示词把没说的 combo 留成 null 的 args，
+  // 以及线上 deepseek-flash 实际给的 query 字符串（它根本不写 args）。
+  for (const action of [
+    { name: "calculate", args: { constant: 14.2, score: 1010000, bell: "fb", combo: null } },
+    { name: "calculate", query: "14.2 1010000 fb ab-plus", args: undefined },
+  ]) {
+    const restore = stubCore();
+    try {
+      const { mock, bot } = await setup({}, { reply: "好嘞", action });
+      mock.push("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "我打了14.2的理论值，以及full bell，单曲rating是多少" }));
+      assert.ok(await mock.waitFor(() => /基础分/.test(sentText(mock))), "应当算出来（实际：" + sentText(mock).slice(0, 80) + "）");
+      assert.match(sentText(mock), /成绩加成 0\.3（SSS\+）\+ 铃铛 0\.05（FB）\+ 连击 0\.35（AB\+）= 16\.90/);
+      await bot.stop(); await mock.stop();
+    } finally { restore(); }
+  }
+});
+
+test("聊天里给了打不出来的组合：说清哪里不可能，不硬算", async () => {
+  const restore = stubCore();
+  try {
+    const { mock, bot } = await setup({}, {
+      reply: "好嘞",
+      action: { name: "calculate", args: { constant: 14.2, score: 1000000, bell: "fb", combo: "ab-plus" } },
+    });
+    mock.push("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "14.2 打了 1000000，fb，ab+，算下单曲 rating" }));
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > 0));
+    await new Promise((r) => setTimeout(r, 300));
+    const text = sentText(mock);
+    assert.ok(!/基础分/.test(text), "AB+ 配 1000000 不能算出 Rating（实际：" + text.slice(0, 80) + "）");
+    assert.match(text, /AB\+ 只在技术分正好 1010000/);
+    await bot.stop(); await mock.stop();
+  } finally { restore(); }
+});
+
+test("聊天里模型替用户估了分数：问分数，不拿编的数去算也不拿它报矛盾", async () => {
+  // 实测（2026-10-08，deepseek-flash）：「14.2打了个鸟加，fb」→ 模型给了 "14.2 1008999 fb ab-plus"。
+  // /计算 的结果不显示分数，真算出来用户看不出是估的；先报矛盾又会冒出两样用户没说过的东西。
+  const restore = stubCore();
+  try {
+    const { mock, bot } = await setup({}, {
+      reply: "好嘞",
+      action: { name: "calculate", query: "14.2 1008999 fb ab-plus", args: undefined },
+    });
+    mock.push("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "14.2打了个鸟加，fb，帮我算下rating" }));
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > 0));
+    await new Promise((r) => setTimeout(r, 300));
+    const text = sentText(mock);
+    assert.ok(!/基础分/.test(text), "不能拿编的分数算（实际：" + text.slice(0, 80) + "）");
+    assert.match(text, /技术分要你报具体数字/);
+    assert.doesNotMatch(text, /1008999/);
     await bot.stop(); await mock.stop();
   } finally { restore(); }
 });

@@ -356,16 +356,76 @@ function calculateBaseRating(chartConstant, score) {
   return 0;
 }
 
+// 技术分理论值。AB+ 的达成条件就是「技术分打到 1010000」，而这个分数只有一种打法：
+// 音符全 CRITICAL BREAK（950000）＋铃铛全取（60000）＋零被弹（每被弹一次扣 10）。
+// 所以 AB+ ⇔ 1010000，且 1010000 ⇒ FB —— 这是分数和灯之间唯一不看谱面就成立的关系。
+// 别的都拦不得：FC / AB 只看音符判定，FB 只看铃铛，三者都不管被弹；算 Rating 用的灯和
+// 最高分也不必出自同一局。其余的分数下限都取决于具体谱面的物量、铃铛数和弹幕数，
+// 这里不知道是哪张谱，硬拦会误伤。（规则出处：wikiwiki.jp/gameongeki 的
+// 「ゲームシステム」和「レーティングシステム」两页。）
+const THEORETICAL_SCORE = 1010000;
+
+// 用理论值补出没说的那几项：分数是 1010000 → FB + AB+；连击是 AB+ → 分数 1010000 + FB。
+// null 表示没说。只补这条关系锁死的值，别的缺项原样留 null，由调用方决定追问还是按「无」算。
+function inferCalculateMarks({ score = null, bell = null, combo = null } = {}) {
+  if (score == null && combo === "ab-plus") score = THEORETICAL_SCORE;
+  if (score === THEORETICAL_SCORE) {
+    bell = bell ?? "fb";
+    combo = combo ?? "ab-plus";
+  }
+  return { score, bell, combo };
+}
+
+// 分数和灯对不上时返回一句说明；对得上、或者信息还不全判断不了，返回空串。null 当「没说」。
+function calculateMarkConflict(score, bellMark, comboMark) {
+  if (comboMark === "ab-plus" && score != null && score !== THEORETICAL_SCORE) {
+    return "AB+ 只在技术分正好 " + THEORETICAL_SCORE + "（理论值）时出现：要全 CRITICAL BREAK、铃铛全取、零被弹。" +
+      score + " 分配不上 AB+，连击请按实际选 none / fc / ab。";
+  }
+  if (score === THEORETICAL_SCORE &&
+      ((bellMark != null && bellMark !== "fb") || (comboMark != null && comboMark !== "ab-plus"))) {
+    return "技术分 " + THEORETICAL_SCORE + " 是理论值，打出来就必然同时拿到 AB+ 和 FB；铃铛请填 fb、连击请填 ab-plus。";
+  }
+  return "";
+}
+
+// /计算 的自由文本解析。位置参数与自然语序都吃：「14.2 1000737 fb none」和
+// 「定数 14.2，技术分 1000737，铃铛 fb，连击 ab+」等价。没说的项是 null，缺省怎么填由调用方定。
+function parseCalculateQuery(query) {
+  const q = String(query || "");
+  // 「理论值」就是 1010000，写字和写数一样算（/计算 14.2 理论值）
+  const numbers = [...q.replace(/理[论論][值値]?/g, " " + THEORETICAL_SCORE + " ").replace(/(\d)[,，](\d)/g, "$1$2")
+    .matchAll(/\d+(?:\.\d+)?/g)].map((match) => Number(match[0]));
+  const bell = /\bfb\b|fb/i.test(q) ? "fb" : null;
+  // ab-plus 是帮助文案和语义路由（semantic-router 拼的 "… none ab-plus"）给出的正式写法，
+  // 漏掉它会让 \bab\b 先命中、少算 0.05；几种写法与 mia-commands 的枚举校验保持一致。
+  const combo = /ab\s*\+|ab[\s-]?plus/i.test(q) ? "ab-plus" : /\bab\b/i.test(q) ? "ab" : /\bfc\b/i.test(q) ? "fc" : null;
+  // 「none / 无」分不清说的是哪盏灯，只能当作「没点名的灯都是无」。这样它就不会再被理论值补成
+  // FB / AB+ —— 1010000 配「无」是自相矛盾，要报出来，不能悄悄替用户改掉。
+  const saidNone = /none|无|沒有|没有/i.test(q);
+  return {
+    constant: numbers.length ? numbers[0] : null,
+    ...inferCalculateMarks({
+      score: numbers.length >= 2 ? numbers[1] : null,
+      bell: bell ?? (saidNone ? "none" : null),
+      combo: combo ?? (saidNone ? "none" : null),
+    }),
+  };
+}
+
 function calculateSingleRating(chartConstant, score, bellMark, comboMark) {
   if (!Number.isFinite(chartConstant) || chartConstant < 0 || chartConstant > 20 ||
       Math.abs(chartConstant * 10 - Math.round(chartConstant * 10)) > 1e-9) {
     throw new Error("谱面定数不合法：请输入 0–20，且最多一位小数（如 13、13.0、13.4）。");
   }
-  if (!Number.isInteger(score) || score < 0 || score > 1010000) {
+  if (!Number.isInteger(score) || score < 0 || score > THEORETICAL_SCORE) {
     throw new Error("技术分不合法：请输入 0–1010000 的纯整数。");
   }
   if (!new Set(["none", "fb"]).has(bellMark)) throw new Error("铃铛加成只能选择 FB 或无。");
   if (!new Set(["none", "fc", "ab", "ab-plus"]).has(comboMark)) throw new Error("连击加成只能选择 FC、AB、AB+ 或无。");
+  // 打不出来的组合（AB+ 配 1000000 之类）不能硬算出一个数：那个 Rating 在游戏里根本不存在。
+  const conflict = calculateMarkConflict(score, bellMark, comboMark);
+  if (conflict) throw new Error(conflict);
 
   const baseRating = calculateBaseRating(chartConstant, score);
   const scoreMark = score >= 1007500 ? "SSS+" : score >= 1000000 ? "SSS" : score >= 990000 ? "SS" : "无";
@@ -990,15 +1050,11 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
   }
 
   if (spec.name === "calculate") {
-    // 位置参数与自然语序都吃：「14.2 1000737 fb none」和「定数 14.2，技术分 1000737，铃铛 fb，连击 ab+」等价
-    const numbers = [...q.replace(/(\d)[,，](\d)/g, "$1$2").matchAll(/\d+(?:\.\d+)?/g)].map((match) => match[0]);
-    if (numbers.length < 2) return text(capabilityHints.calculateUsage);
-    const bell = /\bfb\b|fb/i.test(q) ? "fb" : "none";
-    // ab-plus 是帮助文案和语义路由（semantic-router 拼的 "… none ab-plus"）给出的正式写法，
-    // 漏掉它会让 \bab\b 先命中、少算 0.05；几种写法与 mia-commands 的枚举校验保持一致。
-    const combo = /ab\s*\+|ab[\s-]?plus/i.test(q) ? "ab-plus" : /\bab\b/i.test(q) ? "ab" : /\bfc\b/i.test(q) ? "fc" : "none";
+    const parsed = parseCalculateQuery(q);
+    if (parsed.constant === null || parsed.score === null) return text(capabilityHints.calculateUsage);
     try {
-      return text(calculateSingleRating(Number(numbers[0]), Number(numbers[1]), bell, combo).text);
+      // 理论值推不出来的灯按「无」算，结果里会明写出来（QQ 入口在这之前另有一道「四样要齐」的闸）
+      return text(calculateSingleRating(parsed.constant, parsed.score, parsed.bell ?? "none", parsed.combo ?? "none").text);
     } catch (error) {
       return text(safeError(error));
     }
@@ -1103,6 +1159,10 @@ module.exports = {
   // 定数
   calculateBaseRating,
   calculateSingleRating,
+  THEORETICAL_SCORE,
+  inferCalculateMarks,
+  calculateMarkConflict,
+  parseCalculateQuery,
   // 配置
   readConfig,
   // 子进程与凭据库
