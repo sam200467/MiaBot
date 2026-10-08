@@ -136,6 +136,10 @@ assert.equal(core.selectBinding({ email: "o@x", password: "p" }).dataSource, "ot
   const natural = await core.resolveCapability({}, "free", "calculate", "定数14.2，技术分1000737，铃铛fb，连击ab+");
   assert.equal(positional.text, "基础分 15.49 + 成绩加成 0.2（SSS）+ 铃铛 0.05（FB）+ 连击 0（无）= 15.74");
   assert.equal(natural.text, "基础分 15.49 + 成绩加成 0.2（SSS）+ 铃铛 0.05（FB）+ 连击 0.35（AB+）= 16.09");
+  // ab-plus 是帮助文案和语义路由给的写法；曾被 \bab\b 抢先命中、按 AB 少算 0.05
+  for (const spelling of ["ab-plus", "abplus", "ab plus", "AB+"]) {
+    assert.match((await core.resolveCapability({}, "free", "calculate", "14.2 1000737 fb " + spelling)).text, /连击 0\.35（AB\+）= 16\.09$/, spelling);
+  }
   // 只说「这歌我打了 1000737 分」也能算：铃铛和连击按「无」算，结果里明写出来
   assert.equal((await core.resolveCapability({}, "free", "calculate", "14.2 这歌我打了 1000737 分")).text,
     "基础分 15.49 + 成绩加成 0.2（SSS）+ 铃铛 0（无）+ 连击 0（无）= 15.69");

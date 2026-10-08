@@ -994,7 +994,9 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
     const numbers = [...q.replace(/(\d)[,，](\d)/g, "$1$2").matchAll(/\d+(?:\.\d+)?/g)].map((match) => match[0]);
     if (numbers.length < 2) return text(capabilityHints.calculateUsage);
     const bell = /\bfb\b|fb/i.test(q) ? "fb" : "none";
-    const combo = /ab\s*\+|abplus/i.test(q) ? "ab-plus" : /\bab\b/i.test(q) ? "ab" : /\bfc\b/i.test(q) ? "fc" : "none";
+    // ab-plus 是帮助文案和语义路由（semantic-router 拼的 "… none ab-plus"）给出的正式写法，
+    // 漏掉它会让 \bab\b 先命中、少算 0.05；几种写法与 mia-commands 的枚举校验保持一致。
+    const combo = /ab\s*\+|ab[\s-]?plus/i.test(q) ? "ab-plus" : /\bab\b/i.test(q) ? "ab" : /\bfc\b/i.test(q) ? "fc" : "none";
     try {
       return text(calculateSingleRating(Number(numbers[0]), Number(numbers[1]), bell, combo).text);
     } catch (error) {
