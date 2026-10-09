@@ -41,6 +41,11 @@ QQ 宿主的 `routeIntent` 还可接收当前会话的 `queryState`，返回只�
 分页状态的唯一来源。具体字段、筛选和复核由 `qq-official/public-query.cjs` 与
 `semantic-router.cjs` 实现，个人成绩和写操作仍交原指令执行器。
 
+宿主给了 `adapter.record` 时，每轮回复完（包括出错的那一轮）引擎会把这一轮交给它：
+用户原话、模型这一轮看到的群上下文、之前聊过几轮、结果或出错原因。QQ 侧用它写聊天
+记录（`qq-official/chat-log.cjs`，默认关）；不给就什么都不做。钩子里的异常一律吞掉，
+不影响回复。
+
 ## 客观事实层
 
 `knowledge/` 下的 JSON 都带来源、置信度和人工过目标记。字段含义、各文件的用途，

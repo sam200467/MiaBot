@@ -926,6 +926,13 @@ function createChat(settings, host, deps={}) {
     return message.content.replace(new RegExp("<@!?"+botId+">","g"),"").trim();
   });
   const typing=adapter.typing||((message)=>message.channel.sendTyping().catch(()=>{}));
+  // 聊天记录钩子（可选，QQ 侧拿它落盘）：一轮回复完才调，交出模型这一轮看到的群上下文和结果。
+  // 记录只是旁路，宿主那边出什么错都不能影响回复，所以一律吞掉、只记一行日志。
+  const recordTurn=(turn)=>{
+    if(typeof adapter.record!=="function")return;
+    const fail=error=>log(who+"聊天记录出错："+(error?.message||error));
+    try{const pending=adapter.record(turn);if(pending&&typeof pending.catch==="function")pending.catch(fail);}catch(error){fail(error);}
+  };
   async function handle(message) {
     if(closed||!accepts(message))return;
     const extracted=extractText(message);
@@ -953,6 +960,8 @@ function createChat(settings, host, deps={}) {
     busyUsers.add(userKey);active++;
     const controller=new AbortController();controllers.add(controller);
     const timer=setTimeout(()=>controller.abort(),settings.search?.apiKey?Math.max(settings.c.provider.timeoutMs,110000):settings.c.provider.timeoutMs);
+    // 交给聊天记录钩子的这一轮。放在 try 外面：出错的那一轮也要知道她当时看到了什么。
+    const turn={message,text,at:time,context:[],historyTurns:0};
     try {
       await typing(message);
       const history=(old?.messages||[]).slice(-settings.c.conversation.maxTurns*2);
@@ -961,6 +970,7 @@ function createChat(settings, host, deps={}) {
       const ability=typeof adapter.ability==="function"?adapter.ability(message):adapter.ability;
       // 群上下文由宿主提供（QQ 侧是群里最近几条消息），没有就不插这段
       const context=typeof adapter.context==="function"?(adapter.context(message)||[]).filter(Boolean).map(String):[];
+      turn.context=context;turn.historyTurns=history.length>>1;
       // 本条消息引用（QQ 的「回复」）的那条：可能远在群上下文窗口之外，而且是用户
       // 真正在问的东西。挨着用户那句话放，别塞进上面那段背景里。
       const quoted=typeof adapter.quoted==="function"?String(adapter.quoted(message)||"").trim():"";
@@ -1002,6 +1012,7 @@ function createChat(settings, host, deps={}) {
         // 才会在整条回复超过那个时长之后补一条。走宿主现成的发送路径，前端不用另改。
         ...(typeof adapter.slowNotice==='function'?{slowNotice:async()=>{if(!closed)await send(message,await adapter.slowNotice(message),null);},
           slowNoticeAfterMs:Number(adapter.slowNoticeAfterMs)||0}:{})});
+      turn.result=result;turn.routed=Boolean(routed);
       if(closed)return;
       let file=null, actionHistory="";
       if(result.action) {
@@ -1037,9 +1048,11 @@ function createChat(settings, host, deps={}) {
         searchPending:gateState.pending||null,searchTarget:gateState.lastTarget||null,searchOfferAt:gateState.lastOfferAt||0,
         messages:[...history,{role:"user",content:text},{role:"assistant",content:result.text+record}].slice(-settings.c.conversation.maxTurns*2)});
       log(who+"聊天完成"+(result.action?"，工具 "+result.action.name:"")+(file?"，配图 "+file.id:"")+(result.research?`，检索 ${result.research.status}（联网${result.research.webCalls}轮／实际请求${result.research.webRequests}次，来源${result.research.sourceCount}，理由${result.research.reason}）`:"")+(result.constantFixes?.length?`，定数校正${result.constantFixes.length}处（`+result.constantFixes.map(f=>`${f.title} ${f.from}→${f.to}${f.kind==="annotate"?"（仅补注当前值，原数字未改）":""}`).join("；")+"）":"")+(result.aliasQueries?.length?"，检索词规范化（"+result.aliasQueries.join("；")+"）":"")+(result.termHits?.length?"，术语（"+result.termHits.join("；")+"）":"")+(result.learnedTerms?.length?"，本会话学到术语（"+result.learnedTerms.map(item=>item.alias+"→"+(item.members||[item.target]).join("/")).join("；")+"）":"")+(result.termFixes?.length?"，术语类型纠正（"+result.termFixes.join("；")+"）":"")+(result.toneFixed?"，语气泄漏已纠正（不该提群里那段）":"")+(result.toneLeak?"，语气泄漏未纠正":"")+(result.sourceStats?.retrieved||result.sourceStats?.displayed?`，来源 搜到${result.sourceStats.retrieved}/相关${result.sourceStats.relevant}/引用${result.sourceStats.cited}/展示${result.sourceStats.displayed}`:"")+(result.webDenied?.length?"，联网请求被意图策略拒绝"+result.webDenied.length+"次（"+result.webDenied.map(d=>d.intents.join("+")||"意图缺失").join("；")+"）":"")+(result.webSplits?.length?"，拆分通道只发事实子问题（"+result.webSplits.map(s=>"「"+String(s.from).slice(0,40)+"」→「"+String(s.to).slice(0,40)+"」").join("；")+"）":"")+(result.queryRewrites?.length?"，结果为空后重建检索词（"+result.queryRewrites.map(r=>r.query).join("；")+"）":"")+(result.levelFixed?.length?`，等级资格重写（`+result.levelFixed.join("；")+`${result.levelDropped?.length?"，程序删除推荐："+result.levelDropped.join("；"):""}`+"）":"")+(result.degraded?"，已降级为纯文本":"")+(result.redrawn?"，空白回复后重画成功":"")+(result.lore?.hits?.length?`，本地剧情命中（`+result.lore.hits.map(h=>`${h.id}/${h.strength}`).join("；")+(result.lore.localAnswered?"，直接作答未联网":",转联网")+"）":"")+(result.profiles?.hits?.length?`，本地角色档案命中（`+result.profiles.hits.join("；")+(result.profiles.localAnswered?"，直接作答未联网":",转联网")+"）":"")+(result.canonFixed?.length?"，剧情否认已纠正（"+result.canonFixed.join("；")+"）":"")+(result.canonDenied?.length?"，剧情否认纠正失败（"+result.canonDenied.join("；")+"）":"")+(result.retried?"，网关故障后重试成功":"")+describeGate(result.searchGate));
+      recordTurn({...turn,file});
     } catch(error) {
       log(who+"聊天失败："+failureReason(error,secret));
       if(!closed)await send(message,"唔，这次回复没能顺利完成。稍后再叫我一次吧！").catch(()=>{});
+      recordTurn({...turn,error:failureReason(error,secret)});
     } finally {clearTimeout(timer);controllers.delete(controller);busyUsers.delete(userKey);active--;}
   }
   return {handle,close(){closed=true;for(const c of controllers)c.abort();sessions.clear();if(!deps.dispatcher)void dispatcher?.close();}};

@@ -83,6 +83,7 @@ for (const file of [
 for (const file of [
   path.join(HERE, "test-official-transport.cjs"),
   path.join(HERE, "test-mia-entry.cjs"),
+  path.join(HERE, "test-chat-log.cjs"),
   path.join(HERE, "test-mia-commands.cjs"),
   path.join(HERE, "test-song-search.cjs"),
   path.join(HERE, "test-song-jacket.cjs"),
@@ -99,6 +100,7 @@ for (const file of [
   path.join(ROOT, "chat-core/knowledge.test.cjs"),
   path.join(ROOT, "chat-core/research-policy.test.cjs"),
   path.join(ROOT, "chat-core/search.test.cjs"),
+  path.join(ROOT, "chat-core/search-gate.test.cjs"),
 ]) {
   execFileSync(process.execPath, ["--test", "--test-timeout=60000", file], { cwd: ROOT, stdio: "inherit" });
 }

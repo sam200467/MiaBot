@@ -14,6 +14,9 @@
   "_数据": "workDir 存放运行期文件（临时图片等）",
   "workDir": "./data",
 
+  "_聊天记录": "mode=replies 时，美亚每回一轮群聊就往 workDir/chatlog/<日期>.jsonl 记一行：用户那句话、她当时看到的群上下文（最多 12 条）、她的回复、工具和联网判断结果。没 @ 她的群消息只在被她看到时作为上下文出现；私聊、指令、绑定流程都不记。keepDays 天之前的文件启动时和跨天时自动删除。默认 off。⚠ 上下文里有没跟美亚说过话的群友的发言，开之前最好在群里说一声。",
+  "chatLog": { "mode": "off", "keepDays": 14 },
+
   "_指令": "corePath 和 vaultHelperPath 必须指向已构建的程序，否则启动时报错。相对路径按 qq-official/ 解析。ongeki-core.exe 由 npm run build:core 生成，mia-vault.exe 由根目录 mia-vault.cs 编译；二进制不随源码仓库分发。vaultPath 是绑定数据的存储位置，首次运行时创建。",
   "corePath": "../ongeki-core.exe",
   "vaultHelperPath": "../mia-vault.exe",

@@ -742,3 +742,72 @@ test("rinnet 群绑定：附带凭据、斜杠密码、TOTP 和卡号不进模�
     assert.equal(model.calls.length + model.routeCalls.length, 0);
   } finally { await bot.stop(); await mock.stop(); restore(); }
 });
+
+// ── 聊天记录（chatLog）────────────────────────────────────────────────
+// 记录模块本身和引擎钩子在 test-chat-log.cjs 里测，这里只测接进入口之后的整条链路。
+const readChatLog = (dir) => !fs.existsSync(dir) ? [] : fs.readdirSync(dir).filter((name) => name.endsWith(".jsonl")).sort()
+  .flatMap((name) => fs.readFileSync(path.join(dir, name), "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line)));
+
+test("聊天记录：开着时记下她回复的群聊，连同她当时看到的群上下文；私聊不记", async () => {
+  const logs = [];
+  const { mock, bot, model } = await setup({ chatLog: { mode: "replies" } }, { botDeps: { log: (line) => logs.push(line) } });
+  bot.settings.c.limits.userCooldownSeconds = 0;
+  try {
+    assert.ok(logs.some((line) => /聊天记录：开｜只记美亚回复的群聊｜保留 14 天/.test(line)), logs.join("\n"));
+    mock.push("GROUP_MESSAGE_CREATE", { ...groupEvent({ author: { member_openid: "U9" } }), content: "今天谁出勤" });
+    assert.ok(await mock.waitFor(() => bot.readContext(GROUP, false).length > 0));
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ id: "at-1", content: "刚才他们说啥了" }));
+    await bot.handleEvent("C2C_MESSAGE_CREATE", c2cEvent({ content: "私聊一句" }));
+    assert.equal(model.calls.length, 2, "两句都回了");
+    const records = readChatLog(bot.chatLog.dir);
+    assert.equal(records.length, 1, "私聊不记");
+    const [r] = records;
+    assert.equal(r.group, GROUP);
+    assert.equal(r.user, "U1");
+    assert.equal(r.msgId, "at-1");
+    assert.equal(r.text, "刚才他们说啥了");
+    assert.deepEqual(r.context, ["群友：今天谁出勤"], "没 @ 她的那句作为上下文出现，当前这句不重复");
+    assert.equal(r.reply, "喵哼哼，收到啦！");
+    assert.match(r.time, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+test("聊天记录：默认关，不建目录、不挂钩子", async () => {
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "mia-entry-nolog-"));
+  const { mock, bot } = await setup({ workDir });
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "在吗" }));
+    assert.ok(mock.state.sent.length > 0);
+    assert.equal(bot.chatLog, null);
+    assert.ok(!fs.existsSync(path.join(workDir, "chatlog")));
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+test("聊天记录：配置写错按关闭处理，启动日志里说清楚", async () => {
+  const logs = [];
+  const { mock, bot } = await setup({ chatLog: { mode: "all" } }, { botDeps: { log: (line) => logs.push(line) } });
+  try {
+    assert.equal(bot.chatLog, null);
+    assert.ok(logs.some((line) => /chatLog\.mode 只能是 off \/ replies，聊天记录先按关闭处理/.test(line)), logs.join("\n"));
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+test("聊天记录：绑定流程的邮箱和密码进不了记录", async () => {
+  const SECRET = "chatlog-bind-secret-绝密";
+  const restore = stubCore();
+  const { mock, bot } = await setup({ chatLog: { mode: "replies" } });
+  bot.settings.c.limits.userCooldownSeconds = 0;
+  try {
+    mock.push("GROUP_AT_MESSAGE_CREATE", groupEvent({ id: "bind-start", content: "/绑定" }));
+    assert.ok(await mock.waitFor(() => mock.state.sent.length >= 1));
+    mock.push("GROUP_MESSAGE_CREATE", groupEvent({ id: "bind-email", content: "me@example.com", mentions: undefined }));
+    assert.ok(await mock.waitFor(() => sentText(mock).includes("邮箱收到")));
+    mock.push("GROUP_MESSAGE_CREATE", groupEvent({ id: "bind-password", content: SECRET, mentions: undefined }));
+    assert.ok(await mock.waitFor(() => sentText(mock).includes("绑好啦")));
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "绑好了吗" }));
+    const records = readChatLog(bot.chatLog.dir);
+    assert.deepEqual(records.map((r) => r.text), ["绑好了吗"], "只有绑完之后那句闲聊");
+    const raw = fs.readdirSync(bot.chatLog.dir).map((name) => fs.readFileSync(path.join(bot.chatLog.dir, name), "utf8")).join("");
+    for (const secret of [SECRET, "me@example.com"]) assert.ok(!raw.includes(secret), "记录里不能有 " + secret);
+  } finally { await bot.stop(); await mock.stop(); restore(); }
+});

@@ -19,6 +19,7 @@ const songSearch = require("./song-search.cjs");
 const { routeIntent } = require("./semantic-router.cjs");
 const { MIA_TEMPLATES: T } = require("./mia-voice.cjs");
 const { createAssetBrowser } = require("./asset-browser.cjs");
+const { chatLogSettings, createChatLog, turnRecord } = require("./chat-log.cjs");
 
 const HERE = __dirname;
 const ROOT = path.resolve(HERE, "..");
@@ -208,6 +209,16 @@ function createMiaBot(config, deps = {}) {
 
   const allowGroups = new Set((config.allowedGroupIds || []).map(String));
   const allowPrivate = config.allowPrivateChat !== false;
+
+  // ── 聊天记录（默认关）──────────────────────────────────────────────
+  // 开着时美亚每回一轮群聊就记一行，连同她当时看到的群上下文（见 chat-log.cjs）。
+  // 关着时不挂 record 钩子，chat.cjs 走的还是原来那条路。
+  const chatLogConfig = chatLogSettings(config.chatLog);
+  const chatLog = chatLogConfig.mode === "off" ? null : createChatLog({
+    dir: path.join(config.workDir || path.join(HERE, "data"), "chatlog"),
+    keepDays: chatLogConfig.keepDays, log,
+    ...(deps.now ? { now: deps.now } : {}),
+  });
 
   // ── 指令层 ────────────────────────────────────────────────────────
   // loadConfig 已经强制校验过运行组件，所以生产路径上一定启用。这里是给
@@ -453,6 +464,10 @@ function createMiaBot(config, deps = {}) {
         return e.type === "group" ? readContext(e.openid, true) : [];
       },
       quoted: () => "",   // 官方接口没有 get_msg，读不到被引用那条的内容
+      // 聊天记录：只在开着时挂，而且只记群聊 —— 私聊不记。
+      ...(chatLog ? {
+        record: (turn) => { if (turn.message?.__event?.type === "group") chatLog.write(turnRecord(turn)); },
+      } : {}),
     },
   });
 
@@ -605,7 +620,7 @@ function createMiaBot(config, deps = {}) {
   }
 
   return {
-    chat, transport, settings, allowGroups, readContext, commands,
+    chat, transport, settings, allowGroups, readContext, commands, chatLog,
     handleEvent,
     mentionsSelf, pickTarget, commandAllowedInGroup,
     async start() {
@@ -634,6 +649,12 @@ function createMiaBot(config, deps = {}) {
         (commands?.aliasDeleteOpenids.size ? "｜删别名白名单 " + commands.aliasDeleteOpenids.size + " 人" : ""));
       if (commands && !commands.aliasDeleteOpenids.size) {
         log("提示：config.local.json 里没配 aliasDeleteOpenids，所以谁都不能用 /删除别名。");
+      }
+      if (chatLogConfig.error) log("⚠ " + chatLogConfig.error);
+      if (chatLog) {
+        const removed = chatLog.start();
+        log("聊天记录：开｜只记美亚回复的群聊｜保留 " + chatLog.keepDays + " 天｜" + chatLog.dir +
+          (removed ? "｜清掉过期的 " + removed + " 个" : ""));
       }
       if (commands && botOpenid) {
         log("提示：配置里还留着 botOpenid —— 它已经用不上了（实测 mention 的 id 跟 READY 的 botId 不是一套 id 空间）。现在靠平台给的 is_you 判，可以删掉这个键。");
