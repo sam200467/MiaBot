@@ -157,6 +157,21 @@ function makeFileLog(logFile) {
   };
 }
 
+// ── 回复排版 ────────────────────────────────────────────────────────
+// QQ 把 \n\n 渲染成空行。模型爱用空行分段，原样发出去就是一条被拆得七零八落的回复，
+// 所以正文里的空行折叠成单个换行（保留分段感，但不留空行）。
+// 只有来源脚注（chat-core 的 attachSources 拼在最后的「参考资料：」那段）前面留一个空行：
+// 跟着一起折叠的话，它会跟正文黏在一起（2026-10-09 群里实测）。脚注标题有三种，跟那边保持一致。
+const SOURCE_FOOTER = /\n[ \t]*\n((?:参考资料|搜索结果（供核对）|资料出处[^\n]*?)：\n[\s\S]*)$/;
+function formatReply(text) {
+  const raw = String(text ?? "");
+  const fold = (s) => s.replace(/\n{2,}/g, "\n").trim();
+  const m = raw.match(SOURCE_FOOTER);
+  const body = fold(m ? raw.slice(0, m.index) : raw);
+  const footer = m ? fold(m[1]) : "";
+  return { body, text: body && footer ? body + "\n\n" + footer : body || footer };
+}
+
 // 回答跟着消息走：群里问的回群里，私聊问的回私聊。
 // 一律带 msg_id 走被动回复 —— 主动消息自 2025-04 起基本不可用。
 function makeTarget(event) {
@@ -447,13 +462,12 @@ function createMiaBot(config, deps = {}) {
       typing: async () => {},
       send: async (message, text, file) => {
         const e = message.__event;
-        // QQ 把 \n\n 渲染成空行，模型爱用空行分段，出来就是一条被拆得七零八落的回复。
-        // 折叠成单个换行（保留分段感，但不留空行）。
-        const cleaned = String(text).replace(/\n{2,}/g, "\n").trim();
+        const { body, text: cleaned } = formatReply(text);   // 空行折叠、脚注前留空行，见 formatReply
         // 截断取证：模型偶尔给出以半句话结尾的回复。没有稳定复现前不改共享代码，
         // 先把原始结尾记下来 —— 下次发生时能看出是模型本身就写到一半，还是被谁切了。
-        if (cleaned && !/[。！？…♪」）\)\?\!]$/.test(cleaned)) {
-          log("⚠ 回复疑似未写完（结尾：" + JSON.stringify(cleaned.slice(-14)) + "，全长 " + cleaned.length + "）");
+        // 只看正文：脚注以网址结尾，看整段的话每条带来源的回复都会误报。
+        if (body && !/[。！？…♪」）\)\?\!]$/.test(body)) {
+          log("⚠ 回复疑似未写完（结尾：" + JSON.stringify(body.slice(-14)) + "，全长 " + body.length + "）");
         }
         const sent = await send(e, cleaned, file);
         if (e.type === "group") remember(e.openid, settings.characterName, cleaned + (file ? "（图片）" : ""));
@@ -690,4 +704,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { loadConfig, createMiaBot, makeSender, makeCommandSenders, makeFileLog };
+module.exports = { loadConfig, createMiaBot, makeSender, makeCommandSenders, makeFileLog, formatReply };

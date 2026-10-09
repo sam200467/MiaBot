@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const core = require("../mia-core.cjs");
 const { createMockOfficial } = require("./mock-official.cjs");
-const { createMiaBot } = require("./mia-entry.cjs");
+const { createMiaBot, formatReply } = require("./mia-entry.cjs");
 
 const GROUP = "GROUP_OPENID_A";
 const OTHER_GROUP = "GROUP_OPENID_B";
@@ -810,4 +810,43 @@ test("聊天记录：绑定流程的邮箱和密码进不了记录", async () =>
     const raw = fs.readdirSync(bot.chatLog.dir).map((name) => fs.readFileSync(path.join(bot.chatLog.dir, name), "utf8")).join("");
     for (const secret of [SECRET, "me@example.com"]) assert.ok(!raw.includes(secret), "记录里不能有 " + secret);
   } finally { await bot.stop(); await mock.stop(); restore(); }
+});
+
+// ── 回复排版 ──────────────────────────────────────────────────────────
+
+test("排版：正文的空行照旧折叠，来源脚注前面留一个空行", () => {
+  assert.deepEqual(formatReply("第一段。\n\n\n第二段。\n"), { body: "第一段。\n第二段。", text: "第一段。\n第二段。" }, "没有脚注时和原来一样");
+  const footer = "参考资料：\nCHUNITHM\nhttps://zh.wikipedia.org/wiki/CHUNITHM";
+  assert.deepEqual(formatReply("日本版是 X-VERSE-X。\n\n国际版慢半年♪\n\n" + footer),
+    { body: "日本版是 X-VERSE-X。\n国际版慢半年♪", text: "日本版是 X-VERSE-X。\n国际版慢半年♪\n\n" + footer });
+  for (const title of ["资料出处（本地条目自带的来源优先）：", "搜索结果（供核对）："]) {
+    assert.equal(formatReply("正文。\n\n" + title + "\n来源一").text, "正文。\n\n" + title + "\n来源一", title);
+  }
+  assert.equal(formatReply("\n\n" + footer).text, footer, "只有脚注时前面不留空行");
+  assert.equal(formatReply("参考资料：这一句只是正文。\n\n下一段").text, "参考资料：这一句只是正文。\n下一段", "正文里提到这几个字不算脚注");
+});
+
+test("带来源的回复：发到 QQ 的那条里「参考资料」前面空一行，也不再误报「疑似未写完」", async () => {
+  const { loadSettings } = require("../chat-core/chat.cjs");
+  const { gateSettings, GATE_MARKER } = require("../chat-core/search-gate.cjs");
+  const base = loadSettings(path.resolve(__dirname, "../mia-chat"));
+  const respond = (content) => ({ ok: true, status: 200, text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }) });
+  const fetchImpl = async (_, options) => {
+    const body = JSON.parse(options.body), system = String(body.messages[0].content);
+    if (system.includes("MIA_SEMANTIC_ROUTER_V1")) return respond({ route: "chat" });
+    if (system.startsWith(GATE_MARKER)) return respond({ act: "ask", about: "world", target: "CHUNITHM 最新版本", fresh: true, confident: true, unknownTerms: [] });
+    return respond({ text: "日本版最新是 X-VERSE-X。\n\n国际版慢半年♪", emotion: "happy", scene: "explanation", expressionIds: [], sourceIds: ["S1"] });
+  };
+  const webFetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ search_results: [
+    { title: "CHUNITHM", url: "https://zh.wikipedia.org/wiki/CHUNITHM", chunks: [{ text: "CHUNITHM 最新版本是 X-VERSE-X。" }], snippet: "CHUNITHM 最新版本" }] }) });
+  const settings = { ...base, searchGate: gateSettings({ mode: "auto" }), search: { apiKey: "kimi-fixture", cache: new Map() },
+    c: { ...base.c, limits: { ...base.c.limits, userCooldownSeconds: 0 } } };
+  const logs = [];
+  const { mock, bot } = await setup({}, { botDeps: { settings, fetchImpl, webFetchImpl, log: (line) => logs.push(line) } });
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "CHUNITHM 最新版本是什么" }));
+    assert.equal(mock.state.sent.at(-1).body.content,
+      "日本版最新是 X-VERSE-X。\n国际版慢半年♪\n\n参考资料：\nCHUNITHM\nhttps://zh.wikipedia.org/wiki/CHUNITHM");
+    assert.ok(!logs.some((line) => /疑似未写完/.test(line)), logs.join("\n"));
+  } finally { await bot.stop(); await mock.stop(); }
 });
