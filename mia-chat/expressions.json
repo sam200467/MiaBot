@@ -821,6 +821,22 @@
    "weight": 1,
    "variantGroup": "shy_hide",
    "inspection": "目视检查"
+  },
+  {
+   "id": "starry_craving",
+   "previewNumber": 46,
+   "label": "眼馋流口水",
+   "file": "emojis/46_眼馋流口水.jpg",
+   "width": 332,
+   "height": 264,
+   "bytes": 31201,
+   "animated": false,
+   "emotions": ["affection", "dismay"],
+   "usage": "两眼放光、口水直流地眼巴巴想要：别人晒吃的（尤其水果甜点）、晒可爱女孩子的卡面周边，或要去吃好的没带上她。比渴望到流泪轻一档、没哭；也不是垂涎三尺那种大叔心失态。**馋的是东西，别对着聊天对象本人用。**",
+   "autoEligible": true,
+   "requiresMatchingContext": true,
+   "weight": 1,
+   "inspection": "目视检查"
   }
  ]
 }
