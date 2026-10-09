@@ -73,8 +73,11 @@ const DESCRIPTIONS = Object.freeze({
   whatis: "按别名或部分曲名查歌",
   status: "美亚现在忙不忙",
   unbind: "解开当前数据源的绑定",
-  cancel: "中断正在进行的操作",
-  cardbrowser: "打开本地卡面检索页",
+  // /取消 只管做到一半的绑定和解绑，停不下排队的图（跟 /帮助 里那行同一个口径）。
+  // 它默认不进面板，但这张表别写成万能的。
+  cancel: "中断做到一半的绑定或解绑",
+  // 发的是公网检索页的链接（assetBrowser.publicBaseUrl），不是本地页。
+  cardbrowser: "翻翻角色们的卡面",
   expressionbrowser: "看看角色们的剧情表情",
 });
 
