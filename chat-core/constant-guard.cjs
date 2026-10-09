@@ -75,6 +75,62 @@ function findTitles(knowledge,text,extra){
   return hits.sort((a,b)=>a.start-b.start);
 }
 
+// 曲名索引认不出来的曲名：规范化后不足三个字的（μ3、L9、心、竹、神威…三款游戏合计近百首），
+// 和规范化后整个变成空串的纯符号曲名（∀、+♂）。不进索引是对的：「心」「神曲」「月光」这种
+// 字眼在中文里到处都是，拿它们去认歌、去改数字，会把别的话改错。可它们终究是曲名——认不出来，
+// 前一首歌的段就一直延伸过去，把它们的定数当成前一首的报错值「改正」。线上那条：
+// 「光焔のラテラルアーク（14.2）、μ3（14.3）、THE CELESTIA 180（14.4）」里 μ3 没被认出，
+// 14.3 落进光焔的段，离光焔 EXP 的 14.2 只差 0.1，被改成了 14.2。
+// 所以这批曲名只当「这里在说另一首歌」的标记：截断前一首的段（verifyConstants）、不让兜底删除
+// 连带删掉它（level-guard 的 dropRecommendations），自己从不触发修改。
+const unindexedCache=new WeakMap();
+function unindexedTitles(knowledge){
+  if(unindexedCache.has(knowledge))return unindexedCache.get(knowledge);
+  const indexed=new Set((knowledge.titles||[]).map(entry=>entry.normalized)),seen=new Set(),list=[];
+  for(const catalog of Object.values(knowledge.catalogs||{}))
+    for(const chart of catalog.charts||[]){
+      const title=String(chart?.title??""),normalized=normalize(title);
+      if(indexed.has(normalized))continue;
+      // 纯符号曲名只能按原样（去掉空白）去原文里找；全角空格那首去完还是空的，认不了。
+      const needle=normalized||title.normalize("NFKC").replace(/\s/gu,"");
+      if(!needle||seen.has(needle))continue;
+      seen.add(needle);list.push({needle,symbolic:!normalized});
+    }
+  list.sort((a,b)=>b.needle.length-a.needle.length);
+  unindexedCache.set(knowledge,list);
+  return list;
+}
+// 相邻两个字会不会连成一个词：都是字母或数字，并且同为汉字假名、或同为别的文字。
+// 「开心」里的「心」粘着「开」，是词的一截，不是那首歌；「μ3的」里 3 和「的」不同类，μ3 照样成词。
+// 常见虚词不算粘连：「竹的紫谱 14.3」「还有心」里的竹、心照样是曲名。
+const isCjk=ch=>/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]/u.test(ch);
+const isWordChar=ch=>ch!==undefined&&/[\p{L}\p{N}]/u.test(ch);
+const PARTICLE=/^[的是也和与跟及或还都有在就呢吧啊了]$/;
+const glued=(a,b)=>isWordChar(a)&&isWordChar(b)&&isCjk(a)===isCjk(b)&&!PARTICLE.test(a)&&!PARTICLE.test(b);
+// 上面那批曲名在正文里的位置。和已认出的曲名重叠的不算（那是长曲名里的一截），短曲名还不许
+// 跟两边的字粘成一个词。多认一处的代价只是少核一段——宁可漏改——所以判据可以比曲名索引宽。
+function findUnindexed(knowledge,text,hits){
+  const entries=knowledge?unindexedTitles(knowledge):[],spans=[];
+  if(!entries.length||typeof text!=="string"||!text)return spans;
+  const {flat,map}=compactMap(text);
+  const taken=[...(hits||[])];
+  const claim=(start,end)=>{
+    if(taken.some(hit=>start<hit.end&&end>hit.start))return;
+    const span={start,end};taken.push(span);spans.push(span);
+  };
+  for(const {needle,symbolic} of entries){
+    if(symbolic){
+      for(let at=text.indexOf(needle);at>=0;at=text.indexOf(needle,at+1))claim(at,at+needle.length);
+      continue;
+    }
+    for(let at=flat.indexOf(needle);at>=0;at=flat.indexOf(needle,at+1)){
+      const start=map[at],end=map[at+needle.length-1]+1;
+      if(!glued(text[start-1],text[start])&&!glued(text[end-1],text[end]))claim(start,end);
+    }
+  }
+  return spans.sort((a,b)=>a.start-b.start);
+}
+
 // 数字所在的那一句：向前后各找到句末标点为止。只在这一句里找时效词，避免隔着两句
 // 把「上一句提到老帖」误当成「这一句在讲旧值」。
 function sentenceAround(text,at){
@@ -118,12 +174,17 @@ function nearestConstant(knowledge,title,value,game){
 // 曲名之后要核多宽。模型报定数常写成列表（「BAS 4、ADV 7+、EXP 12+（12.5）、MASTER 15（定数14.9）」），
 // 而且曲名和数字常常不在同一句里：线上那条是「喔，DENGEKI Tube啊，早说拼写不就好了！
 // BACO那首，我翻到的是：…MASTER 15（定数15.2）」——曲名在第一句，四个难度全在第二句。
-// 所以按「段」核：从曲名命中点到下一个曲名命中点为止，最多 REGION 个字符。
+// 所以按「段」核：从曲名命中点到下一个曲名（含索引认不出来的那批）为止，最多 REGION 个字符。
 // 一段里的每个定数形状数字都要核，只核第一个会漏：列表里第一个数字往往本来就是对的
 // （EXP 的 12.5），它改不动，后面的旧值就整条溜过去了——这正是「上一条老定数、这一条
 // 新定数」的来路。段尾交给 MAX_JUMP 兜底：段里别的数字（年份、分数、别人的定数）
 // 离这首歌任何一个定数都超过 1.0，会被当成别的东西放过。
 const REGION=180;
+// 但同一档的推荐列表里，别人的定数离这首歌的定数也就差零点几，MAX_JUMP 兜不住。所以段里
+// 第二个起的数字，要么跟上一个数字之间只隔着标点（「12.5、14.9」），要么隔着难度词
+// （「EXP 12+（12.5）、MASTER 15（定数14.9）」）；隔着别的字就不算这首歌的——那多半是一首
+// 没认出来的歌（别名库里没有的叫法、快照之后的新歌），或者拿来比较的档位（「比 14.5 那几首难」）。
+const LABEL=/(?<![a-z])(?:bas(?:ic)?|adv(?:anced)?|exp(?:ert)?|mas(?:ter)?|lun(?:atic)?|ult(?:ima)?|re:?\s*mas(?:ter)?|rem)(?![a-z])|[绿綠黄黃红紅紫白黑][谱譜]/i;
 // 数字后面要不要补一句当前值：只在「时效句」里用。位置就在数字后，读者一眼能连上。
 const currentNote=value=>"（当前定数 "+value+"）";
 
@@ -135,13 +196,16 @@ function verifyConstants(knowledge,text,game,extra){
   if(!knowledge||typeof text!=="string"||!text)return {text,fixes};
   const hits=findTitles(knowledge,text,extra);
   if(!hits.length)return {text,fixes};
-  for(let i=0;i<hits.length;i++){
-    const hit=hits[i];
-    const stop=Math.min(hits[i+1]?hits[i+1].start:text.length,hit.end+REGION);
-    const region=text.slice(hit.end,stop);
+  const starts=[...hits,...findUnindexed(knowledge,text,hits)].map(span=>span.start);
+  for(const hit of hits){
+    const next=Math.min(text.length,...starts.filter(at=>at>=hit.end));
+    const region=text.slice(hit.end,Math.min(next,hit.end+REGION));
     const scan=new RegExp(CONSTANT.source,"g");
-    let found;
+    let found,previous=-1;
     while((found=scan.exec(region))!==null){
+      const gap=previous<0?"":region.slice(previous,found.index);
+      previous=found.index+found[0].length;
+      if(/\p{L}/u.test(gap)&&!LABEL.test(gap))continue;
       const value=Number(found[1]+"."+found[2]);
       const at=hit.end+found.index,end=at+found[0].length;
       const chart=nearestConstant(knowledge,hit.title,value,game);
@@ -172,4 +236,4 @@ function verifyConstants(knowledge,text,game,extra){
   return {text:out,fixes};
 }
 
-module.exports={verifyConstants,findTitles,nearestConstant,candidates,sentenceAround,STALE};
+module.exports={verifyConstants,findTitles,findUnindexed,nearestConstant,candidates,sentenceAround,STALE};

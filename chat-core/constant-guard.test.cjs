@@ -20,17 +20,16 @@ const CHARTS=[
 // （MAS 15.2）更近——正是「按数值最近跨游戏挑」会挑错的那一类，所以要单独夹具。
 const ONGEKI=[["Love & Justice","EXP","12",12.6],["Love & Justice","MAS","14+",14.7]];
 const rows=list=>list.map(([title,difficulty,level,constant])=>({title,difficulty,level,constant,bpm:null,version:null,id:title}));
-function fixture(games=["chunithm"]){
+function load(sets){
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),"guard-"));
   fs.mkdirSync(path.join(dir,"knowledge"));
-  for(const game of games){
-    const charts=game==="ongeki"?ONGEKI:CHARTS;
+  for(const [game,charts] of Object.entries(sets))
     fs.writeFileSync(path.join(dir,"knowledge",game+".json"),JSON.stringify({source:"fixture",scope:"fixture",charts:rows(charts)}));
-  }
   const knowledge=loadKnowledge(dir);
   fs.rmSync(dir,{recursive:true,force:true});
   return knowledge;
 }
+const fixture=(games=["chunithm"])=>load(Object.fromEntries(games.map(game=>[game,game==="ongeki"?ONGEKI:CHARTS])));
 const guard=(text,game)=>verifyConstants(fixture(),text,game);
 
 test("社区老帖里的旧定数会被曲库当前值改掉",()=>{
@@ -193,4 +192,64 @@ test("正文里写的是正式别名时也认得出那首歌",()=>{
   assert.equal(r.fixes[0].title,"Dengeki Tube");
   // 没给别名表就认不出来：宁可漏改，也不能拿近似词去猜是哪首歌
   assert.equal(verifyConstants(knowledge,"电管的紫谱 14.9，偏水。","chunithm").fixes.length,0);
+});
+
+// ── 索引认不出来的曲名（线上实测）────────────────────────────────────
+// 「推荐几个好吃分的14」那条：模型把 μ3 的 EXP 正确写成 14.3，裁决层却改成了 14.2。
+// μ3 规范化后只有两个字，不进曲名索引；光焔のラテラルアーク的段一直延伸过去，14.3 离
+// 光焔 EXP 的 14.2 只差 0.1，被当成光焔的报错值「改正」了。定数取自真实快照。
+const LIST=[
+  ["光焔のラテラルアーク","ADV","10",10.4],["光焔のラテラルアーク","EXP","14",14.2],["光焔のラテラルアーク","MAS","15",15.3],
+  ["μ3","ADV","11",11.4],["μ3","EXP","14",14.3],["μ3","MAS","15",15.6],
+  ["THE CELESTIA 180","ADV","11+",11.7],["THE CELESTIA 180","EXP","14",14.4],["THE CELESTIA 180","MAS","15",15.4],
+  ["∀","EXP","13",13],["∀","MAS","14+",14.9],
+  ["心","EXP","9+",9.7],["心","MAS","14",14.6],
+  ["竹","EXP","12",12.2],["竹","MAS","14",14.3],
+];
+const listed=text=>verifyConstants(load({ongeki:LIST}),text,"ongeki");
+
+test("短曲名后面的定数不算到前一首头上（线上原句）",()=>{
+  const text="按定数从低到高：lovelynonsense（14.1）、光焔のラテラルアーク（14.2）、μ3（14.3）、THE CELESTIA 180（14.4）。";
+  const r=listed(text);
+  assert.equal(r.text,text,"μ3 的 14.3 本来就对，不能改成光焔的 14.2");
+  assert.deepEqual(r.fixes,[]);
+});
+
+test("短曲名、纯符号曲名夹在前一首和数字之间，也把前一首的段截断",()=>{
+  for(const text of ["光焔のラテラルアーク也挺好。μ3 是 14.3。","光焔のラテラルアーク也行，∀ 的 MAS 14.9。"]){
+    assert.equal(listed(text).text,text,text);
+  }
+});
+
+test("短曲名后面跟着虚词照样认：「竹的紫谱 14.3」",()=>{
+  const text="光焔のラテラルアーク的红谱 14.2，竹的紫谱 14.3 也不错。";
+  assert.equal(listed(text).text,text);
+});
+
+test("粘在词里的短曲名不算：「开心」里的「心」不截断，后面的旧值照样改",()=>{
+  const r=listed("光焔のラテラルアーク打着很开心，紫谱 14.9。");
+  assert.equal(r.text,"光焔のラテラルアーク打着很开心，紫谱 15.3。");
+});
+
+test("短曲名只当段界，不当修改依据",()=>{
+  // μ3 写错了也不改：「心」「神曲」「月光」这种字眼在中文里到处都是，拿短曲名去改数字会把
+  // 别的话改错。宁可漏改。
+  const text="μ3（14.2）也不错。";
+  assert.equal(listed(text).text,text);
+});
+
+test("没认出来的曲名（快照之后的新歌、别名库里没有的叫法）后面的定数不算到前一首头上",()=>{
+  // Titania 不在这份夹具里，相当于快照之后才出的新歌；同一档的定数离 Dengeki Tube 的 MAS 不到 1.0。
+  const text="Dengeki Tube（15.2）、Titania（14.9）都能上分。";
+  assert.equal(guard(text).text,text);
+});
+
+test("拿来比较的档位不当成这首歌的定数",()=>{
+  const text="Dengeki Tube 的紫谱是 15.2，比 14.5 那几首难不少。";
+  assert.equal(guard(text).text,text,"改了就成了「比 15.2 那几首难」");
+});
+
+test("只隔着标点的一串定数照旧逐个核",()=>{
+  const r=guard("Dengeki Tube 四张谱的定数分别是 4、7.5、12.5、14.9。");
+  assert.equal(r.text,"Dengeki Tube 四张谱的定数分别是 4、7.5、12.5、15.2。");
 });

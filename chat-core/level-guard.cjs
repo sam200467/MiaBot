@@ -9,7 +9,7 @@
 // 可以同时有 MAS 14+ 和 ULT 15（Air 就是），按主谱面判会把这类歌误判成不合格。
 // 反过来，Dengeki Tube 是 BAS 4／ADV 7+／EXP 12+／MAS 15，四张谱里一张 14+ 都没有——
 // 这就是要拦下的那种老资料推荐。
-const {findTitles,sentenceAround}=require("./constant-guard.cjs");
+const {findTitles,findUnindexed,sentenceAround}=require("./constant-guard.cjs");
 const {normalize,matchTitle,gameInText}=require("./knowledge.cjs");
 
 // 档位：13／14／14+／15 这类。前后都不能接数字或小数点——「14.3 打 1000737 分能有多少
@@ -119,7 +119,10 @@ function dropRecommendations(text,violations,{knowledge,aliases}={}){
   const dropped=[],kept=[];
   const original=String(text||"");
   if(!original||!violations?.length)return {text:original,dropped,kept};
-  const hits=knowledge?findTitles(knowledge,original,aliases):[];
+  // 索引认不出来的短曲名（μ3、心、竹…）也算「别的曲名」：漏了它们，「X 和 μ3 都能上分」
+  // 会因为 X 不合格被整块删掉，连带删掉本来合格的 μ3。
+  const named=knowledge?findTitles(knowledge,original,aliases):[];
+  const hits=[...named,...findUnindexed(knowledge,original,named)];
   const spans=[];
   for(const item of violations){
     if(item.at==null||item.end==null){kept.push(item);continue;}

@@ -18,12 +18,12 @@ const CHARTS=[
 // 同一首歌在音击是 14+（中二是 15）：跨游戏时不能拿另一款的数据判资格。
 const ONGEKI=[["Dengeki Tube","MAS","14+",14.7]];
 const rows=list=>list.map(([title,difficulty,level,constant])=>({title,difficulty,level,constant}));
-function fixture(games=["chunithm"]){
+function fixture(games=["chunithm"],charts=CHARTS){
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),"level-"));
   fs.mkdirSync(path.join(dir,"knowledge"));
   for(const game of games){
     fs.writeFileSync(path.join(dir,"knowledge",game+".json"),
-      JSON.stringify({source:"fixture",scope:"fixture",charts:rows(game==="ongeki"?ONGEKI:CHARTS)}));
+      JSON.stringify({source:"fixture",scope:"fixture",charts:rows(game==="ongeki"?ONGEKI:charts)}));
   }
   const knowledge=loadKnowledge(dir);
   fs.rmSync(dir,{recursive:true,force:true});
@@ -132,6 +132,15 @@ test("那一小块里还讲着别的歌就不删——逐字抠会抠出断句",
   assert.deepEqual(r.dropped,[]);
   assert.deepEqual(r.kept.map(i=>i.title),["Dengeki Tube"]);
   assert.equal(r.text,text,"宁可退到末尾说明，也不能留下「和 都能上分」");
+});
+test("索引认不出来的短曲名也算别的歌：不能跟着不合格的那首一起删掉",()=>{
+  // 竹规范化后只有一个字，不进曲名索引。认不出来的话，这一块会因为 Dengeki Tube 不合格
+  // 被整块删掉，连带删掉本来合格的竹（中二 MAS 14+）。
+  const text="Titania 14.9 也可以。Dengeki Tube 和竹都能上分。";
+  const r=drop(text,fixture(["chunithm"],[...CHARTS,["竹","MAS","14+",14.9]]));
+  assert.deepEqual(r.dropped,[]);
+  assert.deepEqual(r.kept.map(i=>i.title),["Dengeki Tube"]);
+  assert.equal(r.text,text);
 });
 test("删完就没内容了也不删：整条回复就是那条推荐",()=>{
   const text="中二水的14+，我觉得 Dengeki Tube 15.2 挺合适。";
