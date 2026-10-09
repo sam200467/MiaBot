@@ -337,3 +337,74 @@ test("被动凭据复用：开关打开后改用该目标最新一条消息的�
     "要用新鲜凭据，否则 5 分钟的群窗口早就过期了");
   await transport.stop(); await mock.stop();
 });
+
+// ── 引用回复的原文（message_type 103 + msg_elements）──────────────────
+// 形状照官方文档（C2C_MESSAGE_CREATE / GROUP_MESSAGE_CREATE，2026-09-16 版）：
+// 被引用那条在 msg_elements 里，ext 的 ref_msg_idx 指向它的 msg_idx。
+
+const quotedEvent = (over = {}) => ({
+  id: "q1", group_openid: "G1", content: "<@5FE5240E> 你觉得像吗", message_type: 103,
+  author: { member_openid: "U1" },
+  mentions: [{ bot: true, id: "5FE5240E", is_you: true, member_openid: "5FE5240E" }],
+  message_scene: { source: "default", ext: ["msg_idx=REFIDX_self==", "auth_token=x", "ref_msg_idx=REFIDX_cake=="] },
+  msg_elements: [{
+    msg_idx: "REFIDX_cake==", message_type: 0, content: " 定做的蛋糕 ",
+    author: { id: "U1", member_openid: "U1", username: "sam", bot: false },
+    attachments: [{ content_type: "image/jpeg", filename: "cake.jpg", url: "https://multimedia.nt.qq.com.cn/download?fileid=SECRET_FILE&rkey=SECRET_RKEY" }],
+  }],
+  ...over,
+});
+
+test("引用回复：按 ref_msg_idx 取出被引用那条的正文和附件", () => {
+  const t = createOfficial({ appId: "1", clientSecret: "s" });
+  const ev = t.normalize("GROUP_MESSAGE_CREATE", quotedEvent());
+  assert.equal(ev.content, "你觉得像吗");
+  assert.equal(ev.refId, "REFIDX_self==", "回复时引用的仍是本条自己的 msg_idx，不是被引用那条的");
+  assert.equal(ev.quote.content, "定做的蛋糕");
+  assert.equal(ev.quote.fromSelf, false);
+  assert.equal(ev.quote.attachments.length, 1);
+  assert.equal(ev.quote.attachments[0].content_type, "image/jpeg");
+});
+
+test("引用回复：被引用的是美亚自己（作者 openid 跟本条 @ 到的自己对上）", () => {
+  const t = createOfficial({ appId: "1", clientSecret: "s" });
+  const mine = quotedEvent();
+  mine.msg_elements[0].author = { id: "5FE5240E", member_openid: "5FE5240E", username: "MiaBot", bot: true };
+  assert.equal(t.normalize("GROUP_MESSAGE_CREATE", mine).quote.fromSelf, true);
+  // 别的 bot 发的不算自己
+  const other = quotedEvent();
+  other.msg_elements[0].author = { id: "C19063DA", member_openid: "C19063DA", bot: true };
+  assert.equal(t.normalize("GROUP_MESSAGE_CREATE", other).quote.fromSelf, false);
+  // 私聊里的机器人只可能是自己
+  const c2c = t.normalize("C2C_MESSAGE_CREATE", { ...quotedEvent(), author: { user_openid: "U2" },
+    msg_elements: [{ msg_idx: "REFIDX_cake==", content: "刚才那句", author: { id: "BOT", bot: true } }] });
+  assert.equal(c2c.quote.fromSelf, true);
+  assert.equal(c2c.quote.content, "刚才那句");
+});
+
+test("引用回复：对不上 msg_idx 时，列表只有一条就用那条（官方示例那种），多条就不猜", () => {
+  const t = createOfficial({ appId: "1", clientSecret: "s" });
+  const single = t.normalize("GROUP_MESSAGE_CREATE", quotedEvent({ msg_elements: [{ content: "=== 消息 1 ===" }] }));
+  assert.equal(single.quote.content, "=== 消息 1 ===");
+  assert.deepEqual(single.quote.attachments, []);
+  const many = t.normalize("GROUP_MESSAGE_CREATE", quotedEvent({ msg_elements: [{ msg_idx: "A", content: "一" }, { msg_idx: "B", content: "二" }] }));
+  assert.equal(many.quote, null);
+  assert.match(many.quoteShape, /msg_elements 2 条：#0 msg_idx 对不上/);
+});
+
+test("不是引用回复：quote 为 null、没有结构摘要；有 103 没元素也不编一条", () => {
+  const t = createOfficial({ appId: "1", clientSecret: "s" });
+  const plain = t.normalize("GROUP_MESSAGE_CREATE", { id: "m", group_openid: "G1", content: "早", message_type: 0 });
+  assert.equal(plain.quote, null);
+  assert.equal(plain.quoteShape, "");
+  const empty = t.normalize("GROUP_MESSAGE_CREATE", quotedEvent({ msg_elements: [] }));
+  assert.equal(empty.quote, null);
+  assert.match(empty.quoteShape, /^type=103｜ref_msg_idx 有｜msg_elements 0 条$/);
+});
+
+test("引用消息的结构摘要：只有字段名和附件种类，不带正文和图片地址", () => {
+  const t = createOfficial({ appId: "1", clientSecret: "s" });
+  const shape = t.normalize("GROUP_MESSAGE_CREATE", quotedEvent()).quoteShape;
+  assert.equal(shape, "type=103｜ref_msg_idx 有｜msg_elements 1 条：#0 msg_idx 对上 type=0 正文 5 字 附件 image/jpeg×1 字段 attachments,author,content,message_type,msg_idx");
+  assert.doesNotMatch(shape, /SECRET|蛋糕|https?:/);
+});

@@ -850,3 +850,155 @@ test("带来源的回复：发到 QQ 的那条里「参考资料」前面空一�
     assert.ok(!logs.some((line) => /疑似未写完/.test(line)), logs.join("\n"));
   } finally { await bot.stop(); await mock.stop(); }
 });
+
+// ── 读引用（quotedMessage，默认关）──────────────────────────────────
+// 「回复」一张图再 @ 美亚：被引用的那条在事件的 msg_elements 里（官方 2026-09-16 版文档的形状）。
+// 2026-10-09 群里实测：读引用之前，这种问法被路由判成「问图但没图」，回一句「这边暂时看不到图片里的内容」。
+const PNG_1PX = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+const CAKE_URL = "https://multimedia.nt.qq.com.cn/download?appid=1&fileid=CAKE&rkey=RKEY&spec=0";
+const quotedImageEvent = (over = {}) => groupEvent({
+  content: "猫猫这个是定做的你的蛋糕，你觉得像吗", message_type: 103,
+  message_scene: { source: "default", ext: ["msg_idx=REFIDX_self==", "ref_msg_idx=REFIDX_cake=="] },
+  msg_elements: [{ msg_idx: "REFIDX_cake==", message_type: 0, content: "",
+    author: { id: "U1", member_openid: "U1", bot: false },
+    attachments: [{ content_type: "image/jpeg", filename: "cake.jpg", url: CAKE_URL, width: 1080, height: 1440, size: 300000 }] }],
+  ...over,
+});
+function imageFetcher(fetched, ok = true) {
+  return async (url) => {
+    fetched.push(String(url));
+    return ok ? new Response(PNG_1PX, { status: 200, headers: { "content-type": "image/png", "content-length": String(PNG_1PX.length) } })
+      : new Response("gone", { status: 404 });
+  };
+}
+const systemText = (body) => body.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
+
+test("读引用：默认关时跟改造前一模一样——不下载引用里的图，送给模型的请求跟没引用时逐字相同", async () => {
+  const runs = [];
+  for (const event of [quotedImageEvent(), groupEvent({ content: "猫猫这个是定做的你的蛋糕，你觉得像吗" })]) {
+    const fetched = [], logs = [];
+    const { mock, bot, model } = await setup({}, { botDeps: { mediaFetchImpl: imageFetcher(fetched), log: (line) => logs.push(line) } });
+    try {
+      assert.equal(bot.readQuoted, false);
+      await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", event);
+      assert.ok(await mock.waitFor(() => mock.state.sent.length > 0));
+      runs.push({ fetched, logs, model });
+    } finally { await bot.stop(); await mock.stop(); }
+  }
+  const [withQuote, plain] = runs;
+  assert.deepEqual(withQuote.fetched, [], "关着时不该去下引用里的图");
+  assert.equal(withQuote.model.calls.length, 1);
+  assert.equal(withQuote.model.routeCalls.length, 1);
+  assert.deepEqual(withQuote.model.routeCalls.map((body) => body.messages), plain.model.routeCalls.map((body) => body.messages));
+  assert.deepEqual(withQuote.model.calls[0].body.messages, plain.model.calls[0].body.messages);
+  assert.match(systemText(withQuote.model.calls[0].body), /没有附带原图数据的引用图片仍然看不到，不能猜测。/);
+  assert.ok(!withQuote.logs.some((line) => /引用消息结构|读引用/.test(line)), withQuote.logs.join("\n"));
+});
+
+test("读引用开着：回复一张图再 @ 美亚，那张图和本条的话一起交给模型，不再回「看不到」", async () => {
+  const fetched = [], logs = [];
+  const { mock, bot, model } = await setup({ quotedMessage: "read" }, {
+    reply: "像！连耳朵都做出来了喵～", botDeps: { mediaFetchImpl: imageFetcher(fetched), log: (line) => logs.push(line) },
+  });
+  try {
+    assert.ok(logs.some((line) => /^读引用：开/.test(line)), logs.join("\n"));
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", quotedImageEvent());
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > 0));
+    assert.deepEqual(fetched, [CAKE_URL]);
+    assert.equal(model.routeCalls.length, 0, "看得到图就不走路由，跟直接发图一样");
+    assert.equal(model.calls.length, 1);
+    const body = model.calls[0].body;
+    const user = body.messages.filter((m) => m.role === "user").at(-1);
+    assert.equal(user.content[0].text, "猫猫这个是定做的你的蛋糕，你觉得像吗");
+    assert.equal(user.content[1].type, "image_url");
+    assert.match(user.content[1].image_url.url, /^data:image\/png;base64,/);
+    const system = systemText(body);
+    assert.match(system, /本条消息引用（回复）了下面这条消息[^\n]*\n群友：\[图片 1 张（原图已随本条消息一起给你）\]/);
+    assert.match(system, /用户回复（引用）的那条消息里的图片，程序取到原图时也会一起提供给你/);
+    assert.doesNotMatch(system, /没有附带原图数据的引用图片仍然看不到/);
+    assert.match(mock.state.sent.at(-1).body.content, /连耳朵都做出来了/);
+    assert.equal(logs.find((line) => line.startsWith("引用消息结构")),
+      "引用消息结构（已取到被引用那条）：type=103｜ref_msg_idx 有｜msg_elements 1 条：#0 msg_idx 对上 type=0 正文 0 字 附件 image/jpeg×1 字段 attachments,author,content,message_type,msg_idx");
+    assert.ok(!logs.some((line) => /CAKE|RKEY/.test(line)), "日志里不该有图片地址：\n" + logs.join("\n"));
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+test("读引用开着：本条自己也带图时，自己的图排前面，提示词里说清引用的图排在后面", async () => {
+  const fetched = [];
+  const { mock, bot, model } = await setup({ quotedMessage: "read" }, { botDeps: { mediaFetchImpl: imageFetcher(fetched) } });
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", quotedImageEvent({
+      content: "左边是成品，你看哪个更像", attachments: [{ content_type: "image/png", url: "https://example.invalid/mine.png" }] }));
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > 0));
+    assert.deepEqual(fetched, ["https://example.invalid/mine.png", CAKE_URL]);
+    const user = model.calls[0].body.messages.filter((m) => m.role === "user").at(-1);
+    assert.equal(user.content.filter((part) => part.type === "image_url").length, 2);
+    assert.match(systemText(model.calls[0].body), /\n群友：\[图片 1 张（原图已随本条消息一起给你，排在本条自己那 1 张后面）\]/);
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+test("读引用开着：引用里的图取不到时写明看不到；只 @ 不说话的那种直接回看不到，不让模型猜", async () => {
+  const fetched = [];
+  const { mock, bot, model } = await setup({ quotedMessage: "read" }, { botDeps: { mediaFetchImpl: imageFetcher(fetched, false) } });
+  bot.settings.c.limits.userCooldownSeconds = 0;
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", quotedImageEvent());
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > 0));
+    assert.equal(fetched.length, 1);
+    assert.equal(model.calls.length, 1);
+    const body = model.calls[0].body;
+    assert.ok(!body.messages.some((m) => Array.isArray(m.content)), "取不到原图就不能带图");
+    assert.match(systemText(body), /\n群友：\[图片（内容看不到）\]/);
+    const routeSystem = model.routeCalls[0].messages[0].content;
+    assert.ok(routeSystem.includes('图片接入状态：{"hasImage":true,"hasReference":true,"visionAvailable":false,"images":[],"quotedImages":1}'), routeSystem.slice(-400));
+    // 只 @ 了一下、没说话：本条正文是「[图片]」，路由按「问图但没图」直接回看不到
+    const before = mock.state.sent.length;
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", quotedImageEvent({ content: " " }));
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > before));
+    assert.match(mock.state.sent.at(-1).body.content, /呜喵.*看不到/);
+    assert.equal(model.calls.length, 1, "这一句没进聊天模型");
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+test("读引用开着：引用的是美亚自己的话，署名写明是她自己；语音之类只标一句、不下载", async () => {
+  const fetched = [];
+  const { mock, bot, model } = await setup({ quotedMessage: "read" }, { botDeps: { mediaFetchImpl: imageFetcher(fetched) } });
+  try {
+    await bot.handleEvent("GROUP_MESSAGE_CREATE", groupEvent({
+      content: "<@MIA_OPENID> 这首是哪个难度", message_type: 103,
+      mentions: [{ bot: true, id: "MIA_OPENID", is_you: true, member_openid: "MIA_OPENID" }],
+      message_scene: { source: "default", ext: ["ref_msg_idx=REFIDX_mine=="] },
+      msg_elements: [{ msg_idx: "REFIDX_mine==", content: "推荐你打\n\nμ3 喵", author: { id: "MIA_OPENID", member_openid: "MIA_OPENID", bot: true },
+        attachments: [{ content_type: "voice", url: "https://example.invalid/a.silk" }] }],
+    }));
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > 0));
+    assert.deepEqual(fetched, []);
+    assert.match(systemText(model.calls[0].body), /\n美亚（你自己）：推荐你打 μ3 喵 \[语音\]$/m);
+    assert.ok(model.routeCalls[0].messages.some((m) => String(m.content).includes("美亚（你自己）：推荐你打 μ3 喵")), "路由也看得到被引用的那句");
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+test("读引用：配置写错按关闭处理，启动日志里说清楚", async () => {
+  const logs = [];
+  const { mock, bot } = await setup({ quotedMessage: "on" }, { botDeps: { log: (line) => logs.push(line) } });
+  try {
+    assert.equal(bot.readQuoted, false);
+    assert.ok(logs.includes("⚠ quotedMessage 只能是 off / read，读引用先按关闭处理"), logs.join("\n"));
+    assert.ok(!logs.some((line) => /^读引用：开/.test(line)));
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+test("读引用开着：聊天记录里记下她看到的那条引用，不记图片地址和图本身", async () => {
+  const fetched = [];
+  const { mock, bot } = await setup({ quotedMessage: "read", chatLog: { mode: "replies" } }, { botDeps: { mediaFetchImpl: imageFetcher(fetched) } });
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", quotedImageEvent());
+    assert.ok(await mock.waitFor(() => readChatLog(bot.chatLog.dir).length > 0));
+    const [r] = readChatLog(bot.chatLog.dir);
+    assert.equal(r.text, "猫猫这个是定做的你的蛋糕，你觉得像吗");
+    assert.equal(r.image, true);
+    assert.equal(r.quote, true);
+    assert.equal(r.quoted, "群友：[图片 1 张（原图已随本条消息一起给你）]");
+    assert.doesNotMatch(JSON.stringify(r), /CAKE|RKEY|base64/);
+  } finally { await bot.stop(); await mock.stop(); }
+});

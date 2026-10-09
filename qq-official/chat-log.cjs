@@ -63,8 +63,10 @@ function turnRecord(turn, finishedAt = Date.now()) {
     msgId: String(event.msgId || message.id || ""),
     text: String(turn.text ?? ""),
     ...(media.hasImage ? { image: true } : {}),
-    // 用户点了「回复」某条消息：官方接口读不到被引用的那条，排查时要知道她是缺着这块答的
+    // 用户点了「回复」某条消息。读引用（quotedMessage）关着时她是缺着这块答的，排查时要知道；
+    // 开着时把她看到的那条一起记下（就是交给模型的那一行，图只记看没看到）。
     ...(media.hasReference ? { quote: true } : {}),
+    ...(message.__quoted ? { quoted: String(message.__quoted) } : {}),
     context: (turn.context || []).map(String),
     historyTurns: Number(turn.historyTurns) || 0,
   };

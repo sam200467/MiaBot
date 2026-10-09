@@ -351,6 +351,57 @@ function createOfficial(host) {
     return null;
   }
 
+  // 引用回复（message_type 103）：被引用的那条就在本事件的 msg_elements 里，带着它的正文和附件
+  // （图片下载地址），不用另外去拉 —— 群聊和单聊本来也没有按 id 拉单条消息的接口。
+  //   - message_scene.ext 里的 ref_msg_idx = 被引用那条的 msg_idx（跟上面 extractRefId 取的
+  //     msg_idx 不是一回事：那个是**本条**的，回复时拿来引用本条用）
+  //   - 按它在 msg_elements 里找。找不到、而列表只有一条时就用那一条：官方示例里那条没带 msg_idx。
+  // 出处：bot.q.qq.com/wiki 的 C2C_MESSAGE_CREATE / GROUP_MESSAGE_CREATE 两页（2026-09-16 版）；
+  // NoneBot 的 adapter-qq（_check_reply）也是这么取的。
+  // ⚠ message_reference 是频道接口的字段，群聊和单聊的事件里没有。
+  // isSelf(author)：被引用的这条是不是机器人自己发的 —— 「你自己说的」和「别人说的」对模型是两件事。
+  function extractQuote(d, isSelf) {
+    if (Number(d?.message_type) !== 103 || !Array.isArray(d?.msg_elements)) return null;
+    const elements = d.msg_elements.filter((e) => e && typeof e === "object");
+    if (!elements.length) return null;
+    const ext = Array.isArray(d?.message_scene?.ext) ? d.message_scene.ext.map(String) : [];
+    const quotedIdx = ext.find((s) => s.startsWith("ref_msg_idx="))?.slice("ref_msg_idx=".length).trim() || null;
+    const element = (quotedIdx && elements.find((e) => String(e.msg_idx || "") === quotedIdx)) ||
+      (elements.length === 1 ? elements[0] : null);
+    if (!element) return null;
+    const author = element.author && typeof element.author === "object" ? element.author : {};
+    return {
+      fromSelf: isSelf(author),
+      content: stripMentionMarkers(element.content),
+      attachments: Array.isArray(element.attachments) ? element.attachments.filter((a) => a && typeof a === "object") : [],
+    };
+  }
+
+  // 引用消息的结构摘要，只给日志用：字段名、类型、附件种类和个数，**不含正文和图片地址**。
+  // 官方示例只演示过纯文字的引用，被引用的图到底在不在推送里，第一次线上实测要靠这一行确认。
+  function quoteShape(d) {
+    if (Number(d?.message_type) !== 103 && !Array.isArray(d?.msg_elements)) return "";
+    const ext = Array.isArray(d?.message_scene?.ext) ? d.message_scene.ext.map(String) : [];
+    const quotedIdx = ext.find((s) => s.startsWith("ref_msg_idx="))?.slice("ref_msg_idx=".length).trim() || "";
+    const elements = Array.isArray(d?.msg_elements) ? d.msg_elements : [];
+    const parts = elements.slice(0, 5).map((e, i) => {
+      if (!e || typeof e !== "object") return "#" + i + " 不是对象";
+      const kinds = new Map();
+      for (const a of Array.isArray(e.attachments) ? e.attachments : []) {
+        const kind = String(a?.content_type || "未标类型");
+        kinds.set(kind, (kinds.get(kind) || 0) + 1);
+      }
+      return "#" + i +
+        (e.msg_idx ? (quotedIdx && String(e.msg_idx) === quotedIdx ? " msg_idx 对上" : " msg_idx 对不上") : " 没有 msg_idx") +
+        " type=" + (e.message_type ?? "?") + " 正文 " + String(e.content ?? "").trim().length + " 字" +
+        " 附件 " + ([...kinds].map(([kind, n]) => kind + "×" + n).join(" ") || "无") +
+        (Array.isArray(e.msg_elements) ? " 嵌套 " + e.msg_elements.length + " 条" : "") +
+        " 字段 " + Object.keys(e).sort().join(",");
+    });
+    return "type=" + (d?.message_type ?? "?") + "｜ref_msg_idx " + (quotedIdx ? "有" : "无") +
+      "｜msg_elements " + elements.length + " 条" + (parts.length ? "：" + parts.join("；") : "");
+  }
+
   // 本条消息 @ 了谁。官方把 @ 放在 d.mentions 数组里（跟 OneBot 的 at 段完全是两回事）。
   //
   // ── 实测形状（2026-09-19，正式环境，开了全量群消息的群）──
@@ -420,6 +471,13 @@ function createOfficial(host) {
         mentionsSelf: mentions.some((m) => m.self),
         mentionsEveryone: containsEveryoneMention(d, mentions),
         refId: extractRefId(d),
+        // 群里认「被引用的是不是自己」：跟本条 mentions 里 is_you 那一项的 openid 比。
+        // 没 @ 到自己的消息比不了，就当不是 —— 只影响提示词里那条署名，不影响读不读。
+        quote: extractQuote(d, (author) => {
+          const selfId = mentions.find((m) => m.self)?.id || "";
+          return Boolean(selfId) && String(author.member_openid || author.id || "") === selfId;
+        }),
+        quoteShape: quoteShape(d),
         at, raw: d,
       };
     }
@@ -434,6 +492,8 @@ function createOfficial(host) {
         mentionedOpenids: [],   // 私聊没有 @ 这回事
         mentionsSelf: true,     // 私聊本来就等于对着它说话
         refId: extractRefId(d),
+        quote: extractQuote(d, (author) => author.bot === true),   // 私聊里的机器人只可能是自己
+        quoteShape: quoteShape(d),
         at, raw: d,
       };
     }

@@ -64,8 +64,12 @@ async function readLimitedBody(response, limit) {
   return Buffer.concat(chunks, size);
 }
 
-async function fetchIncomingImages(attachments, fetchImpl, log) {
-  const candidates = attachments.filter(a => /^image\//i.test(String(a.content_type || a.contentType || "")) || /\.(?:png|jpe?g|gif|webp)(?:\?|$)/i.test(String(a.filename || a.url || ""))).slice(0, MAX_INBOUND_IMAGES);
+const isImageAttachment = a => /^image\//i.test(String(a.content_type || a.contentType || "")) || /\.(?:png|jpe?g|gif|webp)(?:\?|$)/i.test(String(a.filename || a.url || ""));
+
+// quoted：其中哪些附件来自被引用的那条。取到的图带上 quoted 标记，提示词里才说得清
+// 「引用里的图看到了几张」；本条自己的图不带标记，跟改造前一样只有 url。
+async function fetchIncomingImages(attachments, fetchImpl, log, quoted = new Set()) {
+  const candidates = attachments.filter(isImageAttachment).slice(0, MAX_INBOUND_IMAGES);
   const images = [];
   let total = 0;
   for (const attachment of candidates) {
@@ -82,13 +86,53 @@ async function fetchIncomingImages(attachments, fetchImpl, log) {
       const mime = imageMime(buffer);
       if (!mime) throw new Error("不是支持的 PNG/JPEG/GIF/WebP 图片");
       total += buffer.length;
-      images.push({ url: `data:${mime};base64,${buffer.toString("base64")}` });
+      images.push({ url: `data:${mime};base64,${buffer.toString("base64")}`, ...(quoted.has(attachment) ? { quoted: true } : {}) });
       if (total >= MAX_INBOUND_IMAGE_TOTAL_BYTES) break;
     } catch (error) {
       log("读取图片附件失败：" + (error?.name === "AbortError" ? "超时" : error?.message || error));
     } finally { clearTimeout(timer); }
   }
   return images;
+}
+
+// ── 读引用 ──────────────────────────────────────────────────────────
+// 用户「回复」某条消息再 @ 美亚时，被引用那条的正文和附件就在事件的 msg_elements 里
+// （传输层 extractQuote 取出来放在 event.quote）。config.local.json 的 quotedMessage：
+//   off（缺省）：不读。跟改造前逐字一致 —— 不下载、不进提示词，能力说明也还是「引用的图看不到」。
+//   read      ：被引用那条的图跟本条自己的图走同一条下载路径交给模型（排在本条的图后面，
+//               同样受 MAX_INBOUND_IMAGES 和大小上限约束），正文交给 chat.cjs 的 quoted 钩子。
+// 配错了按关闭处理，启动日志里说清楚（跟聊天记录同一个脾气）。
+const QUOTED_MODES = ["off", "read"];
+function quotedMessageSetting(raw) {
+  if (raw === undefined || raw === null) return { mode: "off" };
+  const mode = String(raw);
+  if (!QUOTED_MODES.includes(mode)) return { mode: "off", error: "quotedMessage 只能是 " + QUOTED_MODES.join(" / ") + "，读引用先按关闭处理" };
+  return { mode };
+}
+
+// 被引用那条在提示词里的样子（chat.cjs 会在前面加一句「本条消息引用（回复）了下面这条消息」）。
+// 署名照群上下文的规矩：别人一律「群友」，自己的话写明 —— 「你自己说的」和「别人说的」对模型是两件事。
+// 图要写清看没看到：取到原图的已经随本条交给模型；没取到的写死「内容看不到」，不然模型会以为自己看过。
+const QUOTED_MAX_CHARS = 400;   // 跟梨绪那边一样，比群上下文那条宽
+function attachmentLabel(attachment) {
+  const type = String(attachment.content_type || "");
+  if (/^voice$|^audio\//i.test(type)) return "[语音]";
+  if (/^video\//i.test(type)) return "[视频]";
+  return "[文件]";
+}
+function quotedLine(quote, media, selfName) {
+  const body = quote.content.replace(/\s+/g, " ").trim().slice(0, QUOTED_MAX_CHARS);
+  const total = media.quotedImages || 0;
+  const seen = media.images.filter((image) => image.quoted).length;
+  const own = media.images.length - seen;
+  const where = own ? "，排在本条自己那 " + own + " 张后面" : "";
+  const pictures = !total ? ""
+    : seen === total ? "[图片 " + total + " 张（原图已随本条消息一起给你" + where + "）]"
+    : seen ? "[图片 " + total + " 张（" + seen + " 张原图随本条消息一起给你了" + where + "；另外 " + (total - seen) + " 张内容看不到）]"
+    : "[图片（内容看不到）]";
+  const others = quote.attachments.filter((a) => !isImageAttachment(a)).map(attachmentLabel);
+  const text = [body, pictures, ...others].filter(Boolean).join(" ");
+  return text ? (quote.fromSelf ? selfName + "（你自己）" : "群友") + "：" + text : "";
 }
 
 // ── 配置 ────────────────────────────────────────────────────────────
@@ -235,6 +279,10 @@ function createMiaBot(config, deps = {}) {
     ...(deps.now ? { now: deps.now } : {}),
   });
 
+  // ── 读引用（默认关，见上面 quotedMessageSetting）────────────────────
+  const quoteConfig = quotedMessageSetting(config.quotedMessage);
+  const readQuoted = quoteConfig.mode === "read";
+
   // ── 指令层 ────────────────────────────────────────────────────────
   // loadConfig 已经强制校验过运行组件，所以生产路径上一定启用。这里是给
   // **嵌入式调用和测试**留的口子：配置不全就退化成纯聊天，但会**明确打一行日志**
@@ -342,7 +390,9 @@ function createMiaBot(config, deps = {}) {
           + "是不是掉线了、队列排了多少时才调用，打招呼和寒暄时绝对不要调用）。"
           + "结果和图片由程序发送，你只写一句引出话，**绝不自己报数字或曲名结论**。"
           + "删除别名需要用户用 /删除别名 指令，而且只有指定账号能用。"
-          + "当前消息直接附带的 PNG/JPEG/GIF/WebP 图片会随本轮请求提供给你，可以正常识别、描述和评价；没有附带原图数据的引用图片仍然看不到，不能猜测。"
+          + "当前消息直接附带的 PNG/JPEG/GIF/WebP 图片会随本轮请求提供给你，可以正常识别、描述和评价；"
+          + (readQuoted ? "用户回复（引用）的那条消息里的图片，程序取到原图时也会一起提供给你；取不到原图的仍然看不到，不能猜测。"
+            : "没有附带原图数据的引用图片仍然看不到，不能猜测。")
           + "数据源支持大饼和 rinnet，用户通过 /设置数据源 大饼 或 /设置数据源 rinnet 切换。两边绑定分别保存。"
           + "绑定账号只能把用户引到程序控制的 /绑定 流程：你不能索要、接收或转述邮箱、密码、卡号和验证码。"
           + "用户在群里提到绑定，就让他 @你 发 /绑定，并提醒邮箱和密码发出后立刻手动撤回。"
@@ -369,7 +419,8 @@ function createMiaBot(config, deps = {}) {
           + "「帮我查一下 id870」先搜索公共歌曲资料，不要擅自变成查个人成绩；"
           + "用户说的指令叫法（比如 b110 就是 B50+N10+P50 的分表）照办就行，"
           + "不要质疑人家「是不是想说别的」。能办就办，别把活儿推回去。"
-        : "运行时实际能力：你正在 QQ 里回复消息，可以查阅本地音击曲库；当前消息直接附带的图片可以读取，但没有原图数据的引用图片看不到。"
+        : "运行时实际能力：你正在 QQ 里回复消息，可以查阅本地音击曲库；当前消息直接附带的图片可以读取，"
+          + (readQuoted ? "它引用的那条消息里取得到原图的图片也可以读取，取不到原图的看不到。" : "但没有原图数据的引用图片看不到。")
           + (webLine ? "没有查分能力。" + webLine : "没有联网或查分能力。") + "可以按语境发送你的表情图。",
       // 工具清单与执行入口。模型只负责「挑哪个工具、参数是什么」，执行权在程序侧：
       // 能力名、参数、权限、绑定状态、冷却、队列、@ 名单，六道校验全在 mia-commands 里。
@@ -477,7 +528,8 @@ function createMiaBot(config, deps = {}) {
         const e = message.__event;
         return e.type === "group" ? readContext(e.openid, true) : [];
       },
-      quoted: () => "",   // 官方接口没有 get_msg，读不到被引用那条的内容
+      // 被引用那条：只在读引用开着时由 handleEvent 填（quotedLine），关着时这里永远是空的。
+      quoted: (message) => message.__quoted || "",
       // 聊天记录：只在开着时挂，而且只记群聊 —— 私聊不记。
       ...(chatLog ? {
         record: (turn) => { if (turn.message?.__event?.type === "group") chatLog.write(turnRecord(turn)); },
@@ -513,12 +565,16 @@ function createMiaBot(config, deps = {}) {
     }
 
     const attachments = Array.isArray(event.raw?.attachments) ? event.raw.attachments : [];
-    const imageAttachments = attachments.filter(a => /^image\//i.test(String(a.content_type || a.contentType || "")) || /\.(?:png|jpe?g|gif|webp)(?:\?|$)/i.test(String(a.filename || a.url || "")));
+    const imageAttachments = attachments.filter(isImageAttachment);
+    // 读引用关着时 quote 恒为 null，下面每一项都跟改造前一样。
+    const quote = readQuoted ? event.quote || null : null;
+    const quotedImages = quote ? quote.attachments.filter(isImageAttachment) : [];
     const media = {
-      hasImage: imageAttachments.length > 0,
-      hasReference: Boolean(event.raw?.message_reference || event.raw?.referenced_message),
+      hasImage: imageAttachments.length > 0 || quotedImages.length > 0,
+      hasReference: Boolean(event.raw?.message_reference || event.raw?.referenced_message || quote),
       visionAvailable: false,
       images: [],
+      ...(quote ? { quotedImages: quotedImages.length } : {}),
     };
     const text = String(event.content || "").trim() || (media.hasImage ? "[图片]" : "");
     if (!text) return;
@@ -591,11 +647,14 @@ function createMiaBot(config, deps = {}) {
 
     log("收到" + (event.type === "group" ? "群" : "私聊") + "消息（引用 id " +
       (event.refId ? "有 " + event.refId.slice(0, 16) + "…" : "无") + "）：" + text.slice(0, 60));
+    // 只记结构（字段名、附件种类和个数），不记正文和图片地址。读引用开着时，被引用的图到底
+    // 在不在推送里、为什么没读到，看这一行就知道。
+    if (readQuoted && event.quoteShape) log("引用消息结构（" + (quote ? "已取到被引用那条" : "没认出被引用那条") + "）：" + event.quoteShape);
     mark("MIA_BUSY:正在回复…");
     try {
       // 下面 finally 里统一收尾
       if (media.hasImage) {
-        media.images = await fetchIncomingImages(imageAttachments, mediaFetchImpl, log);
+        media.images = await fetchIncomingImages([...imageAttachments, ...quotedImages], mediaFetchImpl, log, new Set(quotedImages));
         media.visionAvailable = media.images.length > 0;
       }
       await chat.handle({
@@ -607,6 +666,7 @@ function createMiaBot(config, deps = {}) {
         __media: media,
         __event: event,
         __replyTo: event.msgId,
+        ...(quote ? { __quoted: quotedLine(quote, media, settings.characterName) } : {}),
       });
     } catch (error) {
       log("⚠ 处理失败：" + (error?.message || error));
@@ -634,7 +694,7 @@ function createMiaBot(config, deps = {}) {
   }
 
   return {
-    chat, transport, settings, allowGroups, readContext, commands, chatLog,
+    chat, transport, settings, allowGroups, readContext, commands, chatLog, readQuoted,
     handleEvent,
     mentionsSelf, pickTarget, commandAllowedInGroup,
     async start() {
@@ -670,6 +730,8 @@ function createMiaBot(config, deps = {}) {
         log("聊天记录：开｜只记美亚回复的群聊｜保留 " + chatLog.keepDays + " 天｜" + chatLog.dir +
           (removed ? "｜清掉过期的 " + removed + " 个" : ""));
       }
+      if (quoteConfig.error) log("⚠ " + quoteConfig.error);
+      if (readQuoted) log("读引用：开｜回复某条消息再 @ 美亚时，被引用那条的文字和图片会交给模型");
       if (commands && botOpenid) {
         log("提示：配置里还留着 botOpenid —— 它已经用不上了（实测 mention 的 id 跟 READY 的 botId 不是一套 id 空间）。现在靠平台给的 is_you 判，可以删掉这个键。");
       }
