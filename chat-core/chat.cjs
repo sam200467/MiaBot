@@ -26,7 +26,7 @@ function recordCandidate(state,{alias,title,game,charts,evidence},messages,optio
   }catch{/* 候选写不进去不影响回答 */}
 }
 const {needsPersonalRecords,unavailable}=require("./personal-recommendation.cjs");
-const {loadSearch,webRule,runWeb,attachSources,publicUrl}=require("./search.cjs");
+const {loadSearch,webRule,runWeb,attachSources,uniqueSources,publicUrl}=require("./search.cjs");
 const {researchPlan,researchRule,needsResearchRepair,ratingEvidence,hasSubject,rewriteQuery,INTENT_RULE,authorizeWeb,webDeniedNote}=require("./research-policy.cjs");
 // 联网判断层（2026-10-09）：开着时取代上面那套研究层的联网入口，见 search-gate.cjs 开头。
 const {gateSettings,prepareGate,describeGate,gateRule,relevantSources,targetProblem,offerPresent,unsure,affirmative,EVIDENCE_PREFIX}=require("./search-gate.cjs");
@@ -834,11 +834,12 @@ async function requestReply(settings, messages, options={}) {
   //      东西只要没进答案，一条都不该出现在群里（线上实测：本地答得完的问题底下挂着
   //      「企业微信群怎么查群主」「Apple Music 单曲页」）。
   // 来源明细仍然进日志（相关/引用/展示三个数 + 引用到的标题），调试不受影响。
-  const cited=sources.filter(item=>Array.isArray(result.sourceIds)&&result.sourceIds.includes(item.id)).slice(0,2);
+  // 同一个页面的不同地址（维基百科的 /zh-hk/ 和 /wiki/ 之类）先合并再截前两条，免得重复的占掉第二个位置。
+  const cited=uniqueSources(sources.filter(item=>Array.isArray(result.sourceIds)&&result.sourceIds.includes(item.id))).slice(0,2);
   sourceStats.cited=cited.length;
   if(asksSource){
     const local=localSourceLines();
-    const lines=[...local,...cited];
+    const lines=uniqueSources([...local,...cited]);
     sourceStats.displayed=lines.length;
     if(lines.length)attachSources(result,lines,1900,{title:local.length?"资料出处（本地条目自带的来源优先）：":"参考资料：",citedOnly:false});
     else result.text+="\n\n（这轮没有可给的链接：答案是本地曲库/人设直接答的，本地条目也没有登记来源。）";

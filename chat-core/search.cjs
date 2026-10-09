@@ -111,11 +111,33 @@ async function runWeb(search,query,options={}){
 //   · citedOnly:false：把传进来的列表原样排版。生产侧「用户明确要出处」走这条——
 //     那一批是调用方挑好的（本地条目自带的 source + 已引用的网页），没有 id 也不该被过滤。
 //   · 条目可以是 {title,url}，也可以是一行字符串（本地条目自带的 source 常常只是一句话）。
+// 同一个页面换个地址算同一条来源：协议、www./m. 前缀、末尾斜杠、utm_ 参数都不算区别；
+// 维基百科的 /zh-hk/、/zh-hans/ 这些语言变体和 /wiki/ 是同一篇（2026-10-09 群里实测列了两条）。
+// 先到先得：留下排在前面的那条，标题和地址都不改写。
+function sourceKey(item){
+ if(typeof item==='string')return 'text:'+item.replace(/\s+/g,' ').trim();
+ const raw=String(item?.url||'');
+ if(!raw)return 'title:'+String(item?.title||'').replace(/\s+/g,' ').trim();
+ try{
+  const u=new URL(raw);
+  const host=u.hostname.toLowerCase().replace(/^www\./,'').replace(/(^|\.)m\./,'$1');
+  let p=decodeURIComponent(u.pathname).replace(/\/+$/,'');
+  if(/(?:^|\.)wikipedia\.org$/.test(host)){p=p.replace(/^\/[a-z]{2,3}(?:-[a-z]+)*\//i,'/wiki/');u.searchParams.delete('variant');}
+  for(const k of [...u.searchParams.keys()])if(/^utm_/i.test(k))u.searchParams.delete(k);
+  u.searchParams.sort();
+  const q=u.searchParams.toString();
+  return host+p+(q?'?'+q:'');
+ }catch{return 'url:'+raw;}
+}
+function uniqueSources(list){
+ const seen=new Set();
+ return list.filter(item=>{const key=sourceKey(item);if(seen.has(key))return false;seen.add(key);return true;});
+}
 function attachSources(result,sources,maxChars,options={}){
  if(!sources.length)return result;
  const ids=Array.isArray(result.sourceIds)?result.sourceIds:[];
- const chosen=sources.filter(s=>s.id&&ids.includes(s.id)).slice(0,2);
- const selected=options.citedOnly===false?sources:(chosen.length?chosen:sources.slice(0,2));
+ const chosen=uniqueSources(sources.filter(s=>s.id&&ids.includes(s.id))).slice(0,2);
+ const selected=options.citedOnly===false?uniqueSources(sources):(chosen.length?chosen:uniqueSources(sources).slice(0,2));
  if(!selected.length)return result;
  const title=options.title||(chosen.length?'参考资料：':'搜索结果（供核对）：');
  const lines=selected.map(item=>typeof item==='string'?item
@@ -125,4 +147,4 @@ function attachSources(result,sources,maxChars,options={}){
  result.scene='explanation';result.expressionIds=[];
  return result;
 }
-module.exports={loadSearch,publicUrl,videoUrl,webRule,runWeb,attachSources,cacheTtlMs,searchPage};
+module.exports={loadSearch,publicUrl,videoUrl,webRule,runWeb,attachSources,uniqueSources,cacheTtlMs,searchPage};

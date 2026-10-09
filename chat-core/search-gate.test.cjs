@@ -319,3 +319,18 @@ test("会话里：答应提议的那句「要」不走语义路由，直接去�
     assert.ok(logs.some(line => /联网判断（auto｜.*search：用户答应了之前的提议/.test(line)), logs.join("\n"));
   } finally { chat.close(); }
 });
+
+test("同一篇文章的两个地址只列一次，第二个位置留给别的来源", async () => {
+  // 2026-10-09 群里实测：维基百科的 /zh-hk/ 和 /wiki/ 两个地址占满了两条来源。
+  const model = fakeModel({ observe: obs({ target: "CHUNITHM 最新版本", fresh: true }),
+    reply: { text: "日本版最新是《Mate》。", emotion: "happy", scene: "explanation", expressionIds: [], sourceIds: ["S1", "S2", "S3"] } });
+  const web = fakeWeb([
+    { title: "CHUNITHM", url: "https://zh.wikipedia.org/zh-hk/CHUNITHM", chunks: [{ text: "CHUNITHM 最新版本……" }], snippet: "CHUNITHM 最新版本" },
+    { title: "CHUNITHM - 維基百科，自由的百科全書", url: "https://zh.wikipedia.org/wiki/CHUNITHM", chunks: [{ text: "CHUNITHM 最新版本……" }], snippet: "CHUNITHM 最新版本" },
+    { title: "CHUNITHM 官网", url: "https://chunithm.sega.jp/", chunks: [{ text: "CHUNITHM 最新版本……" }], snippet: "CHUNITHM 最新版本" },
+  ]);
+  const result = await requestReply(settingsWith({ mode: "auto" }), say("CHUNITHM 最新版本是什么"), { fetchImpl: model.fetchImpl, webFetchImpl: web.webFetchImpl });
+  assert.equal(result.text, "日本版最新是《Mate》。\n\n参考资料：\nCHUNITHM\nhttps://zh.wikipedia.org/zh-hk/CHUNITHM\nCHUNITHM 官网\nhttps://chunithm.sega.jp/");
+  assert.equal(result.sourceStats.cited, 2);
+  assert.equal(result.sourceStats.displayed, 2);
+});

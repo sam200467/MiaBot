@@ -1,6 +1,6 @@
 "use strict";
 const test=require('node:test'),assert=require('node:assert/strict');
-const {runWeb,publicUrl,attachSources,cacheTtlMs}=require('./search.cjs');
+const {runWeb,publicUrl,attachSources,uniqueSources,cacheTtlMs}=require('./search.cjs');
 const {requestReply}=require('./chat.cjs');
 const response=data=>({ok:true,text:async()=>JSON.stringify(data),json:async()=>data});
 test('search selects documented endpoints; cache and video evidence boundaries',async()=>{
@@ -54,4 +54,15 @@ test('cache lifetime follows how fast the material actually changes',()=>{
  assert.equal(cacheTtlMs('search',{query:'音击 手元',kind:'video'}),12*hour);
  assert.equal(cacheTtlMs('fetch',{url:'https://example.com/a'}),6*hour);
  assert.ok(cacheTtlMs('search_pro',{query:'音击 最新 手元',kind:'video'})===1*hour,'时效性优先于视频类型');
+});
+test('the same page under different addresses is listed once, first one wins',()=>{
+ const wiki=[{id:'S1',title:'CHUNITHM',url:'https://zh.wikipedia.org/zh-hk/CHUNITHM'},{id:'S2',title:'CHUNITHM - 維基百科，自由的百科全書',url:'https://zh.wikipedia.org/wiki/CHUNITHM'},{id:'S3',title:'官网',url:'https://chunithm.sega.jp/'}];
+ // 2026-10-09 群里实测：同一篇维基百科的两个地址占满了两条，第二个真正不同的来源被挤掉
+ assert.equal(attachSources({text:'正文',sourceIds:['S1','S2','S3']},wiki,1900).text,'正文\n\n参考资料：\nCHUNITHM\nhttps://zh.wikipedia.org/zh-hk/CHUNITHM\n官网\nhttps://chunithm.sega.jp/');
+ assert.match(attachSources({text:'正文',sourceIds:['S2']},wiki,1900).text,/\nCHUNITHM - 維基百科，自由的百科全書\nhttps:\/\/zh\.wikipedia\.org\/wiki\/CHUNITHM$/,'只引用了后一个地址时就显示它');
+ assert.equal(attachSources({text:'正文'},wiki.slice(0,2),1900,{citedOnly:false,title:'参考资料：'}).text,'正文\n\n参考资料：\nCHUNITHM\nhttps://zh.wikipedia.org/zh-hk/CHUNITHM');
+ for(const url of ['https://zh.m.wikipedia.org/wiki/CHUNITHM','http://zh.wikipedia.org/wiki/CHUNITHM/','https://zh.wikipedia.org/zh-hans/CHUNITHM?variant=zh-cn','https://zh.wikipedia.org/wiki/CHUNITHM?utm_source=x','https://zh.wikipedia.org/wiki/%43HUNITHM'])
+  assert.equal(uniqueSources([wiki[1],{title:'x',url}]).length,1,url);
+ assert.equal(uniqueSources([wiki[1],{title:'x',url:'https://zh.wikipedia.org/wiki/Maimai'},{title:'y',url:'https://en.wikipedia.org/wiki/CHUNITHM'},{title:'z',url:'https://chunithm.sega.jp/news?id=2'},{title:'w',url:'https://chunithm.sega.jp/news?id=3'}]).length,5,'不同的页面都留着');
+ assert.deepEqual(uniqueSources(['本地条目来源 A','本地条目来源  A','本地条目来源 B']),['本地条目来源 A','本地条目来源 B']);
 });
