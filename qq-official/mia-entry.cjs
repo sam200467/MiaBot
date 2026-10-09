@@ -282,10 +282,14 @@ function createMiaBot(config, deps = {}) {
     return list.map((x) => x.who + "：" + x.text.replace(/\s+/g, " ").slice(0, 120));
   }
 
+  // 联网由 chat-core 的判断层决定（mia-chat 配置里的 searchGate，默认 off）。开着时能力说明
+  // 里要把「没有联网能力」换掉，不然跟程序递过去的联网资料正面矛盾。
+  const webLine = settings.searchGate && settings.searchGate.mode !== "off"
+    ? "联网由程序决定：需要的时候程序会替你查好，资料标着【程序联网检索】递给你；没有这一段就是没查过网，不能说自己查过、搜过。" : "";
   const chat = createChat(settings, {
     guildId: "qq-official",
     channelIds: [...allowGroups],   // chat.cjs 的频道白名单：放群 openid
-    // 美亚不联网；本地音击曲库由 mia-chat 的 localKnowledge 单独开启。
+    // 本地音击曲库由 mia-chat 的 localKnowledge 单独开启；联网走 searchGate。
   }, {
     log,
     // 透传注入点：测试用假 fetch 顶掉真实模型调用
@@ -299,6 +303,7 @@ function createMiaBot(config, deps = {}) {
       ability: () => commands
         ? "运行时实际能力：你正在 QQ 里回复消息。"
           + "你可以只读查询本地音击曲库中的曲名、谱面难度、等级、定数、艺术家、版本和对战相手；这不是联网搜索，不能查询其他游戏。"
+          + webLine
           + "公共资料由只读结构化查询处理，无需绑定；严格区分歌名开头、包含、别名线索和角色关系。只有明确要个人成绩或成绩图时才调用 song。查不到不等于歌曲不存在，不要凭记忆否认或猜曲名。"
           + "你可以调用工具替用户办这些事：生成 B50+N10+P50 分表、生成版本牌子完成度图"
           // 牌子版本名是静态公共资料，不需要绑定也不缺参数：认不出名字时程序会列出全部
@@ -338,7 +343,8 @@ function createMiaBot(config, deps = {}) {
           + "「帮我查一下 id870」先搜索公共歌曲资料，不要擅自变成查个人成绩；"
           + "用户说的指令叫法（比如 b110 就是 B50+N10+P50 的分表）照办就行，"
           + "不要质疑人家「是不是想说别的」。能办就办，别把活儿推回去。"
-        : "运行时实际能力：你正在 QQ 里回复消息，可以查阅本地音击曲库；当前消息直接附带的图片可以读取，但没有原图数据的引用图片看不到。没有联网或查分能力。可以按语境发送你的表情图。",
+        : "运行时实际能力：你正在 QQ 里回复消息，可以查阅本地音击曲库；当前消息直接附带的图片可以读取，但没有原图数据的引用图片看不到。"
+          + (webLine ? "没有查分能力。" + webLine : "没有联网或查分能力。") + "可以按语境发送你的表情图。",
       // 工具清单与执行入口。模型只负责「挑哪个工具、参数是什么」，执行权在程序侧：
       // 能力名、参数、权限、绑定状态、冷却、队列、@ 名单，六道校验全在 mia-commands 里。
       routeIntent: ({ messages, message, queryState, querySelection, signal, dispatcher }) => routeIntent({

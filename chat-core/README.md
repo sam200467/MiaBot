@@ -22,6 +22,11 @@
 检索」，如果跟着事实层走，美亚（`research: false`）会被别人的搜索配置带上联网，而
 降级文案本身是写给管理员看的，会变成角色台词吐出去。
 
+联网的**入口**有两套：梨绪那条路上的研究层（`research-policy.cjs`），和角色配置里
+`searchGate` 打开的联网判断层（`search-gate.cjs`，美亚先用，缺省 `off`）。判断层开着时
+研究层整条让位——两套同时开会各搜各的。为什么换、怎么开、评估结果见
+[`SEARCH.md`](SEARCH.md) 最后一节。
+
 ## 入口
 
 `chat.cjs` 导出 `loadSettings` / `createChat` / `requestReply` / `chooseImage` /

@@ -5,6 +5,11 @@
   "research": false,
   "localKnowledge": true,
   "localKnowledgeGames": ["ongeki"],
+  "searchGate": {
+    "mode": "off",
+    "thinking": false,
+    "offerText": "要美亚去翻翻情报吗？回我一句「要」就行♪"
+  },
   "factLayerDir": "../chat-core",
   "provider": {
     "name": "deepseek",
