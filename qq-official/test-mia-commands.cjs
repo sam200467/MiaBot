@@ -13,6 +13,7 @@ const path = require("node:path");
 
 const core = require("../mia-core.cjs");
 const { createMiaCommands, parseCommand, ALIASES } = require("./mia-commands.cjs");
+const { miaHelp } = require("./mia-voice.cjs");
 
 const GROUP = "GROUP_OPENID_A";
 
@@ -233,8 +234,33 @@ test("/帮助 不碰模型也不碰凭据库", async () => {
     assert.doesNotMatch(sent[0].text, /开头:|紫谱13|条件搜索/);
     assert.match(sent[0].text, /普通搜歌只查本地曲库/, "帮助里要写清普通搜歌的数据边界");
     assert.match(sent[0].text, /查曲绘缺图时会联网补图/, "帮助里要说明曲绘会联网补图");
+    // 2026-10-09 照着现在的功能重写过一遍。下面几条是那次补上的东西和改掉的错话。
+    assert.match(sent[0].text, /要先绑定的：[\s\S]*\/分表[\s\S]*不用绑定的：[\s\S]*\/谱面分析/, "按要不要绑定分组");
+    assert.match(sent[0].text, /指令后面再 @ 一位群友，就是查 TA 的/, "要写明怎么查群友");
+    assert.match(sent[0].text, /只发 \/牌子/, "不带版本名会列出全部版本");
+    assert.doesNotMatch(sent[0].text, /停下正在办的事/, "/取消 只管绑定和解绑，停不下排队的图");
+    assert.doesNotMatch(sent[0].text, /偷听/, "开了全量群消息的群里，没 @ 她的话也会进上下文");
     assert.equal(bindingCalls, 0, "帮助不该去读凭据库");
   });
+});
+
+test("帮助清单跟着开关走：联网、读引用、私聊各一行，关着的不写", async () => {
+  const lines = { webSearch: /搜一下/, quotedMessage: /被回复的那条/, privateChat: /私聊美亚不用 @/ };
+  const shown = (text) => Object.keys(lines).filter((key) => lines[key].test(text));
+  assert.deepEqual(shown(miaHelp()), ["privateChat"], "缺省跟三个配置项的缺省一致：只有私聊开着");
+  const helpText = miaHelp({ webSearch: true, quotedMessage: true, privateChat: false });
+  assert.deepEqual(shown(helpText), ["webSearch", "quotedMessage"]);
+  for (const text of [miaHelp(), helpText]) assert.ok(text.endsWith("不 @ 她是不会接话的～"), "开关行插在结尾那句前面");
+
+  // 传进来的那份就是 /帮助 发出去的那份；闲聊触发时开场和清单之间照样空一行
+  const restore = stub();
+  try {
+    const { commands, sent } = setup({}, { helpText });
+    await commands.handleCommand(groupEvent("/帮助"), parseCommand("/帮助"));
+    assert.equal(sent[0].text, helpText);
+    await commands.runCapability(groupEvent("你会什么"), "help", "", "喵哼哼～");
+    assert.equal(sent[1].text, "喵哼哼～\n\n" + helpText);
+  } finally { restore(); }
 });
 
 test("闲聊触发帮助：开场、清单、安全提醒分段，且不重复群绑定说明", async () => {
@@ -242,7 +268,7 @@ test("闲聊触发帮助：开场、清单、安全提醒分段，且不重复�
     await commands.runCapability(groupEvent("帮我看看功能"), "help", "", "喵哼哼，这就把清单翻给你看～");
     const text = sent[0].text;
     assert.ok(text.startsWith("喵哼哼，这就把清单翻给你看～\n\n美亚的小道具"), "开场与清单之间要空一行");
-    assert.match(text, /\/取消[^\n]*\n\n等等，这里要认真听/, "清单与安全提醒之间要空一行");
+    assert.match(text, /\/帮助[^\n]*\n\n等等，这里要认真听/, "清单与安全提醒之间要空一行");
     assert.ok(!text.includes("群里绑定："), "不要把 /绑定 的说明重复写两遍");
     assert.ok(!/允许查询|禁止查询/.test(text), "权限开关已删除，帮助里不该再出现");
   });

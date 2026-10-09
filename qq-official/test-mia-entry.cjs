@@ -558,6 +558,28 @@ test("两条不同的消息、回复文案一样，两条都要发得出去", as
   await bot.stop(); await mock.stop();
 });
 
+test("/帮助 清单跟着这台的开关走：联网、读引用、私聊，关着的那行不出现", async () => {
+  const { loadSettings } = require("../chat-core/chat.cjs");
+  const { gateSettings } = require("../chat-core/search-gate.cjs");
+  const base = loadSettings(path.resolve(__dirname, "../mia-chat"));
+  const helpFrom = async (configOverrides, searchGate) => {
+    const { mock, bot } = await setup(configOverrides, { botDeps: { settings: { ...base, searchGate: gateSettings(searchGate) } } });
+    try {
+      mock.push("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "/帮助" }));
+      assert.ok(await mock.waitFor(() => mock.state.sent.length > 0));
+      return String(mock.state.sent[0].body.content);
+    } finally { await bot.stop(); await mock.stop(); }
+  };
+  const defaults = await helpFrom({}, { mode: "off" });
+  assert.match(defaults, /私聊美亚不用 @/);
+  assert.doesNotMatch(defaults, /搜一下|被回复的那条/, "联网和读引用关着，清单里就不该写");
+  // 联网只要不是 off 就算开：「搜一下 …」这种明说，explicit 档也会去查
+  const flipped = await helpFrom({ quotedMessage: "read", allowPrivateChat: false }, { mode: "explicit" });
+  assert.match(flipped, /搜一下/);
+  assert.match(flipped, /被回复的那条/);
+  assert.doesNotMatch(flipped, /私聊美亚/, "私聊关了就别让人去私聊");
+});
+
 // ── 聊天路径的工具调用 ──────────────────────────────────────────────
 test("聊天里模型挑的工具真的被执行：先发引出语，结果由程序发", async () => {
   const restore = stubCore({ getBinding: async () => ({ playerName: "测试玩家", email: "a@b.c", password: "x" }) });

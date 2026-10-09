@@ -124,6 +124,9 @@ function createMiaCommands(options = {}) {
   const log = options.log || (() => {});
   const now = options.now || Date.now;
   const random = options.random || Math.random;
+  // 帮助清单末尾有几行跟着开关走（见 mia-voice 的 miaHelp），由 mia-entry 按配置拼好传进来；
+  // 不传就用缺省开关拼的那份。
+  const helpText = options.helpText || MIA_HELP;
   const songJacket = options.songJacket || createSongJacket({
     cacheDir: config.workDir ? path.join(config.workDir, "song-jacket-cache") : undefined,
     jacketCacheDir: config.workDir ? path.join(config.workDir, "jacket-cache") : undefined,
@@ -257,7 +260,7 @@ function createMiaCommands(options = {}) {
     if (plan.kind === "notice") return send(event, plan.text);
     // 闲聊触发 /帮助 时，模型的角色化开场和长清单之间留一行；直接 /帮助 则不在
     // 消息开头塞空行。其他短结果仍只换一行，免得每条都显得松散。
-    const isHelpText = plan.kind === "text" && plan.text === MIA_HELP;
+    const isHelpText = plan.kind === "text" && plan.text === helpText;
     const lead = chatLine ? chatLine + (isHelpText ? "\n\n" : "\n") : "";
     if (plan.kind === "text") return send(event, lead + plan.text);
     if (plan.kind === "lines") return sendLines(event, lead + plan.header, plan.lines, plan.footer);
@@ -739,7 +742,7 @@ function createMiaCommands(options = {}) {
     // song-aliases-<scope>.json）；只改其中一个会得到两个并排的文件，
     // 看上去「配了 aliasDir」其实各写各的。
     core.configureAliases({ ...config, aliasScope: config.aliasScope || "qq" });
-    core.configureCapabilities(MIA_HINTS);
+    core.configureCapabilities({ ...MIA_HINTS, helpText });
     core.setStatusProvider(statusText);
   }
 
@@ -748,7 +751,7 @@ function createMiaCommands(options = {}) {
     handleCommand, continueSession, handleBind, handleUnbind,
     getSession, sessionMatches, expireSessionFor, runCapability, hasInventedEnum, calculateRoutingProblem,
     claimEvent, messageKey,
-    statusText, registerCore,
+    statusText, registerCore, helpText,
     aliasDeleteOpenids,
     state: { sessions, queue, queuedUsers, seenEvents },
   };

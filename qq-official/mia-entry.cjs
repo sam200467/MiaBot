@@ -17,7 +17,7 @@ const core = require("../mia-core.cjs");
 const { createMiaCommands } = require("./mia-commands.cjs");
 const songSearch = require("./song-search.cjs");
 const { routeIntent } = require("./semantic-router.cjs");
-const { MIA_TEMPLATES: T } = require("./mia-voice.cjs");
+const { MIA_TEMPLATES: T, miaHelp } = require("./mia-voice.cjs");
 const { createAssetBrowser } = require("./asset-browser.cjs");
 const { chatLogSettings, createChatLog, turnRecord } = require("./chat-log.cjs");
 
@@ -283,6 +283,10 @@ function createMiaBot(config, deps = {}) {
   const quoteConfig = quotedMessageSetting(config.quotedMessage);
   const readQuoted = quoteConfig.mode === "read";
 
+  // 联网由 chat-core 的判断层决定（mia-chat 配置里的 searchGate，默认 off）。
+  // 聊天的能力说明和 /帮助 清单都跟着它走。
+  const webSearchOn = Boolean(settings.searchGate && settings.searchGate.mode !== "off");
+
   // ── 指令层 ────────────────────────────────────────────────────────
   // loadConfig 已经强制校验过运行组件，所以生产路径上一定启用。这里是给
   // **嵌入式调用和测试**留的口子：配置不全就退化成纯聊天，但会**明确打一行日志**
@@ -334,6 +338,8 @@ function createMiaBot(config, deps = {}) {
     commands = createMiaCommands({
       config, transport, log,
       send: senders.send, sendImage: senders.sendImage,
+      // 清单末尾那几行只写开着的功能，免得说她做不到的事
+      helpText: miaHelp({ webSearch: webSearchOn, quotedMessage: readQuoted, privateChat: allowPrivate }),
       ...(deps.now ? { now: deps.now } : {}),
       ...(deps.random ? { random: deps.random } : {}),
       ...(deps.messageKey ? { messageKey: deps.messageKey } : {}),
@@ -356,9 +362,8 @@ function createMiaBot(config, deps = {}) {
     return list.map((x) => x.who + "：" + x.text.replace(/\s+/g, " ").slice(0, 120));
   }
 
-  // 联网由 chat-core 的判断层决定（mia-chat 配置里的 searchGate，默认 off）。开着时能力说明
-  // 里要把「没有联网能力」换掉，不然跟程序递过去的联网资料正面矛盾。
-  const webLine = settings.searchGate && settings.searchGate.mode !== "off"
+  // 联网开着时，能力说明里要把「没有联网能力」换掉，不然跟程序递过去的联网资料正面矛盾。
+  const webLine = webSearchOn
     ? "联网由程序决定：需要的时候程序会替你查好，资料标着【程序联网检索】递给你；没有这一段就是没查过网，不能说自己查过、搜过。" : "";
   const chat = createChat(settings, {
     guildId: "qq-official",
