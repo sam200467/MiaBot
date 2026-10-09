@@ -20,14 +20,23 @@ test("明说要搜才算放行：联网对战、查成绩这类说法不算", ()
   assert.equal(gate.explicitRequest("不用搜了直接说"), null);
 });
 
+test("美亚自己的说法也算明说：「翻翻」「翻…情报」；翻译、翻唱、翻车不算", () => {
+  // 线上：美亚提议「要美亚去翻翻情报吗」，用户照着回「你翻翻claude的情报」，没被认成明说，她又提议了一遍。
+  assert.deepEqual(gate.explicitRequest("你翻翻claude的情报"), { rest: "claude", soft: true });
+  assert.deepEqual(gate.explicitRequest("查查 nora2r 的情报"), { rest: "nora2r", soft: true });
+  assert.deepEqual(gate.explicitRequest("去翻情报"), { rest: "", soft: true }, "「情报」和它前面的动词都是话术，不是要搜的东西");
+  for (const text of ["帮我翻一下这句日语", "翻译一下", "这首歌翻唱了吗", "我翻车了", "美亚的情报本里有吗"])
+    assert.equal(gate.explicitRequest(text), null, text);
+});
+
 test("否决规则只挡纯反应和寒暄，像问句的玩梗留给判断调用", () => {
   for (const text of ["哈哈哈哈", "草", "[图片]", "6666", "在吗？", "早安！", "不要联网，直接答"]) assert.ok(gate.vetoReason(text), text);
   for (const text of ["这日子怎么过啊", "美亚你是不是又摸鱼了", "CHUNITHM 最新版本是什么"]) assert.equal(gate.vetoReason(text), "", text);
 });
 
 test("只有整句短答应才算答应提议", () => {
-  for (const text of ["要", "好呀！", "去吧~", "嗯嗯", "查吧"]) assert.ok(gate.affirmative(text), text);
-  for (const text of ["好，但是我想问别的", "要不你先说说", "不要"]) assert.equal(gate.affirmative(text), false, text);
+  for (const text of ["要", "好呀！", "去吧~", "嗯嗯", "查吧", "翻吧", "去翻翻", "好的，去吧", "要！快去翻"]) assert.ok(gate.affirmative(text), text);
+  for (const text of ["好，但是我想问别的", "要不你先说说", "不要", "要不要", "可以吗", "翻译一下"]) assert.equal(gate.affirmative(text), false, text);
 });
 
 test("检索词要有出处：修饰词可以加，对象不能编", () => {
@@ -81,6 +90,12 @@ test("决策表：说了不要联网 > 答应提议 > 明说要搜 > 按档位",
   assert.ok(d({ explicit }).clarify, "没说搜什么就问");
   assert.equal(d({ explicit, lastTarget: { target: "中二 新版本", expiresAt: T0 + 1 } }).target, "中二 新版本", "只说「搜一下」就搜上一轮的对象");
   assert.equal(d({ explicit: { rest: "疯狂星期四" }, obs: obs({ target: "原神 更新" }), haystack: "搜一下疯狂星期四" }).target, "疯狂星期四", "模型编的对象不用");
+  // 软说法（翻翻、翻…情报）：判断调用说是玩笑就不算明说，按档位走；硬说法照旧放行
+  const joking = obs({ act: "play", about: "bot" });
+  assert.deepEqual([d({ explicit: { rest: "书", soft: true }, obs: joking }).action, d({ explicit: { rest: "书", soft: true }, obs: joking }).reason], ["none", "在玩梗或开玩笑"],
+    "「你去翻翻书吧，别老问我」不该让她解释「这个没法上网查」");
+  assert.equal(d({ explicit: { rest: "claude", soft: true }, obs: obs({ act: "command", target: "Claude" }), haystack: "你翻翻claude的情报" }).target, "Claude");
+  assert.equal(d({ explicit: { rest: "疯狂星期四" }, obs: obs({ act: "play", target: "疯狂星期四" }), haystack: "搜一下疯狂星期四" }).action, "search", "「搜一下」是硬说法，玩笑也照搜");
   // 档位
   const asking = obs({ target: "CHUNITHM 最新版本", fresh: true, confident: false });
   const hay = "CHUNITHM 最新版本是什么";
@@ -318,6 +333,61 @@ test("会话里：答应提议的那句「要」不走语义路由，直接去�
     assert.equal(web.calls[0].body.text_query, "nora2r 新曲");
     assert.ok(logs.some(line => /联网判断（auto｜.*search：用户答应了之前的提议/.test(line)), logs.join("\n"));
   } finally { chat.close(); }
+});
+
+// 群聊里的两个人。判断调用按「本轮这句话」给观察：问 claude 的是在认真问，别的都是闲聊。
+function groupChat() {
+  let time = T0;
+  const sent = [], logs = [];
+  const model = fakeModel({
+    observe: body => /claude/i.test(JSON.parse(body.messages[1].content)["本轮这句话"]) ? obs({ target: "Claude" }) : obs({ act: "chat", about: "none" }),
+    reply: "唔……这个美亚不太清楚呢" });
+  const web = fakeWeb([{ title: "Claude 是什么", url: "https://example.com/claude", chunks: [{ text: "Claude 是 Anthropic 做的 AI 助手。" }], snippet: "Claude" }]);
+  const chat = createChat(settingsWith({ mode: "auto" }), { guildId: "g", channelIds: ["c"] }, {
+    fetchImpl: model.fetchImpl, webFetchImpl: web.webFetchImpl, now: () => time, log: line => logs.push(line),
+    adapter: { accepts: () => true, extractText: m => m.content, typing: async () => {}, send: async (_, text) => { sent.push(text); } },
+  });
+  let n = 0;
+  const say = async (user, content, after = 10000) => { time += after; await chat.handle({ id: "m" + ++n, guildId: "g", channelId: "c", author: { id: user }, content }); };
+  return { chat, web, sent, logs, say };
+}
+
+test("群里别的人回「要」也算答应：搜提问那个人的对象，他那边的提议跟着用掉", async () => {
+  // 线上：A 问「你认识 claude 吗」，美亚提议去翻情报；B 回了句「要」，提议挂在 A 的会话上，
+  // B 这句成了没头没脑的一个字，她反问「是要美亚继续说 Claude 的事吗」。
+  const g = groupChat();
+  try {
+    await g.say("A", "你认识claude吗");
+    assert.match(g.sent.at(-1), /要我去网上查查吗？/);
+    await g.say("B", "要");
+    assert.equal(g.web.calls.length, 1, "B 的「要」答应的是美亚给 A 的提议");
+    assert.equal(g.web.calls[0].body.text_query, "Claude");
+    assert.ok(g.logs.some(line => /search：群友答应了美亚对别人的提议「Claude」/.test(line)), g.logs.join("\n"));
+    await g.say("A", "要");
+    assert.equal(g.web.calls.length, 1, "同一件事不再搜第二遍");
+  } finally { g.chat.close(); }
+});
+
+test("自己在提议之后跟美亚说过话，再回「要」就不借别人的提议", async () => {
+  // 这时他的「要」更可能是在接自己那段对话，替他去搜别人问的东西就是误搜。
+  const g = groupChat();
+  try {
+    await g.say("A", "你认识claude吗");
+    await g.say("B", "今天打了好几把音击");
+    await g.say("B", "要");
+    assert.equal(g.web.calls.length, 0);
+  } finally { g.chat.close(); }
+});
+
+test("「你翻翻 claude 的情报」是明说要搜：直接搜，不再提议一遍", async () => {
+  const g = groupChat();
+  try {
+    await g.say("B", "你翻翻claude的情报");
+    assert.equal(g.web.calls.length, 1);
+    assert.equal(g.web.calls[0].body.text_query, "Claude");
+    assert.doesNotMatch(g.sent.at(-1), /要我去网上查查吗？/);
+    assert.ok(g.logs.some(line => /search：用户明说要搜「Claude」/.test(line)), g.logs.join("\n"));
+  } finally { g.chat.close(); }
 });
 
 test("同一篇文章的两个地址只列一次，第二个位置留给别的来源", async () => {

@@ -79,9 +79,15 @@ function units(text) {
 // 把那一次查询废掉。这条是梨绪那边踩过的坑（SEARCH.md 第八组）。
 // 「联网」「上网」单独出现不算：「音击能联网对战吗」问的是游戏，不是让你去搜。
 const EXPLICIT = /(?:联网|上网|网上)(?:去)?(?:查|搜|找|看)|(?:去|帮我|给我)(?:联网|上网)|搜一下|搜一搜|搜搜|搜下|搜索一下|帮我搜|去搜|百度一下|百度下|谷歌一下|google一下|查资料|查一下资料|核实一下|查证一下/i;
+// 美亚自己的说法也要认：她提议时说的是「要美亚去翻翻情报吗」，用户照着回「你翻翻 claude 的情报」，
+// 线上实测这句没被认成明说，判断层又判成提议，她又问了一遍要不要翻。「翻」只认叠字和「翻…情报」：
+// 「帮我翻一下这句日语」是翻译，「翻唱」「翻车」更不是。这几个是软说法——「你去翻翻书吧，别老问我」
+// 也长这样——所以判断调用说是玩笑（act=play）时不算明说；上面那些硬说法不受这条影响。
+const SOFT_EXPLICIT = /翻翻|翻一翻|(?:翻|查|找|搜)(?:翻|查|找|搜|一下|下)?[^，,。！!？?\n]{0,20}?(?:情报|情報)/;
 const OPT_OUT = /(?:不要|不用|别|不许|不必)(?:去)?.{0,4}(?:联网|上网|搜|查网)/;
 // 只删整段的请求话术，不删单字——「去」「搜」单独删会把「去年」删成「年」。
-const REQUEST_WORDS = /帮我|帮忙|麻烦你?|请你?|给我|联网|上网|网上|百度一下|百度下|谷歌一下|google一下|搜索一下|搜一下|搜一搜|搜搜|搜下|搜索|查一下资料|查资料|核实一下|查证一下|查一下|查查|找一下|看看|一下/gi;
+// 「情报」是美亚的说法，不是要搜的东西：「claude 的情报」搜的是 claude。
+const REQUEST_WORDS = /帮我|帮忙|麻烦你?|请你?|给我|联网|上网|网上|百度一下|百度下|谷歌一下|google一下|(?:去|快去)?(?:翻|查|找|搜)(?:翻|查|找|搜|一下|下)?(?:情报|情報)|搜索一下|搜一下|搜一搜|搜搜|搜下|搜索|查一下资料|查资料|核实一下|查证一下|查一下|查查|找一下|找找|翻翻看|翻一翻|翻翻|翻一下|的情报|的情報|情报|情報|看看|一下/gi;
 // 开头的「你／去／再」只在后面紧跟着被删掉的话术时才删（删话术时留下了空格）：
 // 「去搜一下 X」→「去  X」要删，「去年那次活动」不能删。
 const EDGE_WORDS = /^(?:你|去|再)+\s+|\s*(?:吧|呗|呀|嘛|呢|啊|好不好|可以吗|行吗|谢谢)+$/g;
@@ -89,16 +95,19 @@ const EDGE_WORDS = /^(?:你|去|再)+\s+|\s*(?:吧|呗|呀|嘛|呢|啊|好不好
 const PRONOUN_ONLY = /^(?:这个|那个|这|那|它|他|她|这事|那事|这件事|那件事|刚才的?|上面的?|你说的|这些|那些)?$/;
 function explicitRequest(text) {
   const t = String(text ?? "").trim();
-  if (!EXPLICIT.test(t) || OPT_OUT.test(t)) return null;
+  const soft = !EXPLICIT.test(t);
+  if ((soft && !SOFT_EXPLICIT.test(t)) || OPT_OUT.test(t)) return null;
   const trim = s => s.replace(/^[\s,，。.、:：!！?？~～]+|[\s,，。.、:：!！?？~～]+$/g, "").replace(/\s+/g, " ").trim();
   const rest = trim(t.replace(REQUEST_WORDS, " ").replace(/^[\s,，。.、:：!！?？~～]+|[\s,，。.、:：!！?？~～]+$/g, "").replace(EDGE_WORDS, ""));
-  return { rest: PRONOUN_ONLY.test(rest) ? "" : rest.slice(0, 60) };
+  return { rest: PRONOUN_ONLY.test(rest) ? "" : rest.slice(0, 60), ...(soft ? { soft: true } : {}) };
 }
 
 // ── 待确认的提议 ──────────────────────────────────────────────────────
-// 只认**整句**就是一句短答应：「要」「好呀」「去吧」。夹在长句里的「好」不算——
-// 用户可能已经在说别的事了，那时候替他去搜就是误搜。
-const AFFIRM = /^(?:要|要的|要要|要啊|好|好的|好呀|好啊|好哦|好耶|嗯|嗯嗯|行|行啊|可以|可以的|去吧|去|去查|快去|查吧|查|搜|搜吧|拜托了?|麻烦了?|ok|okay|yes|冲|来吧|安排)[!！。.~～呀啊吧呢喵哇♪\s]*$/i;
+// 只认**整句**就是一句短答应：「要」「好呀」「去吧」，最多三个连着说（「好的，去吧」「要！快去翻」）。
+// 夹在长句里的「好」不算——用户可能已经在说别的事了，那时候替他去搜就是误搜。
+// 「翻」那几个是照着美亚的提议回的（「要美亚去翻翻情报吗」→「翻吧」「去翻翻」）。
+const YES = "要|要的|要要|要啊|需要|想要|当然|当然要|好|好的|好呀|好啊|好哦|好耶|好好|嗯|嗯嗯|行|行啊|可以|可以的|去吧|去|去查|快去|快去查|查吧|查|查查|查一下|去查一下|搜|搜吧|搜搜|搜一下|去搜|快去搜|翻|翻吧|翻翻|翻翻看|翻一下|去翻|去翻翻|去翻一下|快去翻|快翻|拜托了?|麻烦了?|ok|okay|yes|冲|来吧|安排";
+const AFFIRM = new RegExp("^(?:" + YES + ")(?:[，,、\\s!！~～]*(?:" + YES + ")){0,2}[!！。.~～呀啊吧呢喵哇♪\\s]*$", "i");
 function affirmative(text) { return AFFIRM.test(String(text ?? "").trim()); }
 
 // ── ② 否决规则（只能否决，不能放行）─────────────────────────────────
@@ -347,8 +356,8 @@ function autoDecision({ veto, obs, haystack, knowledge, text = "" }) {
 function decide({ mode, text, explicit, pending, lastTarget, obs, veto, haystack, now, knowledge }) {
   if (OPT_OUT.test(String(text ?? ""))) return { action: "none", reason: "用户说了不要联网" };
   if (pending && pending.expiresAt > now && affirmative(text))
-    return { action: "search", target: pending.target, act: "ask", about: "world", reason: "用户答应了之前的提议", confirmed: true };
-  if (explicit) {
+    return { action: "search", target: pending.target, act: "ask", about: "world", reason: pending.shared ? "群友答应了美亚对别人的提议" : "用户答应了之前的提议", confirmed: true };
+  if (explicit && !(explicit.soft && obs?.act === "play")) {
     if (obs && (obs.about === "bot" || obs.about === "group"))
       return { action: "none", act: obs.act, about: obs.about, reason: "明说要搜，但问的是" + (obs.about === "bot" ? "机器人自己" : "群里的人和事") + "，网上搜不到", refuse: obs.about };
     const fromModel = obs?.target && !targetProblem(obs.target, haystack) ? obs.target : "";

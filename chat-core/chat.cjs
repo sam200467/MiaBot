@@ -987,7 +987,21 @@ function createChat(settings, host, deps={}) {
         ...(quoted?[{role:"system",content:"【本条消息引用（回复）了下面这条消息 —— 用户问的多半就是它，别当成没发生过；可以照着它的内容回答，但不要整段复述。】\n"+quoted}]:[]),
         {role:"user",content:text}];
       // 联网判断层的会话状态：待确认的提议、上一轮在问的对象、上次提议的时间。
-      const searchState={pending:old?.searchPending,lastTarget:old?.searchTarget,lastOfferAt:old?.searchOfferAt};
+      // 群里的提议是当众说的（「回我一句「要」就行」），别的群友回「要」也算答应。线上实测：
+      // A 问「你认识 claude 吗」，美亚提议去翻情报，B 回了句「要」——提议挂在 A 的会话上，
+      // B 这句就成了没头没脑的一个字。所以自己没有待确认的提议时，借同一个频道里最近那条
+      // 没过期的；前提是它比这位用户上一次跟美亚说话更晚，否则他这句「要」更可能是在接
+      // 自己那段对话。
+      const room=message.guildId+":"+message.channelId;
+      let borrowed=null;
+      if(gateMode!=="off"&&!(old?.searchPending?.expiresAt>time)&&affirmative(text)){
+        for(const [other,s]of sessions){
+          const p=s.searchPending;
+          if(other===key||s.room!==room||!p||p.expiresAt<=time||p.at<=(old?.at||0))continue;
+          if(!borrowed||p.at>borrowed.pending.at)borrowed={key:other,pending:p};
+        }
+      }
+      const searchState={pending:borrowed?{...borrowed.pending,shared:true}:old?.searchPending,lastTarget:old?.searchTarget,lastOfferAt:old?.searchOfferAt};
       // 用户在答应上一轮的提议（只回了一句「要」）：跳过语义路由直接交给聊天侧去搜。
       // 路由看不到那个提议，一句「要」到它手里可能被判成别的。
       const confirming=gateMode!=="off"&&Boolean(searchState.pending&&searchState.pending.expiresAt>time&&affirmative(text));
@@ -1045,9 +1059,14 @@ function createChat(settings, host, deps={}) {
       // 联网判断层的状态：聊天侧给了新状态就用它；这一轮被路由（查曲库、执行工具）接走时，
       // 待确认的提议作废（用户已经在说别的事了），其余两样照旧。
       const gateState=result.searchState||{pending:null,lastTarget:old?.searchTarget,lastOfferAt:old?.searchOfferAt};
-      sessions.set(key,{at:now(),terms:sessionTerms,queryState:Object.hasOwn(result,"queryState")?result.queryState:old?.queryState,querySelection:Object.hasOwn(result,"queryState")?(result.querySelection||[]):old?.querySelection,
+      sessions.set(key,{at:now(),room,terms:sessionTerms,queryState:Object.hasOwn(result,"queryState")?result.queryState:old?.queryState,querySelection:Object.hasOwn(result,"queryState")?(result.querySelection||[]):old?.querySelection,
         searchPending:gateState.pending||null,searchTarget:gateState.lastTarget||null,searchOfferAt:gateState.lastOfferAt||0,
         messages:[...history,{role:"user",content:text},{role:"assistant",content:result.text+record}].slice(-settings.c.conversation.maxTurns*2)});
+      // 借来的提议用掉了：提问的人那边也清掉，免得他再回一句「要」又把同一件事搜一遍。
+      if(borrowed&&result.searchGate?.decision?.confirmed){
+        const owner=sessions.get(borrowed.key);
+        if(owner?.searchPending===borrowed.pending)sessions.set(borrowed.key,{...owner,searchPending:null});
+      }
       log(who+"聊天完成"+(result.action?"，工具 "+result.action.name:"")+(file?"，配图 "+file.id:"")+(result.research?`，检索 ${result.research.status}（联网${result.research.webCalls}轮／实际请求${result.research.webRequests}次，来源${result.research.sourceCount}，理由${result.research.reason}）`:"")+(result.constantFixes?.length?`，定数校正${result.constantFixes.length}处（`+result.constantFixes.map(f=>`${f.title} ${f.from}→${f.to}${f.kind==="annotate"?"（仅补注当前值，原数字未改）":""}`).join("；")+"）":"")+(result.aliasQueries?.length?"，检索词规范化（"+result.aliasQueries.join("；")+"）":"")+(result.termHits?.length?"，术语（"+result.termHits.join("；")+"）":"")+(result.learnedTerms?.length?"，本会话学到术语（"+result.learnedTerms.map(item=>item.alias+"→"+(item.members||[item.target]).join("/")).join("；")+"）":"")+(result.termFixes?.length?"，术语类型纠正（"+result.termFixes.join("；")+"）":"")+(result.toneFixed?"，语气泄漏已纠正（不该提群里那段）":"")+(result.toneLeak?"，语气泄漏未纠正":"")+(result.sourceStats?.retrieved||result.sourceStats?.displayed?`，来源 搜到${result.sourceStats.retrieved}/相关${result.sourceStats.relevant}/引用${result.sourceStats.cited}/展示${result.sourceStats.displayed}`:"")+(result.webDenied?.length?"，联网请求被意图策略拒绝"+result.webDenied.length+"次（"+result.webDenied.map(d=>d.intents.join("+")||"意图缺失").join("；")+"）":"")+(result.webSplits?.length?"，拆分通道只发事实子问题（"+result.webSplits.map(s=>"「"+String(s.from).slice(0,40)+"」→「"+String(s.to).slice(0,40)+"」").join("；")+"）":"")+(result.queryRewrites?.length?"，结果为空后重建检索词（"+result.queryRewrites.map(r=>r.query).join("；")+"）":"")+(result.levelFixed?.length?`，等级资格重写（`+result.levelFixed.join("；")+`${result.levelDropped?.length?"，程序删除推荐："+result.levelDropped.join("；"):""}`+"）":"")+(result.degraded?"，已降级为纯文本":"")+(result.redrawn?"，空白回复后重画成功":"")+(result.lore?.hits?.length?`，本地剧情命中（`+result.lore.hits.map(h=>`${h.id}/${h.strength}`).join("；")+(result.lore.localAnswered?"，直接作答未联网":",转联网")+"）":"")+(result.profiles?.hits?.length?`，本地角色档案命中（`+result.profiles.hits.join("；")+(result.profiles.localAnswered?"，直接作答未联网":",转联网")+"）":"")+(result.canonFixed?.length?"，剧情否认已纠正（"+result.canonFixed.join("；")+"）":"")+(result.canonDenied?.length?"，剧情否认纠正失败（"+result.canonDenied.join("；")+"）":"")+(result.retried?"，网关故障后重试成功":"")+describeGate(result.searchGate));
       recordTurn({...turn,file});
     } catch(error) {
