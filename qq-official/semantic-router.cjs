@@ -104,7 +104,10 @@ function imageRequest(text, media) {
 function queryReply(query, options = {}) {
   if (query.selection?.excludePrevious && !options.selectionKeys && !options.excludeKeys?.length) return { ...clarification("还没有记下可以排除的上一批呢。先告诉我想选哪些条件的歌吧。"), queryState: null };
   const result = publicQuery.executeQuery(query, options);
-  return { ...clarification(publicQuery.formatResult(result)), queryState: result.query, querySelection: result.selectionKeys };
+  // 不止一页时带上 pager，QQ 入口据此在消息下面挂翻页按钮（chat-core 不认这个字段，原样忽略）。
+  const paged = result.query.mode !== "count" && result.selectedTotal && result.pages > 1 && result.query.page <= result.pages;
+  return { ...clarification(publicQuery.formatResult(result)), queryState: result.query, querySelection: result.selectionKeys,
+    ...(paged ? { pager: { page: result.query.page, pages: result.pages } } : {}) };
 }
 async function routeIntent({ settings, messages, specs, targets = [], queryState, querySelection = [], media = {}, fetchImpl = fetch, signal, dispatcher, validateAction, log = () => {}, pickIndex }) {
   const current = messages.filter(m => m.role === "user").at(-1)?.content || "";
@@ -112,11 +115,17 @@ async function routeIntent({ settings, messages, specs, targets = [], queryState
   if (media?.hasImage && media?.visionAvailable) return null;
   if (imageRequest(current, media)) return validateDecision({ route: "media" }, specs);
   if (needsPersonalRecords(messages)) return null;
-  if (/^(?:下一页|下页|翻页)[吧呀。！!\s]*$/.test(current)) {
+  // 翻页沿用程序保存的查询，不经模型。「上一页」「第3页」是翻页按钮发来的（也可以手打）。
+  const turn = current.match(/^(?:(下一页|下页|翻页)|(上一页|上页)|第\s*(\d{1,4})\s*页)[吧呀。！!\s]*$/);
+  if (turn) {
     if (!queryState) return clarification("还没有可以接着翻的查询呢，先告诉我想找什么吧。");
     const previous = publicQuery.executeQuery(queryState, { selectionKeys: querySelection, pickIndex });
-    if (previous.query.mode === "count" || !previous.total || previous.query.page >= previous.pages) return clarification("已经没有下一页啦，要不要换个条件再看看？");
-    return queryReply({ ...previous.query, page: previous.query.page + 1 }, { selectionKeys: querySelection, pickIndex });
+    const page = previous.query.page, pages = previous.pages;
+    if (previous.query.mode === "count" || !previous.total) return clarification("已经没有下一页啦，要不要换个条件再看看？");
+    const target = turn[1] ? page + 1 : turn[2] ? page - 1 : Number(turn[3]);
+    if (target > pages) return clarification(turn[1] ? "已经没有下一页啦，要不要换个条件再看看？" : `一共只有 ${pages} 页哦。`);
+    if (target < 1) return clarification("已经是第一页啦。");
+    return queryReply({ ...previous.query, page: target }, { selectionKeys: querySelection, pickIndex });
   }
   const p = settings.c.provider;
   // The model has no roster of its own: told nothing, it once mapped 刹那 to

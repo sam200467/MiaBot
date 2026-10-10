@@ -17,6 +17,7 @@ const core = require("../mia-core.cjs");
 const { createMiaCommands } = require("./mia-commands.cjs");
 const songSearch = require("./song-search.cjs");
 const { routeIntent } = require("./semantic-router.cjs");
+const { pagerKeyboard, parseOwnedData } = require("./pager-buttons.cjs");
 const { MIA_TEMPLATES: T, miaHelp } = require("./mia-voice.cjs");
 const { createAssetBrowser } = require("./asset-browser.cjs");
 const { chatLogSettings, createChatLog, turnRecord } = require("./chat-log.cjs");
@@ -432,13 +433,14 @@ function createMiaBot(config, deps = {}) {
           + (webLine ? "没有查分能力。" + webLine : "没有联网或查分能力。") + "可以按语境发送你的表情图。",
       // 工具清单与执行入口。模型只负责「挑哪个工具、参数是什么」，执行权在程序侧：
       // 能力名、参数、权限、绑定状态、冷却、队列、@ 名单，六道校验全在 mia-commands 里。
+      // 查询结果不止一页时，路由结果带 pager；记到这条消息上，下面的 send 据此挂翻页按钮。
       routeIntent: ({ messages, message, queryState, querySelection, signal, dispatcher }) => routeIntent({
           settings, messages, queryState, querySelection, media: message.__media, signal, dispatcher, log,
           specs: commands ? [...core.CAPABILITY_SPECS, songSearch.SEARCH_SPEC] : [],
           targets: (message.__event?.mentionedOpenids || []).map(String).filter(id => id !== botOpenid),
           validateAction: (action, userText) => (action.name === "calculate" && commands?.calculateRoutingProblem(action.query, userText)) || "",
           ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
-        }),
+        }).then((result) => { if (result?.pager) message.__pager = result.pager; return result; }),
       images: (message) => message.__media?.images || [],
       ...(commands ? {
         actions: [...core.CAPABILITY_SPECS, songSearch.SEARCH_SPEC],
@@ -528,7 +530,15 @@ function createMiaBot(config, deps = {}) {
         if (body && !/[。！？…♪」）\)\?\!]$/.test(body)) {
           log("⚠ 回复疑似未写完（结尾：" + JSON.stringify(body.slice(-14)) + "，全长 " + body.length + "）");
         }
-        const sent = await send(e, cleaned, file);
+        // 公共查询不止一页：用 Markdown 发，下面挂翻页按钮。按钮发的是「第N页」，绑着发起人 ——
+        // 翻的是这个人自己存的查询，别人点了回「没有权限」。按钮或 Markdown 被拒时传输层退回原文。
+        const pager = !file && message.__pager;
+        const sent = pager
+          ? await transport.sendMarkdown(makeTarget(e), cleaned, cleaned, e.msgId, e.refId, {
+            keyboard: pagerKeyboard({ ...pager, owner: e.userId, jump: (page) => "第" + page + "页" }),
+            markdownWithoutKeyboard: cleaned,
+          })
+          : await send(e, cleaned, file);
         if (e.type === "group") remember(e.openid, settings.characterName, cleaned + (file ? "（图片）" : ""));
         return sent;
       },
@@ -549,7 +559,15 @@ function createMiaBot(config, deps = {}) {
     const event = transport.normalize(eventName, d);
     if (!event) return;
     // 按钮回调先应答（客户端据此提示「操作成功」），再照普通指令执行按钮里存的那句。
-    if (event.interactionId) await transport.ackInteraction?.(event.interactionId);
+    // 绑了发起人的按钮（翻自己的查询、自己的成绩）别人点了回 4「没有权限」，不执行。
+    if (event.interactionId) {
+      const owned = parseOwnedData(event.content);
+      const foreign = Boolean(owned.owner) && owned.owner !== String(event.userId);
+      event.content = owned.data;
+      event.buttonOwned = Boolean(owned.owner);
+      await transport.ackInteraction?.(event.interactionId, foreign ? 4 : 0);
+      if (foreign) return;
+    }
 
     // ── 1. 白名单 ───────────────────────────────────────────────────
     // 放在幂等闸**之前**：不在名单里的群整条忽略，连去重表都不该占一格。
@@ -592,10 +610,12 @@ function createMiaBot(config, deps = {}) {
     const isDirect = event.type === "c2c";
     let command = commands ? commands.parseCommand(text) : null;
 
-    // 按钮里存的只会是指令（翻页）。不是指令的不接；也不进绑定会话 ——
+    // 按钮里存的只会是指令或翻页的话。别的不接；也不进绑定会话 ——
     // 正在输邮箱密码的人顺手点了翻页，不能把「/搜索歌曲 … --page 2」当成密码交上去。
     // 群上下文也不记：这句不是谁在群里说的话。
-    if (event.interactionId) {
+    // 「第N页」（公共查询的翻页）只认绑了发起人的按钮，交给下面的聊天路径，由语义路由按这个人存的查询翻。
+    const buttonPageTurn = Boolean(event.interactionId) && !command && event.buttonOwned && /^第\d{1,4}页$/.test(text);
+    if (event.interactionId && !buttonPageTurn) {
       if (!command?.name) return;
       event.__target = null;
       log("收到按钮指令 " + (commands.ALIASES[command.name]?.[0] || command.name) +
@@ -609,11 +629,11 @@ function createMiaBot(config, deps = {}) {
 
     // 群绑定的邮箱/密码必须在进入上下文缓冲、日志或模型之前截走。
     // 会话已经按 user + group 绑定，不会吞掉别人的话或同一用户在别群的消息。
-    if (commands?.expireSessionFor(event)) {
+    if (!buttonPageTurn && commands?.expireSessionFor(event)) {
       await send(event, T.bindExpired);
       return;
     }
-    if (commands) {
+    if (commands && !buttonPageTurn) {
       const groupSession = commands.getSession(event.userId);
       if (commands.sessionMatches(event, groupSession)) {
         if (["cancel", "source"].includes(command?.name)) await commands.handleCommand(event, command);
@@ -629,7 +649,7 @@ function createMiaBot(config, deps = {}) {
     // 全量群消息也记（模型要靠它接上「他刚才说的」这类指代），但**不进聊天**。
     // 群绑定凭据已在上面提前截走，所以绝不会进入这里。
     // 有人会把凭据误写在 /绑定 后面；这种指令也不能进入聊天上下文。
-    if (event.type === "group" && command?.name !== "bind") remember(event.openid, "群友", String(event.content || ""));
+    if (event.type === "group" && command?.name !== "bind" && !buttonPageTurn) remember(event.openid, "群友", String(event.content || ""));
 
     // ── 4~7. 会话与指令 ─────────────────────────────────────────────
     // 顺序照抄 qq/qq-entry.cjs:785-798，那里的注释解释了为什么必须这样排：

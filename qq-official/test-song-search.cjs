@@ -266,3 +266,13 @@ test("Markdown 版按纯文本长度切块，每块的纯文本拼起来就是�
   for (const c of chunks) assert.ok(c.text.length <= 200, c.text);
   assert.equal(chunks.map(c => c.text).join("\n\n"), reply("a"));
 });
+
+test("翻页按钮绑发起人：data 前面带上 openid，拆得回来；没绑的原样", () => {
+  const { ownedData, parseOwnedData, pagerKeyboard } = require("./pager-buttons.cjs");
+  assert.equal(ownedData("U1abc", "/等级 14+ 2"), "mia:U1abc:/等级 14+ 2");
+  assert.deepEqual(parseOwnedData("mia:U1abc:/等级 14+ 2"), { owner: "U1abc", data: "/等级 14+ 2" });
+  assert.deepEqual(parseOwnedData("/搜索歌曲 a --page 2"), { owner: null, data: "/搜索歌曲 a --page 2" });
+  assert.deepEqual(parseOwnedData("mia:U1:第2页:还有冒号"), { owner: "U1", data: "第2页:还有冒号" });
+  const keyboard = pagerKeyboard({ page: 1, pages: 2, jump: (p) => `第${p}页`, owner: "U1" });
+  assert.deepEqual(keyboard.rows.map((r) => r.buttons.map((b) => b.action.data)), [["mia:U1:第2页"], ["mia:U1:第2页"]]);
+});

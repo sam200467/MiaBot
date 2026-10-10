@@ -26,6 +26,7 @@ const path = require("node:path");
 
 const core = require("../mia-core.cjs");
 const songSearch = require("./song-search.cjs");
+const { pagerKeyboard } = require("./pager-buttons.cjs");
 const { createSongJacket } = require("./song-jacket.cjs");
 const { continueRinnetBinding } = require("./rinnet-binding.cjs");
 const { RinnetError, diagnosticText } = require("../rinnet-client.cjs");
@@ -257,7 +258,25 @@ function createMiaCommands(options = {}) {
     for (const chunk of chunks) await send(event, chunk);
   }
 
-  async function dispatch(event, plan, chatLine = "") {
+  // 分页出图（/等级）发完图之后补一条翻页消息：图片消息挂不了按钮（按钮只能跟 Markdown），所以另发一条。
+  // 只翻自己的：查别人（target）时按钮执行的是点的人自己的指令，会翻成自己的成绩，干脆不发。
+  // 翻页按钮绑发起人（别人点了回「没有权限」）；页码按钮把「/等级 14+ 」填进输入框，谁填谁查自己。
+  // 发不出去只记日志：图已经到了，翻页消息是锦上添花。
+  async function sendPaging(event, plan, image, forOther) {
+    const pages = Number(image?.meta?.totalPages);
+    if (!plan.paging || forOther || !sendMarkdown || !(pages > 1)) return;
+    const { command, page } = plan.paging;
+    if (page > pages) return;
+    const text = `第 ${page}/${pages} 页` + (page < pages ? `；下一页：${command} ${page + 1}` : "；已到最后一页");
+    try {
+      await sendMarkdown(event, `第 ${page}/${pages} 页，点下面的按钮翻页；点页码可以自己填页数`, text, {
+        keyboard: pagerKeyboard({ page, pages, owner: String(event.userId), jump: (target) => `${command} ${target}`, input: command + " " }),
+        markdownWithoutKeyboard: text,
+      });
+    } catch (error) { log("翻页消息没发出去：" + core.safeError(error)); }
+  }
+
+  async function dispatch(event, plan, chatLine = "", { forOther = false } = {}) {
     if (plan.kind === "notice") return send(event, plan.text);
     // 闲聊触发 /帮助 时，模型的角色化开场和长清单之间留一行；直接 /帮助 则不在
     // 消息开头塞空行。其他短结果仍只换一行，免得每条都显得松散。
@@ -274,7 +293,9 @@ function createMiaCommands(options = {}) {
     const done = await job.done;
     if (!done.ok) return send(event, done.reason);
     try {
-      return await sendImage(event, done.image, plan.caption);
+      const sent = await sendImage(event, done.image, plan.caption);
+      await sendPaging(event, plan, done.image, forOther);
+      return sent;
     } catch (error) {
       // 被动回复窗口过期。**只记日志、不补发文字** —— 补发会同样失败，
       // 结果是「操作失败」压在一条本来就只是超时的消息上，比静默更难懂。
@@ -422,7 +443,7 @@ function createMiaCommands(options = {}) {
     const plan = await core.resolveCapability(
       config, String(event.userId), name, query,
       (line) => log(core.safeError(line)), target);
-    return dispatch(event, plan, chatLine);
+    return dispatch(event, plan, chatLine, { forOther: Boolean(target) });
   }
 
   // ── 绑定会话 ──────────────────────────────────────────────────────

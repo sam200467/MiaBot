@@ -3,6 +3,7 @@
 // Public metadata only: never consult player bindings or send a model-written result.
 const { songs: catalogSongs } = require("../ongeki-song-catalog.json");
 const core = require("../mia-core.cjs");
+const { pagerKeyboard } = require("./pager-buttons.cjs");
 const { botSongId, botChartId, catalogCoverage, currentCatalogSongs } = require("./song-id.cjs");
 // 换了新条目重新上架的歌，公开曲库里那条「已删除」的旧条目不再单独列出（见 song-id.cjs）。
 const songs = currentCatalogSongs(catalogSongs);
@@ -164,26 +165,10 @@ function replyLines(query) {
   return { lines: out, pager, pagerLine };
 }
 
-// 翻页按钮，照「提比不想睡觉」那种排法：上一页、页码、下一页一行，首页、末页一行。
-// 翻页四个是回调按钮（type 1）：点了平台推 INTERACTION_CREATE，美亚把 data 当这个人发的指令执行，
-// 群里不会多出一条指令消息。页码是指令按钮（type 2，enter=false）：只把「/搜索歌曲 … --page 」
-// 填进输入框，页数让用户自己补。到头的方向不放按钮，免得点了只得到一句「没有这一页」。
-// 字段出处：bot.q.qq.com/wiki 的「消息按钮」。permission.type=2 是所有人可点（搜的是公开曲库）。
-function pagerKeyboard({ query, page, pages }) {
+// 翻页按钮见 pager-buttons.cjs。搜的是公开曲库，谁点都一样，不绑发起人；页码按钮填「/搜索歌曲 … --page 」。
+function searchKeyboard({ query, page, pages }) {
   const command = `/搜索歌曲 ${query} --page `;
-  const button = (id, label, style, action) => ({
-    id, render_data: { label, visited_label: label, style },
-    action: { permission: { type: 2 }, unsupport_tips: "这个版本的 QQ 不支持按钮，请手动发送翻页指令", ...action },
-  });
-  const jump = (id, label, target) => button(id, label, 1, { type: 1, data: command + target });
-  // 分两行：一行五个会被挤成「⏮…」——点按钮发出的那页不带引用，QQ 给的气泡窄（2026-10-10 线上截图）。
-  const rows = [
-    [...(page > 1 ? [jump("prev", "◀ 上一页", page - 1)] : []),
-      button("page", `第${page}/${pages}页`, 0, { type: 2, data: command, enter: false }),
-      ...(page < pages ? [jump("next", "下一页 ▶", page + 1)] : [])],
-    [...(page > 1 ? [jump("first", "⏮ 首页", 1)] : []), ...(page < pages ? [jump("last", "末页 ⏭", pages)] : [])],
-  ];
-  return { rows: rows.filter(buttons => buttons.length).map(buttons => ({ buttons })) };
+  return pagerKeyboard({ page, pages, jump: target => command + target, input: command });
 }
 
 const plainLine = line => line.map(part => typeof part === "string" ? part : part.text ?? "").join("");
@@ -239,7 +224,7 @@ function replyChunks(query, limit) {
     return {
       markdown: chunk.map(line => line === pagerLine ? buttonsHint : markdownLine(line)).join("\n"),
       text,
-      keyboard: pagerKeyboard(pager),
+      keyboard: searchKeyboard(pager),
       markdownWithoutKeyboard: markdown,
     };
   });
