@@ -348,9 +348,15 @@ function createOfficial(host) {
   // 没有 Markdown 权限的机器人两样都会被拒，各失败一次之后就只发纯文本了。
   let markdownRejected = false, keyboardRejected = false;
   const rejected = (error) => classify(error) === "rejected";
+  //
+  // options.requireMarkdown：这条离了 Markdown 就没意义（正文里引用着图片，纯文本补发等于把图丢了）。
+  // 发不成 Markdown 时抛出，由调用方换别的发法。这时不记「平台不收 Markdown」：没有纯文本补发成功来证明是格式的错。
   async function sendMarkdown(target, markdown, text, msgId, refId, options = {}) {
     // QQ 频道是另一套接口，没实测过，照旧发纯文本。
-    if (markdownRejected || !config.markdown || target.kind === "channel") return sendText(target, text, msgId, refId);
+    if (markdownRejected || !config.markdown || target.kind === "channel") {
+      if (options.requireMarkdown) throw new Error("Markdown 不可用（" + (markdownRejected ? "平台拒收过" : "没开或是频道") + "）");
+      return sendText(target, text, msgId, refId);
+    }
     let keyboardError = null;
     if (options.keyboard && config.keyboard && !keyboardRejected) {
       try {
@@ -365,7 +371,7 @@ function createOfficial(host) {
     try {
       result = await sendText(target, text, msgId, refId, markdown);
     } catch (error) {
-      if (!rejected(error)) throw error;
+      if (!rejected(error) || options.requireMarkdown) throw error;
       result = await sendText(target, text, msgId, refId);
       markdownRejected = true;
       log("Markdown 消息被拒（" + (error.code ?? error.status) + "），之后改发纯文本：" + error.message);

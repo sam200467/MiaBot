@@ -116,12 +116,15 @@ function parseCommand(text) {
 // 平台相关的三件事全部由调用方注入，这个文件不 require 任何 qq-official 的传输层：
 //   send(event, text)            回原地发一条文本
 //   sendImage(event, image, cap) 回原地发一张图（image 是 {buffer, meta}）
+//   publishImage(buffer)         可选：把图放到外网地址，供 Markdown 引用
 //   transport                    只为 statusText 读「网关连上没有」
 function createMiaCommands(options = {}) {
   const config = options.config || {};
   const send = options.send;
   const sendImage = options.sendImage;
   const sendMarkdown = options.sendMarkdown;
+  // 把图放到外网能取的临时地址，返回网址（见 asset-browser.cjs 的 publishImage）；没有就不合成一条。
+  const publishImage = options.publishImage || null;
   const transport = options.transport;
   const log = options.log || (() => {});
   const now = options.now || Date.now;
@@ -262,18 +265,47 @@ function createMiaCommands(options = {}) {
   // 只翻自己的：查别人（target）时按钮执行的是点的人自己的指令，会翻成自己的成绩，干脆不发。
   // 翻页按钮绑发起人（别人点了回「没有权限」）；页码按钮把「/等级 14+ 」填进输入框，谁填谁查自己。
   // 发不出去只记日志：图已经到了，翻页消息是锦上添花。
-  async function sendPaging(event, plan, image, forOther) {
+  // 这一张图要不要翻页：要的话给出页码、总页数和按钮。
+  function pagingOf(event, plan, image, forOther) {
     const pages = Number(image?.meta?.totalPages);
-    if (!plan.paging || forOther || !sendMarkdown || !(pages > 1)) return;
+    if (!plan.paging || forOther || !sendMarkdown || !(pages > 1) || plan.paging.page > pages) return null;
     const { command, page } = plan.paging;
-    if (page > pages) return;
-    const text = `第 ${page}/${pages} 页` + (page < pages ? `；下一页：${command} ${page + 1}` : "；已到最后一页");
+    return {
+      hint: `第 ${page}/${pages} 页，点下面的按钮翻页；点页码可以自己填页数`,
+      text: `第 ${page}/${pages} 页` + (page < pages ? `；下一页：${command} ${page + 1}` : "；已到最后一页"),
+      keyboard: pagerKeyboard({ page, pages, owner: String(event.userId), jump: (target) => `${command} ${target}`, input: command + " " }),
+    };
+  }
+
+  async function sendPaging(event, paging) {
     try {
-      await sendMarkdown(event, `第 ${page}/${pages} 页，点下面的按钮翻页；点页码可以自己填页数`, text, {
-        keyboard: pagerKeyboard({ page, pages, owner: String(event.userId), jump: (target) => `${command} ${target}`, input: command + " " }),
-        markdownWithoutKeyboard: text,
-      });
+      await sendMarkdown(event, paging.hint, paging.text, { keyboard: paging.keyboard, markdownWithoutKeyboard: paging.text });
     } catch (error) { log("翻页消息没发出去：" + core.safeError(error)); }
+  }
+
+  // 图、图注和翻页按钮合成一条 Markdown（跟「提比不想睡觉」一样）。Markdown 里的图只能写网址，
+  // 所以先把图交给素材检索网页的临时地址（publishImage，见 asset-browser.cjs）。
+  // 开关 pagedImageInMarkdown 默认关：QQ 取不到图（端口没放行、只认 https）时这边察觉不到，
+  // 用户看到的是一条没有图的消息 —— 所以要部署的人确认外网打得开之后再开。
+  // 发不成 Markdown（被拒、没开）就返回 false，调用方照旧发图片 + 翻页消息。
+  async function sendImageInMarkdown(event, image, caption, paging) {
+    if (!config.pagedImageInMarkdown || !publishImage) return false;
+    let size;
+    try { size = core.pngSize(image.buffer); } catch { return false; }   // 读不出尺寸就不合成，照旧发图
+    const url = publishImage(image.buffer);
+    if (!url) return false;
+    // 图注里有玩家名，可能带 Markdown 符号；反斜杠转义掉，免得名字里的 * 或 _ 把排版弄乱。
+    const safeCaption = String(caption || "").replace(/[\\`*_~#<>\[\]()|]/g, (ch) => "\\" + ch);
+    const head = `![成绩图 #${size.width}px #${size.height}px](${url})` + (safeCaption ? "\n\n" + safeCaption : "");
+    try {
+      await sendMarkdown(event, head + "\n\n" + paging.hint, paging.text, {
+        keyboard: paging.keyboard, markdownWithoutKeyboard: head + "\n\n" + paging.text, requireMarkdown: true,
+      });
+      return true;
+    } catch (error) {
+      log("图片合进 Markdown 没发出去，改发图片 + 翻页消息：" + core.safeError(error));
+      return false;
+    }
   }
 
   async function dispatch(event, plan, chatLine = "", { forOther = false } = {}) {
@@ -293,8 +325,10 @@ function createMiaCommands(options = {}) {
     const done = await job.done;
     if (!done.ok) return send(event, done.reason);
     try {
+      const paging = pagingOf(event, plan, done.image, forOther);
+      if (paging && await sendImageInMarkdown(event, done.image, plan.caption, paging)) return null;
       const sent = await sendImage(event, done.image, plan.caption);
-      await sendPaging(event, plan, done.image, forOther);
+      if (paging) await sendPaging(event, paging);
       return sent;
     } catch (error) {
       // 被动回复窗口过期。**只记日志、不补发文字** —— 补发会同样失败，

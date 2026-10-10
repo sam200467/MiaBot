@@ -536,3 +536,18 @@ test("凭据错了（三种格式全被拒）：原样报错，不记成「平�
   assert.ok(body.keyboard, "按钮没被记成不能用");
   await transport.stop(); await mock.stop();
 });
+
+test("requireMarkdown：Markdown 被拒或没开时抛出，不退成纯文本（正文里引用着图，退成纯文本图就丢了）", async () => {
+  const { mock, transport } = await connected();
+  mock.state.nextError = { status: 400, err_code: 40034012, message: "不允许发送原生 markdown" };
+  await assert.rejects(() => transport.sendMarkdown({ kind: "group", openid: "G1" }, "![图](http://x/a.png)", "纯文本", "m1", null, { requireMarkdown: true }));
+  assert.equal(mock.state.sent.length, 0, "没有补发纯文本");
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**普通**", "纯文本", "m2");
+  assert.equal(mock.state.sent.at(-1).body.msg_type, 2, "没被记成「平台不收 Markdown」");
+  await transport.stop(); await mock.stop();
+
+  const off = await connected({ markdown: false });
+  await assert.rejects(() => off.transport.sendMarkdown({ kind: "group", openid: "G1" }, "![图](http://x/a.png)", "纯文本", "m1", null, { requireMarkdown: true }), /Markdown 不可用/);
+  assert.equal(off.mock.state.sent.length, 0);
+  await off.transport.stop(); await off.mock.stop();
+});

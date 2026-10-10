@@ -1,5 +1,6 @@
 "use strict";
 
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
@@ -73,11 +74,34 @@ function loadIndex(assetRoot) {
 function createAssetBrowser(options = {}) {
   const assetRoot = path.resolve(options.assetRoot || "");
   const host = String(options.host || "127.0.0.1");
-  const port = Math.max(1, Math.min(65535, Number(options.port) || 47831));
+  // port 写 0 是测试用的：让系统挑空闲端口，起来之后用 port() 读实际的。
+  const port = options.port === 0 ? 0 : Math.max(1, Math.min(65535, Number(options.port) || 47831));
   const log = options.log || (() => {});
   if (!fs.existsSync(assetRoot)) throw new Error("卡面资源目录不存在：" + assetRoot);
   const items = loadIndex(assetRoot);
   if (!items.length) throw new Error("卡面资源索引为空：" + assetRoot);
+
+  // ── 临时图片（/shared/<随机串>.png）────────────────────────────────
+  // 给 QQ 的 Markdown 引用：Markdown 里的图只能写网址，而美亚的成绩图是程序刚画的、没有网址。
+  // 放在内存里：地址是 32 位随机串，猜不到；24 小时后作废；最多留 SHARED_MAX 张，多了先丢最旧的。
+  // QQ 什么时候来取图（发送时一次，还是每次有人看都来）没法确认，所以留得久一点。
+  const SHARED_TTL_MS = Number(options.sharedTtlMs) || 24 * 60 * 60 * 1000;
+  const SHARED_MAX = Number(options.sharedMax) || 30;
+  const shared = new Map();   // token -> { buffer, expiry }
+  const now = options.now || Date.now;
+  const publicBase = String(options.publicBaseUrl || "").replace(/\/+$/, "");
+  function pruneShared() {
+    for (const [token, entry] of shared) if (entry.expiry <= now()) shared.delete(token);
+    while (shared.size > SHARED_MAX) shared.delete(shared.keys().next().value);
+  }
+  // 返回外网能取到的地址；没配 publicBaseUrl 就给不出来，返回 null。
+  function publishImage(buffer) {
+    if (!publicBase || !Buffer.isBuffer(buffer)) return null;
+    const token = crypto.randomBytes(16).toString("hex");
+    shared.set(token, { buffer, expiry: now() + SHARED_TTL_MS });
+    pruneShared();
+    return publicBase + "/shared/" + token + ".png";
+  }
 
   const server = http.createServer((req, res) => {
     try {
@@ -90,6 +114,14 @@ function createAssetBrowser(options = {}) {
         const limit = Math.max(1, Math.min(120, Number(url.searchParams.get("limit")) || 48));
         const matches = items.filter((item) => item.kind === kind && (!visual || item.visual === visual) && (!query || item.search.includes(query)));
         return json(res, { total: matches.length, offset, items: matches.slice(offset, offset + limit).map(({ search, ...item }) => item) });
+      }
+      const sharedMatch = url.pathname.match(/^\/shared\/([0-9a-f]{32})\.png$/);
+      if (sharedMatch) {
+        pruneShared();
+        const entry = shared.get(sharedMatch[1]);
+        if (!entry) return reply(res, 404, "text/plain; charset=utf-8", "Not found");
+        res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff" });
+        return res.end(entry.buffer);
       }
       if (url.pathname.startsWith("/media/")) {
         const segments = url.pathname.slice(7).split("/").map(decodeURIComponent);
@@ -109,6 +141,8 @@ function createAssetBrowser(options = {}) {
   });
   return {
     items,
+    publishImage,
+    port: () => server.address()?.port,
     start: () => new Promise((resolve, reject) => {
       server.once("error", reject);
       server.listen(port, host, () => { server.off("error", reject); log(`素材检索网页已启动：http://${host}:${port}（${items.length} 项）`); resolve(); });

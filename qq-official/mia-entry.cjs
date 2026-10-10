@@ -342,6 +342,8 @@ function createMiaBot(config, deps = {}) {
     commands = createMiaCommands({
       config, transport, log,
       send: senders.send, sendMarkdown: senders.sendMarkdown, sendImage: senders.sendImage,
+      // 分页的成绩图要跟翻页按钮合成一条 Markdown 时，图放在素材检索网页的临时地址上（pagedImageInMarkdown 开着才用）
+      publishImage: assetBrowser ? (buffer) => assetBrowser.publishImage(buffer) : null,
       // 清单末尾那几行只写开着的功能，免得说她做不到的事
       helpText: miaHelp({ webSearch: webSearchOn, quotedMessage: readQuoted, privateChat: allowPrivate }),
       ...(deps.now ? { now: deps.now } : {}),
