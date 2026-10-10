@@ -1086,7 +1086,7 @@ test("/等级 开了 pagedImageInMarkdown：图、图注和翻页按钮合成一
   });
   try {
     const { commands, sent } = setup({ pagedImageInMarkdown: true }, {
-      publishImage: (buffer) => { published.push(buffer); return "http://203.0.113.5:47831/shared/" + "a".repeat(32) + ".png"; },
+      publishImage: (buffer) => { published.push(buffer); return { url: "http://203.0.113.5:47831/shared/" + "a".repeat(32) + ".png", width: 1200, height: 3400 }; },
       sendMarkdown: async (event, markdown, text, options) => {
         if (rejectMarkdown && options?.requireMarkdown) throw Object.assign(new Error("Markdown 被拒"), { status: 400 });
         md.push({ markdown, text, options }); return { id: "md" };

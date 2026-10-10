@@ -768,6 +768,12 @@ function createMiaBot(config, deps = {}) {
         "｜私聊 " + (allowPrivate ? "开" : "关") +
         "｜指令 " + (commands ? "开" : "关") +
         (commands?.aliasDeleteOpenids.size ? "｜删别名白名单 " + commands.aliasDeleteOpenids.size + " 人" : ""));
+      // 分页成绩图合进 Markdown 这项要配合素材检索网页，开没开、图放哪儿，启动时说清楚，省得猜配置生效没有。
+      if (commands && config.pagedImageInMarkdown) {
+        log("成绩图合进 Markdown：开｜" + (assetBrowser && config.assetBrowser?.publicBaseUrl
+          ? "临时图片地址 " + String(config.assetBrowser.publicBaseUrl).replace(/\/+$/, "") + "/shared/"
+          : "⚠ 素材检索网页没开或没配 publicBaseUrl，实际仍发图片 + 翻页消息"));
+      }
       if (commands && !commands.aliasDeleteOpenids.size) {
         log("提示：config.local.json 里没配 aliasDeleteOpenids，所以谁都不能用 /删除别名。");
       }

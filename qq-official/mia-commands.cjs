@@ -116,7 +116,7 @@ function parseCommand(text) {
 // 平台相关的三件事全部由调用方注入，这个文件不 require 任何 qq-official 的传输层：
 //   send(event, text)            回原地发一条文本
 //   sendImage(event, image, cap) 回原地发一张图（image 是 {buffer, meta}）
-//   publishImage(buffer)         可选：把图放到外网地址，供 Markdown 引用
+//   publishImage(buffer)         可选：把图放到外网地址，供 Markdown 引用；返回 { url, width, height } 或 null
 //   transport                    只为 statusText 读「网关连上没有」
 function createMiaCommands(options = {}) {
   const config = options.config || {};
@@ -289,14 +289,14 @@ function createMiaCommands(options = {}) {
   // 用户看到的是一条没有图的消息 —— 所以要部署的人确认外网打得开之后再开。
   // 发不成 Markdown（被拒、没开）就返回 false，调用方照旧发图片 + 翻页消息。
   async function sendImageInMarkdown(event, image, caption, paging) {
-    if (!config.pagedImageInMarkdown || !publishImage) return false;
-    let size;
-    try { size = core.pngSize(image.buffer); } catch { return false; }   // 读不出尺寸就不合成，照旧发图
-    const url = publishImage(image.buffer);
-    if (!url) return false;
+    if (!config.pagedImageInMarkdown) return false;
+    if (!publishImage) { log("图片合进 Markdown：素材检索网页没开，照旧发图片 + 翻页消息"); return false; }
+    const published = publishImage(image.buffer);   // { url, width, height }
+    if (!published) { log("图片合进 Markdown：没有临时地址（publicBaseUrl 没配，或图片不是 PNG/JPG），照旧发图片 + 翻页消息"); return false; }
+    const { url, width, height } = published;
     // 图注里有玩家名，可能带 Markdown 符号；反斜杠转义掉，免得名字里的 * 或 _ 把排版弄乱。
     const safeCaption = String(caption || "").replace(/[\\`*_~#<>\[\]()|]/g, (ch) => "\\" + ch);
-    const head = `![成绩图 #${size.width}px #${size.height}px](${url})` + (safeCaption ? "\n\n" + safeCaption : "");
+    const head = `![成绩图 #${width}px #${height}px](${url})` + (safeCaption ? "\n\n" + safeCaption : "");
     try {
       await sendMarkdown(event, head + "\n\n" + paging.hint, paging.text, {
         keyboard: paging.keyboard, markdownWithoutKeyboard: head + "\n\n" + paging.text, requireMarkdown: true,

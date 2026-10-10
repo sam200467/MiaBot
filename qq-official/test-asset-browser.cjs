@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
-const { createAssetBrowser, loadIndex, parseCsv, normalize } = require("./asset-browser.cjs");
+const { createAssetBrowser, loadIndex, parseCsv, normalize, imageInfo } = require("./asset-browser.cjs");
 
 // 卡图和表情的导出目录是部署者自己从游戏资源里抽的（见 ASSETS.md），仓库里没有。
 // 缺了只跳过下面那条真实数据的断言，CSV 解析那条照跑 —— 否则新克隆上 `npm test` 必红。
@@ -39,21 +39,51 @@ test("临时图片：给出外网地址、按地址取得到；地址猜不到�
   const port = browser.port();
   const get = (url) => fetch(url.replace("http://203.0.113.5:47831", "http://127.0.0.1:" + port));
   try {
-    const url = browser.publishImage(Buffer.from("PNGDATA"));
+    const pngData = png(1200, 3400);
+    const { url, width, height } = browser.publishImage(pngData);
     assert.match(url, /^http:\/\/203\.0\.113\.5:47831\/shared\/[0-9a-f]{32}\.png$/, "外网地址照 publicBaseUrl 拼");
+    assert.deepEqual([width, height], [1200, 3400]);
     const ok = await get(url);
     assert.equal(ok.status, 200);
     assert.equal(ok.headers.get("content-type"), "image/png");
-    assert.equal(Buffer.from(await ok.arrayBuffer()).toString(), "PNGDATA");
+    assert.deepEqual(Buffer.from(await ok.arrayBuffer()), pngData);
+
+    const jpg = browser.publishImage(jpeg(1440, 2981));
+    assert.match(jpg.url, /\.jpg$/, "JPG 照 JPG 给（/等级 出的是 JPG）");
+    assert.deepEqual([jpg.width, jpg.height], [1440, 2981]);
+    assert.equal((await get(jpg.url)).headers.get("content-type"), "image/jpeg");
+    assert.equal(browser.publishImage(Buffer.from("不是图片，不是图片，不是图片")), null, "认不出的不给地址");
     assert.equal((await get(url.replace(/[0-9a-f]{32}/, "0".repeat(32)))).status, 404, "别的地址取不到");
 
-    const second = browser.publishImage(Buffer.from("B"));
-    browser.publishImage(Buffer.from("C"));
+    const second = browser.publishImage(png(1, 1)).url;
     assert.equal((await get(url)).status, 404, "超过上限先丢最旧的");
     clock += 60001;
     assert.equal((await get(second)).status, 404, "过期作废");
   } finally { await browser.stop(); }
 
   const noBase = createAssetBrowser({ assetRoot: root, port: 0 });
-  assert.equal(noBase.publishImage(Buffer.from("x")), null, "没配 publicBaseUrl 给不出地址");
+  assert.equal(noBase.publishImage(png(1, 1)), null, "没配 publicBaseUrl 给不出地址");
 });
+
+test("图片尺寸：PNG 读 IHDR，JPG 跳过前面的段找到 SOF", () => {
+  assert.deepEqual(imageInfo(png(1200, 3400)), { type: "png", mime: "image/png", width: 1200, height: 3400 });
+  assert.deepEqual(imageInfo(jpeg(1440, 2981)), { type: "jpg", mime: "image/jpeg", width: 1440, height: 2981 });
+  assert.equal(imageInfo(Buffer.from([0xff, 0xd8, 0xff, 0xda, 0, 4, 0, 0, ...new Array(30).fill(0)])), null, "没有 SOF 的 JPG");
+  assert.equal(imageInfo(null), null);
+});
+
+// 只有 IHDR 的最小 PNG
+function png(width, height) {
+  const data = Buffer.alloc(24);
+  data.writeUInt32BE(0x89504e47, 0); data.writeUInt32BE(0x0d0a1a0a, 4); data.write("IHDR", 12, "ascii");
+  data.writeUInt32BE(width, 16); data.writeUInt32BE(height, 20);
+  return data;
+}
+// 最小的 JPG 头：SOI、一个 APP0 段、SOF0（高在前、宽在后）
+function jpeg(width, height) {
+  const app0 = Buffer.from([0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00]);
+  const sof = Buffer.alloc(19);
+  sof.writeUInt16BE(0xffc0, 0); sof.writeUInt16BE(17, 2); sof[4] = 8;
+  sof.writeUInt16BE(height, 5); sof.writeUInt16BE(width, 7); sof[9] = 3;
+  return Buffer.concat([Buffer.from([0xff, 0xd8]), app0, sof, Buffer.from([0xff, 0xd9])]);
+}
