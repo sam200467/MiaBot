@@ -164,7 +164,7 @@ function replyLines(query) {
   return { lines: out, pager, pagerLine };
 }
 
-// 翻页按钮，照「提比不想睡觉」那种排法：首页、上一页、页码、下一页、末页一行。
+// 翻页按钮，照「提比不想睡觉」那种排法：上一页、页码、下一页一行，首页、末页一行。
 // 翻页四个是回调按钮（type 1）：点了平台推 INTERACTION_CREATE，美亚把 data 当这个人发的指令执行，
 // 群里不会多出一条指令消息。页码是指令按钮（type 2，enter=false）：只把「/搜索歌曲 … --page 」
 // 填进输入框，页数让用户自己补。到头的方向不放按钮，免得点了只得到一句「没有这一页」。
@@ -176,15 +176,14 @@ function pagerKeyboard({ query, page, pages }) {
     action: { permission: { type: 2 }, unsupport_tips: "这个版本的 QQ 不支持按钮，请手动发送翻页指令", ...action },
   });
   const jump = (id, label, target) => button(id, label, 1, { type: 1, data: command + target });
-  return {
-    rows: [{
-      buttons: [
-        ...(page > 1 ? [jump("first", "⏮ 首页", 1), jump("prev", "◀ 上一页", page - 1)] : []),
-        button("page", `第${page}/${pages}页`, 0, { type: 2, data: command, enter: false }),
-        ...(page < pages ? [jump("next", "下一页 ▶", page + 1), jump("last", "末页 ⏭", pages)] : []),
-      ],
-    }],
-  };
+  // 分两行：一行五个会被挤成「⏮…」——点按钮发出的那页不带引用，QQ 给的气泡窄（2026-10-10 线上截图）。
+  const rows = [
+    [...(page > 1 ? [jump("prev", "◀ 上一页", page - 1)] : []),
+      button("page", `第${page}/${pages}页`, 0, { type: 2, data: command, enter: false }),
+      ...(page < pages ? [jump("next", "下一页 ▶", page + 1)] : [])],
+    [...(page > 1 ? [jump("first", "⏮ 首页", 1)] : []), ...(page < pages ? [jump("last", "末页 ⏭", pages)] : [])],
+  ];
+  return { rows: rows.filter(buttons => buttons.length).map(buttons => ({ buttons })) };
 }
 
 const plainLine = line => line.map(part => typeof part === "string" ? part : part.text ?? "").join("");

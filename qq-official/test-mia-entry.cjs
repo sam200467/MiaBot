@@ -1175,7 +1175,7 @@ test("翻页按钮：点了先应答，再以 event_id 回复那一页，带着�
     assert.equal(body.msg_id, undefined);
     assert.equal(body.msg_type, 2);
     assert.match(body.markdown.content, /第 2\/\d+ 页，点下面的按钮翻页/);
-    assert.deepEqual(body.keyboard.content.rows[0].buttons.map((b) => b.id), ["first", "prev", "page", "next", "last"]);
+    assert.deepEqual(body.keyboard.content.rows.map((r) => r.buttons.map((b) => b.id)), [["prev", "page", "next"], ["first", "last"]]);
     assert.equal(model.calls.length + model.routeCalls.length, 0, "按钮指令不碰模型");
 
     // 按钮里不是指令的不接；白名单外的群只应答不回复。

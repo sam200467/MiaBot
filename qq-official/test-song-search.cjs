@@ -234,8 +234,10 @@ test("翻页按钮：翻页是回调按钮，页码只填输入框；到头的�
   const { replyChunks, search } = require("./song-search.cjs");
   const { pages } = search("a", { uncataloged: true });
   assert.ok(pages >= 3, "测试需要至少三页");
-  const buttonsOf = query => replyChunks(query, 900).at(-1).keyboard.rows[0].buttons;
+  const rowsOf = query => replyChunks(query, 900).at(-1).keyboard.rows.map(row => row.buttons);
+  const buttonsOf = query => rowsOf(query).flat();
   const summary = buttons => buttons.map(b => [b.id, b.action.type, b.action.data]);
+  const layout = query => rowsOf(query).map(row => row.map(b => b.id));
 
   assert.deepEqual(summary(buttonsOf("a")), [
     ["page", 2, "/搜索歌曲 a --page "],
@@ -244,9 +246,10 @@ test("翻页按钮：翻页是回调按钮，页码只填输入框；到头的�
   ]);
   assert.equal(buttonsOf("a")[0].action.enter, false, "页码只填输入框，页数让用户补");
   assert.equal(buttonsOf("a")[0].render_data.label, `第1/${pages}页`);
-  assert.deepEqual(summary(buttonsOf("a --page 2")).map(b => b[0]), ["first", "prev", "page", "next", "last"]);
-  assert.equal(buttonsOf("a --page 2")[1].action.data, "/搜索歌曲 a --page 1");
-  assert.deepEqual(summary(buttonsOf(`a --page ${pages}`)).map(b => b[0]), ["first", "prev", "page"]);
+  assert.deepEqual(layout("a"), [["page", "next"], ["last"]]);
+  assert.deepEqual(layout("a --page 2"), [["prev", "page", "next"], ["first", "last"]], "一行最多三个，窄气泡里也放得下");
+  assert.equal(buttonsOf("a --page 2")[0].action.data, "/搜索歌曲 a --page 1");
+  assert.deepEqual(layout(`a --page ${pages}`), [["prev", "page"], ["first"]]);
   for (const b of buttonsOf("a --page 2")) assert.equal(b.action.permission.type, 2, "公开曲库，谁都能点");
 
   const single = replyChunks("Perfect Shining!!", 900);
