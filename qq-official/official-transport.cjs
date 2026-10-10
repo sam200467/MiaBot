@@ -43,6 +43,9 @@ const DEFAULTS = Object.freeze({
   // 心跳周期由网关的 Hello 指定；这里只是下限，防止测试里回一个荒谬的小值刷屏
   minHeartbeatIntervalMs: 5000,
   maxImageBytes: 8 * 1024 * 1024,
+  // /搜索歌曲 用 Markdown 发，曲名和白谱可点（指令链接）。机器人没有 Markdown 权限时会自动退回纯文本，
+  // 想彻底不发 Markdown 就在 config.local.json 里写 "markdown": false。
+  markdown: true,
 
   // 官方有正式频控并会返回明确错误码，失败代价不再是封号（这点和 NapCat 版相反）。
   // 所以节流放宽，但**熔断保留** —— 它是识别「平台侧异常」的手段，不是为了保号。
@@ -269,7 +272,7 @@ function createOfficial(host) {
     return "/v2/users/" + target.openid + "/files";
   }
 
-  async function sendText(target, text, msgId, refId) {
+  async function sendText(target, text, msgId, refId, markdown) {
     const run = async () => {
       const key = targetKey(target);
       const suppress = suppressKey(key, text, msgId);
@@ -280,7 +283,7 @@ function createOfficial(host) {
 
       // 被动回复必须带 msg_id；msg_seq 对同一个 msg_id 要递增，否则被当成重复发送
       const useId = effectiveMsgId(target, msgId);
-      const body = { content: String(text), msg_type: 0 };
+      const body = markdown ? { msg_type: 2, markdown: { content: String(markdown) } } : { content: String(text), msg_type: 0 };
       if (useId) { body.msg_id = useId; body.msg_seq = nextSeq(useId); }
       // 引用是**另一个**字段：填了才以「回复」形式展示，不填就是一条独立消息。
       // 拿不到 refId（对方引用的是更早的消息、ext 里没有 msg_idx）就退化成不引用。
@@ -292,13 +295,33 @@ function createOfficial(host) {
         return data;
       } catch (error) {
         const kind = classify(error);
-        if (kind === "server" || kind === "network" || kind === "unknown") tripCircuit(kind + "：" + error.message);
+        // Markdown 被拒是这条消息的格式问题，不是平台异常：不熔断，否则紧跟着的纯文本补发也会被挡下。
+        const markdownRejection = markdown && error?.status >= 400 && error.status < 500;
+        if (!markdownRejection && (kind === "server" || kind === "network" || kind === "unknown")) tripCircuit(kind + "：" + error.message);
         throw error;
       }
     };
     const result = sendChain.then(run, run);
     sendChain = result.then(() => undefined, () => undefined);
     return result;
+  }
+
+  // Markdown（msg_type=2）发不出去就用纯文本 text 补发，用户总能收到一条。
+  // 只有平台明确拒收（4xx）才补发：网络错误、5xx 时那条可能已经到了，补发会变成两条。
+  // 被动回复过期（40034128）和限流补发也一样会失败，原样抛出。
+  // 拒收过一次就记住，之后直接发纯文本 —— 没开 Markdown 权限的机器人每条都先失败一次没有意义。
+  let markdownRejected = false;
+  async function sendMarkdown(target, markdown, text, msgId, refId) {
+    // QQ 频道是另一套接口，没实测过，照旧发纯文本。
+    if (markdownRejected || !config.markdown || target.kind === "channel") return sendText(target, text, msgId, refId);
+    try {
+      return await sendText(target, text, msgId, refId, markdown);
+    } catch (error) {
+      if (!(error?.status >= 400 && error.status < 500) || error.status === 429 || classify(error) !== "unknown") throw error;
+      markdownRejected = true;
+      log("Markdown 消息被拒（" + (error.code ?? error.status) + "），之后改发纯文本：" + error.message);
+      return sendText(target, text, msgId, refId);
+    }
   }
 
   async function sendImage(target, image, msgId, caption = "", refId) {
@@ -653,7 +676,7 @@ function createOfficial(host) {
   // 但要用同一套 access_token 和 base URL）。默认不导出它是有意的 ——
   // 上层不该绕过 sendText/sendImage 自己拼消息，那会把限流、抑制、熔断全绕过去。
   // 用它的人要自己负责：这里**没有**限流、没有去重、没有熔断。
-  return { start, stop, sendText, sendImage, state, healthy, config, normalize, rest };
+  return { start, stop, sendText, sendMarkdown, sendImage, state, healthy, config, normalize, rest };
 }
 
 module.exports = { createOfficial, DEFAULTS, OP, INTENT_GROUP_AND_C2C, INTENT_GROUP_MEMBER, INTENT_PUBLIC_GUILD_MESSAGES };

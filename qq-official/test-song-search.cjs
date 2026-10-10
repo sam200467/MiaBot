@@ -199,3 +199,39 @@ test("每张公开曲库的白谱都对得上内部曲库里真有这张谱面�
   }
   assert.equal(botChartId(catalogSongs.find(song => song.meta.name === "Gate of Doom"), "MAS"), 39, "其他难度照旧是本曲的 ID");
 });
+
+test("Markdown 版：「id36 曲名」整段填到「/谱面分析 id36 」，白谱整条填好，绿黄红紫不做链接，提示只在最后一行出现一次", () => {
+  const { replyChunks } = require("./song-search.cjs");
+  const chunks = replyChunks("Perfect Shining!!", 900);
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0].text, reply("Perfect Shining!!"), "纯文本补发的内容跟以前逐字一样");
+  assert.equal(chunks[0].markdown, [
+    "查到 1 首：",
+    "",
+    '<qqbot-cmd-input text="/谱面分析 id36 " show="id36   Perfect Shining!!" reference="false" />',
+    'BAS 3 / ADV 6 / EXP 8 / MAS 11.5<qqbot-cmd-input text="/谱面分析 id8003 白" show="（id8003：LUN 0）" reference="false" /><qqbot-cmd-input text="/谱面分析 id8091 白" show="（id8091：LUN 13.8）" reference="false" />',
+    "",
+    "（点曲名会填入 /谱面分析 和曲目 ID，再补一个难度字：绿/黄/红/紫；点括号里的白谱，回车即可）",
+  ].join("\n"));
+  const many = replyChunks("光", 900).map(c => c.markdown).join("\n");
+  assert.equal(many.match(/点曲名会填入/g).length, 1, "搜到多首也只提示一次");
+  assert.doesNotMatch(reply("光"), /点曲名/, "纯文本没有链接，不写提示");
+  assert.match(many, /text="\/谱面分析 id8025 白" show="id8025   怒槌～光吉猛修一部謎～"/, "只有白谱的歌没得挑，直接填白");
+});
+
+test("Markdown 版：曲名里有半角引号放不进属性值，照原样显示不做链接；翻页的下一页也可点", () => {
+  const { replyChunks } = require("./song-search.cjs");
+  const snow = replyChunks("Snow in", 900).map(c => c.markdown).join("\n");
+  assert.match(snow, /Snow in "I love you"/);
+  assert.doesNotMatch(snow, /show="id\d+   Snow in/);
+  const paged = replyChunks("a", 900).map(c => c.markdown).join("\n");
+  assert.match(paged, /<qqbot-cmd-input text="\/搜索歌曲 a --page 2" show="\/搜索歌曲 a --page 2" reference="false" \/>/);
+});
+
+test("Markdown 版按纯文本长度切块，每块的纯文本拼起来就是原来的回复", () => {
+  const { replyChunks } = require("./song-search.cjs");
+  const chunks = replyChunks("a", 200);
+  assert.ok(chunks.length > 1);
+  for (const c of chunks) assert.ok(c.text.length <= 200, c.text);
+  assert.equal(chunks.map(c => c.text).join("\n\n"), reply("a"));
+});

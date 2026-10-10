@@ -54,6 +54,9 @@
   "_被动凭据": "延迟发出的内容改用「该目标最新一条消息」的 msg_id 当被动凭据，引用仍指向原始请求。群窗口只有 5 分钟，而分表/牌子的生成上限是 6～10 分钟，不借新凭据的话等图出来就发不出去了。2026-09-19 probe 实测平台接受这种搭配。⚠ 它不是万能补丁：那之后没人在群里说话就仍然没有新鲜凭据可用。",
   "reuseLatestPassiveCredential": true,
 
+  "_Markdown": "markdown=true（缺省）时 /搜索歌曲 用 Markdown 发，曲名和白谱是指令链接，点一下把 /谱面分析 填进输入框。机器人没有 Markdown 权限时平台会拒收，自动改发纯文本并记住，不用改这里；想彻底不发 Markdown 就写 false。",
+  "markdown": true,
+
   "_限流": "官方有正式频控且失败代价不是封号，所以比 NapCat 版宽松；熔断保留，用于识别平台侧异常。不填用 official-transport.cjs 的默认值。",
   "minSendIntervalMs": 500,
   "jitterMs": 200,

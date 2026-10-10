@@ -120,6 +120,7 @@ function createMiaCommands(options = {}) {
   const config = options.config || {};
   const send = options.send;
   const sendImage = options.sendImage;
+  const sendMarkdown = options.sendMarkdown;
   const transport = options.transport;
   const log = options.log || (() => {});
   const now = options.now || Date.now;
@@ -401,7 +402,12 @@ function createMiaCommands(options = {}) {
   }
 
   async function runCapability(event, name, query, chatLine = "", target = null) {
-    if (name === "songsearch") return sendLines(event, "", songSearch.reply(query).split("\n"));
+    if (name === "songsearch") {
+      // 曲名和白谱做成指令链接（点一下填好 /谱面分析）。没接 Markdown 发送器的宿主照旧发纯文本。
+      if (!sendMarkdown) return sendLines(event, "", songSearch.reply(query).split("\n"));
+      for (const chunk of songSearch.replyChunks(query, LINES_LIMIT)) await sendMarkdown(event, chunk.markdown, chunk.text);
+      return;
+    }
     if (name === "calculate" && !hasFullCalculateArgs(query)) {
       // notice 不带引出语：这不是「查到了」，是「这次不算」
       return dispatch(event, {
