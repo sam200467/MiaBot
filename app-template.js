@@ -67,7 +67,7 @@ const BROWSER_CANDIDATES = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
 ];
-const VERSION = "4.1.8-greek-title-fonts";
+const VERSION = "4.1.9-level0-rating";
 
 // 开发模式（node ongenki-exe.js 直跑）时用 cwd，exe 模式用 exe 所在目录；
 // GUI 会把核心解压到临时目录运行，用 ONGEKI_APP_DIR 指回 GUI 所在目录（配置文件放那里）
@@ -1944,6 +1944,9 @@ function buildChartInfoThemeData(song, difficultyId) {
     ? SONG_JACKET_URL + encodeURIComponent(imageUrl)
     : songJacketPlaceholder(song?.name, song?.id);
 
+  // 0 级谱面（特殊白谱）打多少分都进不了 B50/N10/P50，单曲 Rating 一律写 0；
+  // 照定数 0 硬套公式会算出 SSS+ 2.050、AAA -1.715 这种不存在的数。
+  const unrated = String(level) === "0";
   const breakLoss = 95000 / noteCount;
   const hitLoss = 380000 / noteCount;
   const missLoss = 950000 / noteCount;
@@ -1959,7 +1962,7 @@ function buildChartInfoThemeData(song, difficultyId) {
     const lossBudget = 1010000 - item.target;
     return {
       ...item,
-      rating: chartInfoTruncateThree(chartInfoRatingAtTarget(constant, item.target)),
+      rating: chartInfoTruncateThree(unrated ? 0 : chartInfoRatingAtTarget(constant, item.target)),
       lossBudget,
       maxBreak: chartInfoTruncateTwo(lossBudget / breakLoss),
       maxHit: chartInfoTruncateTwo(lossBudget / hitLoss),
@@ -1985,7 +1988,7 @@ function buildChartInfoThemeData(song, difficultyId) {
       lossBudget,
       maxMinusOne: lossBudget,
       maxMinusTwo: Math.floor(lossBudget / 2),
-      rating: (item.stars * constant * constant / 1000).toFixed(3),
+      rating: (unrated ? 0 : item.stars * constant * constant / 1000).toFixed(3),
     };
   });
 
@@ -3607,6 +3610,11 @@ async function main() {
         chartInfoTheme.platinumTheory !== 3316 || chartInfoTheme.platinumRows[0].minimum !== 3283 ||
         chartInfoTheme.platinumRows[0].rating !== "1.066" || chartInfoTheme.platinumRows[2].maxMinusTwo !== 49) {
       throw new Error("单谱面分析公式或数据映射自测失败");
+    }
+    const levelZeroTheme = buildChartInfoThemeData(catalogIndex.internalById.get(8015), 10);
+    if (levelZeroTheme.chart.level !== "0" || levelZeroTheme.chart.noteCount !== 1226 ||
+        ![...levelZeroTheme.scoreRows, ...levelZeroTheme.platinumRows].every((row) => row.rating === "0.000")) {
+      throw new Error("0 级谱面的单曲 Rating 应一律为 0");
     }
     const plates = completionPlateDefinitions();
     const versionSongCounts = plates.map((plate, index) => {

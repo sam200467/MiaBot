@@ -31,7 +31,7 @@ function compileApp() {
     renderCompletionTheme = async data => { captured.plate = data; return Buffer.from("test"); };
     renderLevelScoreTheme = async data => { captured.level = data; return Buffer.from("test"); };
     module.exports = { captured, runJobData, runSongDetailJobData, runCompletionJobData, runLevelScoreJobData, completionVersionSongs, getCompletionPlate,
-      collectJacketItems, localizeJackets, findCachedJacket };
+      collectJacketItems, localizeJackets, findCachedJacket, buildChartInfoThemeData, levelScoreCharts };
   `, file);
   return loaded.exports;
 }
@@ -103,6 +103,28 @@ test("rinnet 头像带官网 Referer 下载并改用本地缓存", async () => {
   assert.match(data.profile.avatarUrl, /^file:\/\//);
   assert.equal(fs.existsSync(new URL(data.profile.avatarUrl)), true);
   assert.equal(missing.profile.avatarUrl, fallback);
+});
+
+test("谱面分析：0 级谱面的单曲 Rating 一律写 0，普通谱面照常算", () => {
+  // 0 级白谱打多少分都进不了 B50/N10/P50。照定数 0 硬套公式，原来 SSS+ 写 2.050、AAA 写 -1.715。
+  const app = compileApp();
+  const songs = require("./ongeki-music-internal.json");
+  const zero = app.buildChartInfoThemeData(songs.find(song => song.id === 8015), 10);
+  assert.deepEqual(zero.scoreRows.map(row => row.rating), ["0.000", "0.000", "0.000", "0.000", "0.000"]);
+  assert.ok(zero.platinumRows.every(row => row.rating === "0.000"));
+  assert.equal(zero.scoreRows[0].maxBreak, 32.26, "容错照算，只有 Rating 写 0");
+  const normal = app.buildChartInfoThemeData(songs.find(song => song.id === 870), 3);
+  assert.deepEqual([normal.scoreRows[0].rating, normal.scoreRows[4].rating, normal.platinumRows[0].rating], ["16.650", "12.885", "1.066"]);
+});
+
+test("已删的ユーフィリア《Hand in Hand》（id212）不算进進撃牌子，也不进等级表", () => {
+  // 导入脚本按曲名借上线状态，曲库里只剩 livetune 那首《Hand in Hand》，id212 就被标成了 online：
+  // 進撃一直多算一首打不了的歌，/等级 12 里也列着它。官网现役列表和 arcade-songs（jp:false）都确认它已删除。
+  const app = compileApp();
+  const plate = app.completionVersionSongs(app.getCompletionPlate("040105"));
+  assert.ok(!plate.some(song => song.id === 212));
+  for (const level of ["2", "7", "8+", "12"]) assert.ok(!app.levelScoreCharts(level).some(chart => chart.songId === 212), "/等级 " + level);
+  assert.ok(app.levelScoreCharts("11+").some(chart => chart.songId === 380), "同名的 livetune 那首照常在");
 });
 
 // 曲绘是公网图，国内时通时不通。缓存逻辑决定了这件事的代价：
