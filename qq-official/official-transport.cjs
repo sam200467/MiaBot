@@ -94,9 +94,12 @@ function createOfficial(host) {
   // 6～10 分钟，等图出来时原始凭据往往已经过期。实测（2026-09-19）平台接受
   // 「用新消息的凭据 + 引用指向旧请求」这种搭配。
   const latestInbound = new Map();        // targetKey -> { msgId, at }
-  // 按钮回调（INTERACTION_CREATE）的事件 id。它也能当被动回复凭据，但字段是 event_id 不是 msg_id。
-  // 上层把它照样当 msgId 传下来，发的时候在这里认出来换字段 —— 上层不用知道两种凭据的区别。
-  const interactionIds = new Map();       // 事件 id -> 过期时间
+  // 按钮回调（INTERACTION_CREATE）带两个 id，**不能混用**（2026-10-10 线上实测）：
+  //   - d.id：回调 id，只用来应答（PUT /interactions/{id}）；上层把它当 msgId 往下传
+  //   - 网关帧最外层的 id（形如 INTERACTION_CREATE:xxxx）：被动回复的 event_id。
+  //     拿 d.id 去当 event_id，平台回 40034025「请求参数event_id无效」
+  // 发的时候在这里按回调 id 查出 event_id 换上 —— 上层不用知道两种凭据的区别。
+  const interactions = new Map();         // 回调 id -> { eventId, expiry }
   const rateState = { day: "", dayCount: 0, lastSendAt: 0, byTarget: new Map() };
   let circuit = { failures: 0, openUntil: 0 };
 
@@ -208,6 +211,8 @@ function createOfficial(host) {
     if (error.code === 40034100) return "rate_limited";
     if (error.status === 429) return "rate_limited";
     if (error.status >= 500) return "server";
+    // 其余 4xx 是平台明确拒收了这一条（参数、格式、权限）。毛病出在这条消息上，不是平台异常，不熔断。
+    if (error.status >= 400 && error.status < 500 && error.status !== 401) return "rejected";
     if (/ECONN|socket|timeout|超时/i.test(String(error.message || ""))) return "network";
     return "unknown";
   }
@@ -277,8 +282,11 @@ function createOfficial(host) {
   // 被动回复凭据写进消息体。msg_seq 跟 msg_id 一样按凭据递增。
   function applyCredential(body, useId) {
     if (!useId) return;
-    prune(interactionIds);
-    body[interactionIds.has(useId) ? "event_id" : "msg_id"] = useId;
+    const current = now();
+    for (const [k, v] of interactions) if (v.expiry <= current) interactions.delete(k);
+    const interaction = interactions.get(useId);
+    if (interaction) body.event_id = interaction.eventId;
+    else body.msg_id = useId;
     body.msg_seq = nextSeq(useId);
   }
   function messagePath(target) {
@@ -316,9 +324,8 @@ function createOfficial(host) {
         return data;
       } catch (error) {
         const kind = classify(error);
-        // Markdown 被拒是这条消息的格式问题，不是平台异常：不熔断，否则紧跟着的纯文本补发也会被挡下。
-        const markdownRejection = markdown && error?.status >= 400 && error.status < 500;
-        if (!markdownRejection && (kind === "server" || kind === "network" || kind === "unknown")) tripCircuit(kind + "：" + error.message);
+        // 被拒（4xx）是这条消息的问题，不是平台异常：不熔断，否则紧跟着的补发也会被挡下。
+        if (kind === "server" || kind === "network" || kind === "unknown") tripCircuit(kind + "：" + error.message);
         throw error;
       }
     };
@@ -333,31 +340,42 @@ function createOfficial(host) {
   // 拒收过一次就记住，之后直接发纯文本 —— 没开 Markdown 权限的机器人每条都先失败一次没有意义。
   //
   // 按钮（options.keyboard，即 keyboard.content 那一层 { rows }）也照这个办法：带按钮被拒就去掉按钮再发一次，
-  // 正文换成 options.markdownWithoutKeyboard —— 没了按钮，翻页得写回正文里。拒过一次同样记住。
+  // 正文换成 options.markdownWithoutKeyboard —— 没了按钮，翻页得写回正文里。
+  //
+  // **降级成功了才记住**：被拒不一定是格式的错。2026-10-10 线上踩过：凭据填错（40034025 event_id 无效）时
+  // 三种格式全被拒，旧写法却把按钮和 Markdown 都记成「平台不收」，之后一直只发纯文本。
+  // 现在去掉按钮（或改纯文本）发成功了，才说明是按钮（或 Markdown）的问题；补发也失败就原样抛出，什么都不记。
   // 没有 Markdown 权限的机器人两样都会被拒，各失败一次之后就只发纯文本了。
   let markdownRejected = false, keyboardRejected = false;
-  const rejectedFormat = (error) => error?.status >= 400 && error.status < 500 && error.status !== 429 && classify(error) === "unknown";
+  const rejected = (error) => classify(error) === "rejected";
   async function sendMarkdown(target, markdown, text, msgId, refId, options = {}) {
     // QQ 频道是另一套接口，没实测过，照旧发纯文本。
     if (markdownRejected || !config.markdown || target.kind === "channel") return sendText(target, text, msgId, refId);
+    let keyboardError = null;
     if (options.keyboard && config.keyboard && !keyboardRejected) {
       try {
         return await sendText(target, text, msgId, refId, markdown, options.keyboard);
       } catch (error) {
-        if (!rejectedFormat(error)) throw error;
-        keyboardRejected = true;
-        log("带按钮的消息被拒（" + (error.code ?? error.status) + "），之后不再发按钮：" + error.message);
+        if (!rejected(error)) throw error;
+        keyboardError = error;
       }
     }
     if (options.keyboard) markdown = options.markdownWithoutKeyboard ?? markdown;
+    let result;
     try {
-      return await sendText(target, text, msgId, refId, markdown);
+      result = await sendText(target, text, msgId, refId, markdown);
     } catch (error) {
-      if (!rejectedFormat(error)) throw error;
+      if (!rejected(error)) throw error;
+      result = await sendText(target, text, msgId, refId);
       markdownRejected = true;
       log("Markdown 消息被拒（" + (error.code ?? error.status) + "），之后改发纯文本：" + error.message);
-      return sendText(target, text, msgId, refId);
+      return result;
     }
+    if (keyboardError) {
+      keyboardRejected = true;
+      log("带按钮的消息被拒（" + (keyboardError.code ?? keyboardError.status) + "），之后不再发按钮：" + keyboardError.message);
+    }
+    return result;
   }
 
   async function sendImage(target, image, msgId, caption = "", refId) {
@@ -672,7 +690,8 @@ function createOfficial(host) {
           if (recentIds.has(key)) return;
           prune(recentIds, key, 10 * 60 * 1000);
         }
-        if (frame.t === "INTERACTION_CREATE" && id) prune(interactionIds, String(id), 60 * 60 * 1000);
+        // 帧外层没有 id 时只能退回 d.id —— 多半发不出去，但总比不带凭据强。
+        if (frame.t === "INTERACTION_CREATE" && id) interactions.set(String(id), { eventId: String(frame.id || id), expiry: now() + 60 * 60 * 1000 });
         rememberInbound(frame.t, frame.d);
         onEvent?.(frame.t, frame.d);
         return;

@@ -461,17 +461,17 @@ test("按钮回调：订了 1<<26；群和单聊的点击都归一化成「这�
   await transport.stop(); await mock.stop();
 });
 
-test("按钮回调：应答走 PUT /interactions/{id}；回复用 event_id 当被动凭据，msg_seq 照样递增", async () => {
+test("按钮回调：应答走 PUT /interactions/{回调 id}；回复的 event_id 是网关帧外层的 id，msg_seq 照样递增", async () => {
   const { mock, transport, events } = await connected();
   await transport.ackInteraction("itr-9");
   assert.deepEqual(mock.state.acks, [{ id: "itr-9", body: { code: 0 } }]);
 
-  mock.push("INTERACTION_CREATE", { id: "itr-5", group_openid: "G1", group_member_openid: "U1", data: { resolved: { button_data: "/搜索歌曲 a --page 2" } } });
+  mock.push("INTERACTION_CREATE", { id: "itr-5", group_openid: "G1", group_member_openid: "U1", data: { resolved: { button_data: "/搜索歌曲 a --page 2" } } }, "INTERACTION_CREATE:frame-5");
   await mock.waitFor(() => events.length >= 1);
   await transport.sendText({ kind: "group", openid: "G1" }, "第一条", "itr-5");
   await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**第二条**", "第二条", "itr-5");
   const [first, second] = mock.state.sent.map((s) => s.body);
-  assert.equal(first.event_id, "itr-5");
+  assert.equal(first.event_id, "INTERACTION_CREATE:frame-5", "回调 id（d.id）当 event_id 会被拒 40034025");
   assert.equal(first.msg_id, undefined, "回调事件的 id 不是 msg_id");
   assert.deepEqual([first.msg_seq, second.msg_seq], [1, 2]);
 
@@ -512,11 +512,27 @@ test("按钮：挂在 Markdown 上发；被拒就去掉按钮、换上不带按�
 test("按钮回调：开着 reuseLatestPassiveCredential 时也用这次点击的凭据，不换回群里更早的消息", async () => {
   const { mock, transport, events } = await connected({ reuseLatestPassiveCredential: true });
   mock.push("GROUP_AT_MESSAGE_CREATE", { id: "old-search", group_openid: "G1", content: "/搜索歌曲 a", author: { member_openid: "U1" } });
-  mock.push("INTERACTION_CREATE", { id: "itr-new", group_openid: "G1", group_member_openid: "U1", data: { resolved: { button_data: "/搜索歌曲 a --page 2" } } });
+  mock.push("INTERACTION_CREATE", { id: "itr-new", group_openid: "G1", group_member_openid: "U1", data: { resolved: { button_data: "/搜索歌曲 a --page 2" } } }, "INTERACTION_CREATE:frame-new");
   await mock.waitFor(() => events.length >= 2);
   await transport.sendText({ kind: "group", openid: "G1" }, "第二页", "itr-new");
   const body = mock.state.sent.at(-1).body;
-  assert.equal(body.event_id, "itr-new");
+  assert.equal(body.event_id, "INTERACTION_CREATE:frame-new");
   assert.equal(body.msg_id, undefined);
+  await transport.stop(); await mock.stop();
+});
+
+test("凭据错了（三种格式全被拒）：原样报错，不记成「平台不收按钮 / Markdown」，也不熔断", async () => {
+  const { mock, transport } = await connected();
+  const options = { keyboard: { rows: [{ buttons: [{ id: "next" }] }] }, markdownWithoutKeyboard: "**无按钮**" };
+  // 带按钮、不带按钮、纯文本连着三次都被拒（2026-10-10 线上实测的形状）
+  mock.state.nextError = { status: 400, err_code: 40034025, message: "请求参数event_id无效", times: 3 };
+  await assert.rejects(() => transport.sendMarkdown({ kind: "group", openid: "G1" }, "**有按钮**", "纯文本", "m1", null, options), /event_id无效/);
+  assert.equal(mock.state.nextError, null, "三种格式都试过了");
+  assert.equal(transport.state.circuitOpen, false, "参数错误不是平台异常");
+
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**有按钮**", "纯文本", "m2", null, options);
+  const body = mock.state.sent.at(-1).body;
+  assert.equal(body.msg_type, 2, "Markdown 没被记成不能用");
+  assert.ok(body.keyboard, "按钮没被记成不能用");
   await transport.stop(); await mock.stop();
 });

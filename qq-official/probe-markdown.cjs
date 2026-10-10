@@ -112,7 +112,12 @@ console.log("环境  :", cfg.sandbox ? "沙箱 sandbox.api.sgroup.qq.com（只�
 console.log("监听  :", seconds + " 秒");
 console.log("");
 
-const transport = createOfficial({ ...cfg, log: (m) => console.log("[传输] " + m) });
+// 回调的 event_id 是网关帧最外层的 id，不是 d.id（拿 d.id 会被拒 40034025）。帧探针里记下来。
+const frameIds = new Map();   // d.id -> 帧外层 id
+const transport = createOfficial({
+  ...cfg, log: (m) => console.log("[传输] " + m),
+  onFrame: (frame) => { if (frame?.t === "INTERACTION_CREATE" && frame.d?.id) frameIds.set(String(frame.d.id), String(frame.id || "")); },
+});
 const tested = new Map();   // "c2c" | "group" -> [{ name, ok, code, message, payload }]
 const clicks = [];          // 回调按钮被点之后：[{ name, ok, code, ... }]，应答和回复各一条
 const KIND = { group: "群聊", c2c: "私聊", channel: "QQ频道" };
@@ -153,12 +158,13 @@ async function runFor(target, msgId) {
   maybeFinish();
 }
 
-// 回调按钮被点了：先应答，再用事件 id 当 event_id 回一条。
+// 回调按钮被点了：先用回调 id 应答，再用帧外层的事件 id 当 event_id 回一条。
 async function onClick(shape) {
-  console.log("\n收到按钮回调（" + KIND[shape.type] + "，事件 " + shape.interactionId + "）：按钮数据「" + shape.content + "」");
+  const eventId = frameIds.get(shape.interactionId) || "";
+  console.log("\n收到按钮回调（" + KIND[shape.type] + "，回调 " + shape.interactionId + "，事件 " + (eventId || "（帧里没有 id）") + "）：按钮数据「" + shape.content + "」");
   await attempt(clicks, "应答 PUT /interactions/{id}", "PUT", "/interactions/" + encodeURIComponent(shape.interactionId), { code: 0 });
   await attempt(clicks, "D｜按钮回调的回复（event_id 凭据）", "POST", messagePath({ kind: shape.type, openid: shape.openid }), {
-    msg_type: 0, content: "探针 D：收到按钮「" + shape.content + "」（这条用的是 event_id）", event_id: shape.interactionId, msg_seq: 1,
+    msg_type: 0, content: "探针 D：收到按钮「" + shape.content + "」（这条用的是 event_id）", event_id: eventId || shape.interactionId, msg_seq: 1,
   });
   maybeFinish();
 }

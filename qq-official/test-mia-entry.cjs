@@ -1167,11 +1167,11 @@ test("翻页按钮：点了先应答，再以 event_id 回复那一页，带着�
     });
 
     const first = click();
-    mock.push("INTERACTION_CREATE", first);
+    mock.push("INTERACTION_CREATE", first, "INTERACTION_CREATE:frame-first");
     assert.ok(await mock.waitFor(() => mock.state.sent.length >= 1));
-    assert.deepEqual(mock.state.acks.map((a) => [a.id, a.body.code]), [[first.id, 0]]);
+    assert.deepEqual(mock.state.acks.map((a) => [a.id, a.body.code]), [[first.id, 0]], "应答用回调 id");
     const body = mock.state.sent.at(-1).body;
-    assert.equal(body.event_id, first.id);
+    assert.equal(body.event_id, "INTERACTION_CREATE:frame-first", "回复用网关帧外层的事件 id");
     assert.equal(body.msg_id, undefined);
     assert.equal(body.msg_type, 2);
     assert.match(body.markdown.content, /第 2\/\d+ 页，点下面的按钮翻页/);
