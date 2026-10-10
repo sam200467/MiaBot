@@ -47,6 +47,23 @@ test("去掉符号仍能搜到：用户通常不会照着打「!」「☆」", (
   assert.ok(histories.matches.some(m => m.meta.name === "ヒストリー×ブレイカー"), "× 少打了也要搜到");
 });
 
+test("纯数字曲名搜得到；照着封面连作者一起抄进来时给候选，短曲名不乱命中", () => {
+  // 群里实测：问「2112410403927243233368253215是什么歌」回 0 首。前 22 位是曲名，后面的 253215 是作者，
+  // 封面上印在一起；原来整串数字只当 ID 找，曲名本身是数字的歌怎么都搜不到。
+  for (const q of ["2112410", "2112410403927243233368"]) {
+    const r = search(q);
+    assert.deepEqual(r.matches.map(s => s.meta.name), ["2112410403927243233368"], q);
+    assert.equal(r.fuzzy, false, q);
+  }
+  const pasted = search("2112410403927243233368253215");
+  assert.deepEqual(pasted.matches.map(s => s.meta.name), ["2112410403927243233368"]);
+  assert.equal(pasted.fuzzy, true, "多抄了作者，只能算候选");
+  assert.match(reply("2112410403927243233368253215"), /id665   2112410403927243233368[\s\S]*比较接近的候选/);
+  assert.deepEqual(search("39").matches.map(s => botSongId(s)).sort((a, b) => a - b), [39, 213], "ID 39 和曲名《39》都列出来");
+  assert.equal(search("id39").total, 1, "写了 id 前缀就只认 ID");
+  assert.equal(search("Ring of Fortune").total, 0, "长查询里碰巧含着《Ring》不算");
+});
+
 test("简体焰能找到标题写作焔的歌，符号曲名仍可检索", () => {
   const result = search("光焰");
   assert.equal(result.total, 1);

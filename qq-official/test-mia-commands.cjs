@@ -33,6 +33,26 @@ test("搜索歌曲无需绑定，斜杠与模型工具共用真实曲库", async
   });
 });
 
+test("数字曲名：/单曲 打曲名片段就能出图；数字同时对上 ID 和曲名时两首都列出来，不替人挑", async () => {
+  // 群里实测：/单曲 2112410 回「没有找到曲目」。原来整串数字只当 ID 找，《2112410403927243233368》（id665）
+  // 打曲名永远查不到；《39》（id213）也一直被 ID 39 的《Gate of Doom》挡着。
+  const drawn = [];
+  await run({}, {
+    getBinding: async () => ({ playerName: "测试玩家", email: "a@b.c", password: "x" }),
+    generateSongChart: async (config, binding, song) => { drawn.push(song.id); return { name: "song.png", buffer: Buffer.from("png"), meta: {} }; },
+  }, async ({ commands, sent }) => {
+    await commands.handleCommand(groupEvent("/单曲 2112410"), parseCommand("/单曲 2112410"));
+    assert.deepEqual(drawn, [665]);
+    assert.ok(sent.some(s => s.kind === "image" && /id665 2112410403927243233368/.test(s.caption)), JSON.stringify(sent));
+    const before = sent.length;
+    await commands.handleCommand(groupEvent("/单曲 39", { userId: "U3" }), parseCommand("/单曲 39"));
+    const listed = sent.slice(before).map(s => s.text).join("\n");
+    assert.match(listed, /id39　Gate of Doom/);
+    assert.match(listed, /id213　39　/);
+    assert.deepEqual(drawn, [665], "两首都对得上时不该替人挑一首去出图");
+  });
+});
+
 // ── 夹具 ────────────────────────────────────────────────────────────
 // 每个用例一份独立的临时目录：别名库是 mia-core 的模块级单例，
 // 让它们各自指向自己的目录，用例之间就不会串。

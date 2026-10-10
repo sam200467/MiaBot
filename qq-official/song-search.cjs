@@ -40,17 +40,29 @@ function search(raw) {
   // 直接拿去匹配会把整库倒出来，所以那一支必须判非空 —— 这正是原代码要拦的东西。
   const squashedNeedle = squash(query);
   const pool = index;
-  const idMatch = query.match(/^(?:id\s*)?(\d+)$/i);
-  const aliasTitles = idMatch ? null : new Set(core.searchSongs(query).map(s => normalize(s.name)));
-  let matches = idMatch
-    ? pool.filter(({ song }) => botSongId(song) === Number(idMatch[1]))
+  // 数字跟 mia-core 的 searchSongs 同一套规矩：「id870」只认 ID；光是一串数字先当 ID，跟它完全相同的
+  // 曲名（《39》《2112410403927243233368》）一起列出；两样都不是，就当曲名片段往下找。
+  const idMatch = query.match(/^(id\s*)?(\d+)$/i);
+  const byId = idMatch ? pool.filter(({ song }) => botSongId(song) === Number(idMatch[2])) : [];
+  const sameTitle = idMatch && !idMatch[1] ? pool.filter(item => item.title === needle && !byId.includes(item)) : [];
+  const asNumber = Boolean(idMatch && (idMatch[1] || byId.length || sameTitle.length));
+  const aliasTitles = asNumber ? null : new Set(core.searchSongs(query).map(s => normalize(s.name)));
+  let matches = asNumber ? [...byId, ...sameTitle]
     : pool.filter(({ title, squashed }) =>
       title.includes(needle) || (squashedNeedle && squashed.includes(squashedNeedle)) || aliasTitles.has(title));
   let fuzzy = false;
-  if (!matches.length && !idMatch && needle.length >= 3) {
+  if (!matches.length && !asNumber && needle.length >= 3) {
     const limit = needle.length < 5 ? 1 : Math.min(3, Math.floor(needle.length * 0.25));
     matches = pool.map(item => ({ ...item, distance: Math.abs(item.title.length - needle.length) <= limit ? distance(needle, item.title) : Infinity }))
       .filter(item => item.distance <= limit).sort((a, b) => a.distance - b.distance || a.title.localeCompare(b.title));
+    fuzzy = matches.length > 0;
+  }
+  // 最后一级：查询词里含着一首歌的完整曲名，而且曲名占了查询词的一半以上。照着封面抄曲名时会把作者
+  // 一起抄进来 ——《2112410403927243233368》的封面上紧跟着作者 253215，群里问的就是这一整串。
+  // 「占一半以上」是挡短曲名的：长查询里碰巧含着《39》《Ring》这种，不算。结果按候选给，不当精确命中。
+  if (!matches.length && !asNumber && squashedNeedle.length >= 3) {
+    matches = pool.filter(({ squashed }) => squashed.length >= 3 && squashed.length * 2 >= squashedNeedle.length && squashedNeedle.includes(squashed))
+      .sort((a, b) => b.squashed.length - a.squashed.length || a.title.localeCompare(b.title));
     fuzzy = matches.length > 0;
   }
   if (!fuzzy) matches.sort((a, b) => Number(b.title === needle) - Number(a.title === needle) || a.title.localeCompare(b.title));

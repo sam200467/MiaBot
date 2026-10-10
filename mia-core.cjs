@@ -156,12 +156,18 @@ const SONG_SEARCH_INDEX = INTERNAL_SONGS.map(song => ({ song, title: normalizeSo
 function searchSongs(query) {
   const raw = String(query || "").normalize("NFKC").trim();
   if (!raw) return [];
-  const idMatch = raw.match(/^(?:id\s*)?(\d+)$/i);
-  if (idMatch) {
-    const id = Number(idMatch[1]);
-    return INTERNAL_SONGS.filter((song) => Number(song?.id) === id);
-  }
   const needle = normalizeSongQuery(raw);
+  // 「id870」只认 ID。光是一串数字也先当 ID，但曲名本身也可能就是数字：《39》（id213）跟 ID 39 的
+  // 《Gate of Doom》撞车，《2112410403927243233368》（id665）更是对不上任何 ID —— 原来这两首只能用
+  // id 查，打曲名一律「没有找到曲目」（群里实测：/单曲 2112410）。所以跟这串数字完全相同的曲名一起列出来；
+  // 既不是 ID 也不是完整曲名，就当曲名片段往下找。
+  const idMatch = raw.match(/^(id\s*)?(\d+)$/i);
+  if (idMatch) {
+    const byId = INTERNAL_SONGS.filter((song) => Number(song?.id) === Number(idMatch[2]));
+    if (idMatch[1]) return byId;
+    const sameTitle = SONG_SEARCH_INDEX.filter(({ song, title }) => title === needle && !byId.includes(song)).map(({ song }) => song);
+    if (byId.length || sameTitle.length) return [...byId, ...sameTitle];
+  }
   return SONG_SEARCH_INDEX
     .filter(({ song, title }) => title.includes(needle) || songAliases.matches(song.name, needle, "ongeki"))
     .map(({ song }) => song)

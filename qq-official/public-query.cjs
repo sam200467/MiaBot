@@ -97,7 +97,7 @@ const fields = {
   release: { label: "收录日期", type: "date", note: "YYYY-MM-DD；没有记录就未知" },
   bpm: { label: "BPM", type: "number" },
   deleted: { label: "已删除", type: "boolean" },
-  botId: { label: "ID", type: "number", note: "分表和 Bot 指令使用的短 ID；用户问某首歌的 id 时返回此字段" },
+  botId: { label: "ID", type: "number", note: "分表和 Bot 指令使用的短 ID（最多四位的整数，比如 870）；用户问某首歌的 id 时返回此字段。用户拿一串数字问是哪首歌或问它的资料时用 title search：曲名本身也可能就是数字，比如《39》《2112410403927243233368》" },
   officialId: { label: "官方曲目ID", type: "text", note: "仅用户明确说“官方曲目 ID”时返回；用户输入 id870 查歌时用 title search" },
   difficulty: { label: "谱面难度", type: "enum", values: DIFFICULTIES },
   level: { label: "显示等级", type: "level", note: "13 与 13+ 不同；不可把等级自动改成定数" },
@@ -225,6 +225,7 @@ const rows = catalog.songs.flatMap((song, songIndex) => DIFFICULTIES.flatMap((di
     };
   });
 }));
+const knownBotIds = new Set(rows.map(row => row.botId));
 const levelValue = v => Number(String(v).replace("+", "")) + (String(v).endsWith("+") ? 0.5 : 0);
 function compare(value, filter) {
   if (!known(value) || (Array.isArray(value) && !value.length)) return false;
@@ -396,6 +397,11 @@ function queryMismatch(query, text, { self } = {}) {
   if (request.excludePrevious && !query.selection.excludePrevious) return "用户要求换一批或不重复，必须excludePrevious=true";
   const asksSongs = /哪些歌|哪些歌曲|哪几首|多少首|几首歌|歌曲有哪些|歌都有哪些/.test(text);
   if (asksSongs && !/谱面数量|多少张|几张|每张谱面|按谱面/.test(text) && query.entity !== "songs") return "用户要歌曲列表或歌曲数量，应 entity=songs 去重，不能按谱面重复列同一首歌";
+  // 模型见到一长串数字就当 ID 去筛。《2112410403927243233368》整条曲名就是数字，22 位连 JSON 数字都存不下
+  // （解析出来是 2.1124104039272434e+21），按 ID 筛必然 0 首（真模型实测「2112410403927243233368的定数是多少」）。
+  // 按 ID 等值筛选，值就得是真有的 Bot ID；对不上任何一首，就点名让它照原话里那串数字改成歌名 search。
+  if (query.filters.some(f => f.field === "botId" && (f.op === "eq" || f.op === "in") && [].concat(f.value).some(v => !knownBotIds.has(v))))
+    return "按 ID 筛选只能用真有的短 ID（最多四位，比如 870），这个值对不上任何一首。用户给的一串数字多半是曲名本身（曲名可以就是数字，比如《2112410403927243233368》），照原话里那串数字用 title search 查";
   const title = query.filters.filter(f => f.field === "title");
   let expected;
   for (const match of text.matchAll(/开头|開頭|前缀|前綴|结尾|結尾|后缀|後綴|包含|含有/g)) {

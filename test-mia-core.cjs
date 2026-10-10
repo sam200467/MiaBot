@@ -51,6 +51,16 @@ for (const query of ["光焔", "光焰", "光燄"]) {
     query + " 的谱面分析也应命中同一首歌");
 }
 
+// 纯数字曲名。群里实测 /单曲 2112410 回「没有找到曲目」：原来整串数字只当 ID 找，
+// 《2112410403927243233368》（id665）打曲名永远查不到，《39》（id213）也被 ID 39 挡着。
+assert.deepEqual(core.searchSongs("2112410").map((song) => song.id), [665], "数字曲名的片段");
+assert.deepEqual(core.searchSongs("2112410403927243233368").map((song) => song.id), [665], "完整的数字曲名");
+assert.deepEqual(core.searchSongs("39").map((song) => song.id), [39, 213], "ID 39 和曲名《39》都列出来，让人用 id 挑");
+assert.deepEqual(core.searchSongs("id39").map((song) => song.id), [39], "写了 id 前缀就只认 ID");
+assert.deepEqual(core.searchSongs("id2112410").map((song) => song.id), [], "id 前缀不退回去找曲名");
+assert.deepEqual(core.searchSongs("870").map((song) => song.id), [870], "普通的数字 ID 照旧");
+assert.deepEqual(core.searchSongClues("2112410").map((song) => song.id), [665], "/是什么歌 也一样");
+
 // 自动补全
 assert.equal(core.songAutocomplete("song", "id870")[0].value, "id870");
 assert.equal(core.songAutocomplete("chartinfo", "id870 紫譜")[0].value, "id870 master");

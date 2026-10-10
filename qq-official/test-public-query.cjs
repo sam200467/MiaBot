@@ -24,6 +24,25 @@ test("开头/包含/完整名互不退化；严格搜索不引入别名与纠错
   assert.equal(run([filter("title", "search", "id999999999")]).total, 0);
 });
 
+test("数字曲名：片段直接查到；连作者一起贴进来时给近似候选，不再回 0 首", () => {
+  // 群里实测原句「2112410403927243233368253215是什么歌」：路由把整串当歌名线索，回「按这些条件暂时没找到匹配的记录」。
+  assert.deepEqual(run([filter("title", "search", "2112410")]).entries.map(e => e.title), ["2112410403927243233368"]);
+  const pasted = run([filter("title", "search", "2112410403927243233368253215")]);
+  assert.deepEqual(pasted.entries.map(e => e.title), ["2112410403927243233368"]);
+  assert.equal(pasted.fuzzy, true);
+  assert.match(formatResult(pasted), /^没找到完全匹配的，美亚翻到了这些近似曲名/);
+});
+
+test("按 ID 等值筛选，值得是真有的短 ID：一长串数字多半是曲名，点名让它改成歌名查", () => {
+  // 真模型实测「2112410403927243233368的定数是多少」：路由把整串当 ID 去筛，22 位解析成 2.1124104039272434e+21，0 首。
+  const asId = validateQuery({ filters: [filter("botId", "eq", 2112410403927243233368)], select: ["title", "constant"] });
+  assert.match(queryMismatch(asId, "2112410403927243233368的定数是多少"), /title search/);
+  assert.match(queryMismatch(validateQuery({ filters: [filter("botId", "in", [870, 99999])], select: ["title"] }), "id870和99999"), /title search/);
+  // 真有的 ID、按范围筛的 ID 都照旧
+  assert.ok(!queryMismatch(validateQuery({ filters: [filter("botId", "eq", 870)], select: ["title"] }), "id870是什么歌"));
+  assert.ok(!queryMismatch(validateQuery({ filters: [filter("botId", "gt", 8100)], select: ["title"] }), "ID大于8100的歌有哪些"));
+});
+
 test("search 操作符不吞符号：整条是符号的曲名也一样查得到", () => {
   // search 走的是 song-search 那套归一化。它若把 \p{S} 一起抹掉，《∀》这条查询
   // 就变成空串，静默返回 0 条 —— 用户拿到的是「没这首歌」，而曲库里明明有。
