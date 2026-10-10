@@ -118,28 +118,94 @@ function search(raw, { uncataloged = false } = {}) {
   return { matches: matches.slice((page - 1) * 8, page * 8).map(x => x.song), total, pages, page, fuzzy, repeatQuery };
 }
 
-function reply(query) {
+// 回复按行给出，每行是若干段：字符串原样显示；{ text, command } 在 Markdown 里是指令链接
+// （点一下把 command 填进输入框，用户自己按回车），纯文本里只显示 text；{ hint } 只在发 Markdown 时出现。
+// 链接只给曲名和白谱（2026-10-10 定的）：曲名填到「/谱面分析 id36 」为止，难度让用户自己补一个颜色字；
+// 白谱各有各的 ID，难度只能是白，整条命令填好。绿黄红紫不单独做链接，一行里蓝字太多。
+function replyLines(query) {
   const r = search(query, { uncataloged: true });
-  if (r.usage) return "给我一点曲名线索吧♪\n/搜索歌曲 サド\n也能用别名或 id；结果多时加 --page 2 翻页。";
-  if (!r.total) return "本地音击曲库里没有找到匹配这个关键词的歌。换一小段曲名试试？";
-  if (r.page > r.pages) return `这一页没有结果，一共只有 ${r.pages} 页。`;
+  const lines = text => text.split("\n").map(line => [line]);
+  if (r.usage) return lines("给我一点曲名线索吧♪\n/搜索歌曲 サド\n也能用别名或 id；结果多时加 --page 2 翻页。");
+  if (!r.total) return lines("本地音击曲库里没有找到匹配这个关键词的歌。换一小段曲名试试？");
+  if (r.page > r.pages) return lines(`这一页没有结果，一共只有 ${r.pages} 页。`);
   const showId = id => id == null ? "ID待核实" : `id${id}`;
   // 0 级白谱的定数就是 0。先判它：《Perfect Shining!!》那张在曲库里记的是「定数未知」，不能显示成漏填。
   const showConstant = (difficulty, { level, value, known }) => difficulty === "LUN" && String(level) === "0" ? 0
     : known && value != null ? value : "定数未知";
+  const link = (text, id, command) => id == null ? text : { text, command };
   // 白谱在游戏里是单独一条曲目（见 song-id.cjs）。ID 跟本曲不同的，跟在绿黄红紫后面、一张一对括号写上它自己的 ID：
   // 「MAS 11.5（id8003：LUN 0）（id8091：LUN 13.8）」。不写的话，用户会拿本曲的 ID 去查白谱，照着打「/谱面分析 id39 白」。
-  const entries = r.matches.map(song => {
+  const out = [[`查到 ${r.total} 首：`]];
+  let linked = false;
+  for (const song of r.matches) {
     const { id, main, lunatics } = entryBySong.get(song);
-    const title = `${showId(id)}   ${song.meta.name}${song.meta.is_deleted ? "（已删除）" : ""}`;
-    const chartLine = main.map(chart => `${chart.difficulty} ${showConstant(chart.difficulty, chart)}`).join(" / ") +
-      lunatics.map(l => `（${showId(l.id)}：LUN ${showConstant("LUN", l)}${l.deleted ? "，已删除" : ""}）`).join("");
-    return chartLine ? `${title}\n${chartLine}` : title;
-  });
-  const sections = [`查到 ${r.total} 首：`, entries.join("\n\n")];
-  if (r.fuzzy) sections.push("以上是曲名比较接近的候选。");
-  if (r.pages > 1) sections.push(`第 ${r.page}/${r.pages} 页；${r.page < r.pages ? `下一页：/搜索歌曲 ${r.repeatQuery} --page ${r.page + 1}` : "已到最后一页"}`);
-  return sections.join("\n\n");
+    // 只有白谱的（《怒槌～光吉猛修一部謎～》id8025）没得挑，难度直接填上白。
+    const onlyLunatic = main.length > 0 && main.every(chart => chart.difficulty === "LUN");
+    const title = link(song.meta.name, id, `/谱面分析 id${id} ${onlyLunatic ? "白" : ""}`);
+    linked ||= id != null;
+    out.push([""], [`${showId(id)}   `, title, ...(song.meta.is_deleted ? ["（已删除）"] : [])]);
+    const chartLine = [
+      ...(main.length ? [main.map(chart => `${chart.difficulty} ${showConstant(chart.difficulty, chart)}`).join(" / ")] : []),
+      ...lunatics.map(l => link(`（${showId(l.id)}：LUN ${showConstant("LUN", l)}${l.deleted ? "，已删除" : ""}）`, l.id, `/谱面分析 id${l.id} 白`)),
+    ];
+    if (chartLine.length) out.push(chartLine);
+  }
+  if (r.fuzzy) out.push([""], ["以上是曲名比较接近的候选。"]);
+  if (r.pages > 1) {
+    const next = `/搜索歌曲 ${r.repeatQuery} --page ${r.page + 1}`;
+    out.push([""], [`第 ${r.page}/${r.pages} 页；`, ...(r.page < r.pages ? ["下一页：", { text: next, command: next }] : ["已到最后一页"])]);
+  }
+  if (linked) out.push([""], [{ hint: "（点曲名会填入 /谱面分析 和曲目 ID，再补一个难度字：绿/黄/红/紫；点括号里的白谱，回车即可）" }]);
+  return out;
 }
 
-module.exports = { search, reply, SEARCH_SPEC };
+const plainLine = line => line.map(part => typeof part === "string" ? part : part.text ?? "").join("");
+const isHintLine = line => line.length > 0 && line.every(part => part?.hint);
+
+// QQ 的指令链接：<qqbot-cmd-input text="…" show="…" />，点了只填输入框、不直接发出；群里会自动带上 @美亚（2026-10-10 实测）。
+// 属性值里放不下半角双引号和尖括号（《Snow in "I love you"》），这种曲名不做链接、照原样显示。
+// 单个换行在 QQ 的 Markdown 里就是换行（同日实测），所以行与行之间不用改成空一行。
+function markdownLine(line) {
+  return line.map(part => {
+    if (typeof part === "string") return part;
+    if (part.hint) return part.hint;
+    if (/["<>&]/.test(part.text + part.command)) return part.text;
+    return `<qqbot-cmd-input text="${part.command}" show="${part.text}" reference="false" />`;
+  }).join("");
+}
+
+// 纯文本：跟以前逐字一样，提示行不出现（没有链接可点）。
+function reply(query) {
+  return replyLines(query).filter(line => !isHintLine(line)).map(plainLine).join("\n").replace(/\n+$/, "");
+}
+
+// 按纯文本长度切块（跟 core.splitLines 同一个规则），每块同时给出 Markdown 和纯文本，
+// Markdown 被拒时传输层用纯文本补发。提示行跟着最后一块走。
+function replyChunks(query, limit) {
+  const lines = replyLines(query);
+  const hints = lines.filter(isHintLine);
+  const body = lines.filter(line => !isHintLine(line));
+  while (body.length && plainLine(body[body.length - 1]) === "") body.pop();
+  const chunks = [];
+  let current = [], length = 0;
+  for (const line of body) {
+    const addition = (current.length ? 1 : 0) + plainLine(line).length;
+    if (current.length && length + addition > limit) {
+      while (plainLine(current[current.length - 1]) === "") current.pop();
+      chunks.push(current);
+      current = [];
+      length = 0;
+      if (plainLine(line) === "") continue;
+      length = plainLine(line).length;
+      current.push(line);
+    } else { current.push(line); length += addition; }
+  }
+  if (current.length) chunks.push(current);
+  if (hints.length && chunks.length) chunks[chunks.length - 1].push([""], ...hints);
+  return chunks.map(chunk => ({
+    markdown: chunk.map(markdownLine).join("\n"),
+    text: chunk.filter(line => !isHintLine(line)).map(plainLine).join("\n").replace(/\n+$/, ""),
+  }));
+}
+
+module.exports = { search, reply, replyChunks, SEARCH_SPEC };

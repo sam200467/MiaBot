@@ -245,6 +245,8 @@ function makeSender(transport, log) {
 function makeCommandSenders(transport, log) {
   return {
     send: (event, text) => transport.sendText(makeTarget(event), text, event.msgId, event.refId),
+    // Markdown 发不出去时传输层用 text 补发，见 official-transport.cjs 的 sendMarkdown。
+    sendMarkdown: (event, markdown, text) => transport.sendMarkdown(makeTarget(event), markdown, text, event.msgId, event.refId),
     sendImage: (event, image, caption) => {
       const buffer = image?.buffer;
       if (!Buffer.isBuffer(buffer)) throw new Error("出图结果里没有图片数据");
@@ -337,7 +339,7 @@ function createMiaBot(config, deps = {}) {
     const senders = makeCommandSenders(transport, log);
     commands = createMiaCommands({
       config, transport, log,
-      send: senders.send, sendImage: senders.sendImage,
+      send: senders.send, sendMarkdown: senders.sendMarkdown, sendImage: senders.sendImage,
       // 清单末尾那几行只写开着的功能，免得说她做不到的事
       helpText: miaHelp({ webSearch: webSearchOn, quotedMessage: readQuoted, privateChat: allowPrivate }),
       ...(deps.now ? { now: deps.now } : {}),

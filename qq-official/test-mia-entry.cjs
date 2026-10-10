@@ -21,7 +21,10 @@ test("截图查歌请求经语义路由查本地，未绑定不查账号或状�
       const before = mock.state.sent.length;
       await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content }));
       assert.ok(await mock.waitFor(() => mock.state.sent.length > before));
-      const text = mock.state.sent.at(-1).body.content;
+      const body = mock.state.sent.at(-1).body;
+      // /搜索歌曲 走 Markdown（曲名可点）；自然语言那两句走结构化查询，照旧是纯文本。
+      if (content.startsWith("/")) assert.equal(body.msg_type, 2, "搜索歌曲走 Markdown（曲名可点）");
+      const text = body.msg_type === 2 ? body.markdown.content : body.content;
       assert.match(text, /サドマミホリック/);
       assert.match(text, /13\.5/);
       assert.doesNotMatch(text, /绑定|网关|排队/);

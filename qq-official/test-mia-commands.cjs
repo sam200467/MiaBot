@@ -33,6 +33,22 @@ test("搜索歌曲无需绑定，斜杠与模型工具共用真实曲库", async
   });
 });
 
+test("搜索歌曲：接了 Markdown 发送器就发指令链接，纯文本作补发内容", async () => {
+  const md = [];
+  const restore = stub({});
+  try {
+    const { commands, sent } = setup({}, {
+      sendMarkdown: async (event, markdown, text) => { md.push({ markdown, text }); return { id: "md" }; },
+    });
+    await commands.handleCommand(groupEvent(""), parseCommand("/搜索歌曲 Perfect Shining"));
+    assert.equal(sent.length, 0, "不该再走纯文本发送");
+    assert.equal(md.length, 1);
+    assert.match(md[0].markdown, /<qqbot-cmd-input text="\/谱面分析 id8091 白"/);
+    assert.match(md[0].text, /^查到 1 首：/);
+    assert.doesNotMatch(md[0].text, /qqbot/);
+  } finally { restore(); }
+});
+
 test("数字曲名：/单曲 打曲名片段就能出图；数字同时对上 ID 和曲名时两首都列出来，不替人挑", async () => {
   // 群里实测：/单曲 2112410 回「没有找到曲目」。原来整串数字只当 ID 找，《2112410403927243233368》（id665）
   // 打曲名永远查不到；《39》（id213）也一直被 ID 39 的《Gate of Doom》挡着。

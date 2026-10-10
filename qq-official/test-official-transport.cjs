@@ -408,3 +408,37 @@ test("引用消息的结构摘要：只有字段名和附件种类，不带正�
   assert.equal(shape, "type=103｜ref_msg_idx 有｜msg_elements 1 条：#0 msg_idx 对上 type=0 正文 5 字 附件 image/jpeg×1 字段 attachments,author,content,message_type,msg_idx");
   assert.doesNotMatch(shape, /SECRET|蛋糕|https?:/);
 });
+
+test("Markdown：发成 msg_type=2；被拒就用纯文本补发、不熔断，之后直接发纯文本", async () => {
+  const logs = [];
+  const { mock, transport } = await connected({ log: (m) => logs.push(m) });
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**md**", "纯文本", "m1");
+  assert.equal(mock.state.sent[0].body.msg_type, 2);
+  assert.equal(mock.state.sent[0].body.markdown.content, "**md**");
+  assert.equal(mock.state.sent[0].body.content, undefined);
+
+  mock.state.nextError = { status: 400, err_code: 40034012, message: "不允许发送原生 markdown" };
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**md2**", "纯文本2", "m2");
+  const last = mock.state.sent.at(-1).body;
+  assert.equal(last.msg_type, 0);
+  assert.equal(last.content, "纯文本2");
+  assert.equal(last.msg_seq, 2, "补发要换新的 msg_seq，不然被判重复");
+  assert.ok(logs.some((m) => /Markdown 消息被拒（40034012）/.test(m)));
+
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**md3**", "纯文本3", "m3");
+  assert.equal(mock.state.sent.at(-1).body.msg_type, 0, "拒过一次就不再试 Markdown");
+  await transport.stop(); await mock.stop();
+});
+
+test("Markdown：被动回复过期不补发；关掉 markdown 配置就只发纯文本", async () => {
+  const { mock, transport } = await connected();
+  mock.state.nextError = { status: 400, err_code: 40034128, message: "被动回复过期" };
+  await assert.rejects(() => transport.sendMarkdown({ kind: "c2c", openid: "U1" }, "**md**", "纯文本", "m1"));
+  assert.equal(mock.state.sent.length, 0);
+  await transport.stop(); await mock.stop();
+
+  const off = await connected({ markdown: false });
+  await off.transport.sendMarkdown({ kind: "c2c", openid: "U1" }, "**md**", "纯文本", "m1");
+  assert.equal(off.mock.state.sent[0].body.msg_type, 0);
+  await off.transport.stop(); await off.mock.stop();
+});
