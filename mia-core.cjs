@@ -1075,6 +1075,8 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
     return {
       kind: "image", key: "level", label: "正在生成等级成绩图", failText: "等级成绩图生成失败：",
       caption: escapeText(player) + " 的 " + target + " 全谱面成绩 · 第 " + page + " 页",
+      // 宿主要做翻页（QQ 的翻页按钮）时用：第 N 页就是 command + " " + N。总页数在出图结果的 meta.totalPages。
+      paging: { command: "/等级 " + parts[0], page },
       run: () => coreCall("generateLevelChart", config, binding, level, page, onLine),
     };
   }

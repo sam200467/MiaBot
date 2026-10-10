@@ -10,6 +10,8 @@ const { createMockOfficial } = require("./mock-official.cjs");
 const { createMiaBot, formatReply } = require("./mia-entry.cjs");
 
 const GROUP = "GROUP_OPENID_A";
+// 最后一条回复的正文。分页的查询结果带翻页按钮，是 Markdown 发的。
+const lastText = (mock) => { const body = mock.state.sent.at(-1).body; return body.msg_type === 2 ? body.markdown.content : body.content; };
 const OTHER_GROUP = "GROUP_OPENID_B";
 
 test("截图查歌请求经语义路由查本地，未绑定不查账号或状态", async () => {
@@ -144,17 +146,17 @@ test("结构化查询状态按用户隔离，闲聊后仍可翻页，重置后�
   bot.settings.c.limits.userCooldownSeconds = 0;
   try {
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "歌名包含ai的有哪些" }));
-    assert.match(mock.state.sent.at(-1).body.content, /第 1\//);
+    assert.match(lastText(mock), /第 1\//);
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "下一页", author: { member_openid: "ANOTHER_USER" } }));
-    assert.match(mock.state.sent.at(-1).body.content, /还没有/);
+    assert.match(lastText(mock), /还没有/);
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "谢谢你" }));
-    assert.match(mock.state.sent.at(-1).body.content, /喵哼哼/);
+    assert.match(lastText(mock), /喵哼哼/);
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "下一页" }));
-    assert.match(mock.state.sent.at(-1).body.content, /第 2\//);
-    assert.match(mock.state.sent.at(-1).body.content, /歌名包含ai/);
+    assert.match(lastText(mock), /第 2\//);
+    assert.match(lastText(mock), /歌名包含ai/);
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "清空对话" }));
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "下一页" }));
-    assert.match(mock.state.sent.at(-1).body.content, /还没有/);
+    assert.match(lastText(mock), /还没有/);
   } finally { await bot.stop(); await mock.stop(); }
 });
 
@@ -172,7 +174,7 @@ test("当前图片附件进入 DeepSeek 多模态请求；只有引用ID时仍�
   try {
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "点评一下这张图", attachments: [{ content_type: "image/png", url: "https://example.invalid/picture.png" }] }));
     assert.equal(fetched.length, 1);
-    assert.match(mock.state.sent.at(-1).body.content, /测试像素/);
+    assert.match(lastText(mock), /测试像素/);
     assert.equal(model.routeCalls.length, 0);
     assert.equal(model.calls.length, 1);
     const imageMessage = model.calls[0].body.messages.find(m => Array.isArray(m.content));
@@ -183,9 +185,9 @@ test("当前图片附件进入 DeepSeek 多模态请求；只有引用ID时仍�
     assert.match(imageMessage.content[1].image_url.url, /^data:image\/png;base64,/);
 
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "点评一下这张图", message_reference: { message_id: "unavailable" } }));
-    assert.match(mock.state.sent.at(-1).body.content, /呜喵.*看不到/);
+    assert.match(lastText(mock), /呜喵.*看不到/);
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "看看这张图", attachments: [{ content_type: "image/png", url: "http://example.invalid/not-accepted.png" }] }));
-    assert.match(mock.state.sent.at(-1).body.content, /呜喵.*看不到/);
+    assert.match(lastText(mock), /呜喵.*看不到/);
     assert.equal(fetched.length, 1, "非 HTTPS 图片不能下载或转发");
     assert.equal(mock.state.uploads.length, 0);
     assert.equal(model.calls.length, 1, "拿不到引用原图时不能让模型猜图");
@@ -203,18 +205,18 @@ test("随机抽样经QQ入口保存，同批翻页不重抽，用户间不能共
   const titles = text => [...text.matchAll(/^《(.+)》/gm)].map(m => m[1]);
   try {
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "随机选10张14.5的谱" }));
-    const first = titles(mock.state.sent.at(-1).body.content);
+    const first = titles(lastText(mock));
     assert.equal(first.length, 8);
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "下一页" }));
-    const second = titles(mock.state.sent.at(-1).body.content);
+    const second = titles(lastText(mock));
     assert.equal(second.length, 2); assert.ok(second.every(t => !first.includes(t)));
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "换一批" }));
-    assert.ok(titles(mock.state.sent.at(-1).body.content).every(t => ![...first, ...second].includes(t)));
+    assert.ok(titles(lastText(mock)).every(t => ![...first, ...second].includes(t)));
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "换一批", author: { member_openid: "ANOTHER_USER" } }));
-    assert.match(mock.state.sent.at(-1).body.content, /还没有/);
+    assert.match(lastText(mock), /还没有/);
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "清空对话" }));
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "换一批" }));
-    assert.match(mock.state.sent.at(-1).body.content, /还没有/);
+    assert.match(lastText(mock), /还没有/);
   } finally { await bot.stop(); await mock.stop(); }
 });
 
@@ -870,7 +872,7 @@ test("带来源的回复：发到 QQ 的那条里「参考资料」前面空一�
   const { mock, bot } = await setup({}, { botDeps: { settings, fetchImpl, webFetchImpl, log: (line) => logs.push(line) } });
   try {
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "CHUNITHM 最新版本是什么" }));
-    assert.equal(mock.state.sent.at(-1).body.content,
+    assert.equal(lastText(mock),
       "日本版最新是 X-VERSE-X。\n国际版慢半年♪\n\n参考资料：\nCHUNITHM\nhttps://zh.wikipedia.org/wiki/CHUNITHM");
     assert.ok(!logs.some((line) => /疑似未写完/.test(line)), logs.join("\n"));
   } finally { await bot.stop(); await mock.stop(); }
@@ -941,7 +943,7 @@ test("读引用开着：回复一张图再 @ 美亚，那张图和本条的话�
     assert.match(system, /本条消息引用（回复）了下面这条消息[^\n]*\n群友：\[图片 1 张（原图已随本条消息一起给你）\]/);
     assert.match(system, /用户回复（引用）的那条消息里的图片，程序取到原图时也会一起提供给你/);
     assert.doesNotMatch(system, /没有附带原图数据的引用图片仍然看不到/);
-    assert.match(mock.state.sent.at(-1).body.content, /连耳朵都做出来了/);
+    assert.match(lastText(mock), /连耳朵都做出来了/);
     assert.equal(logs.find((line) => line.startsWith("引用消息结构")),
       "引用消息结构（已取到被引用那条）：type=103｜ref_msg_idx 有｜msg_elements 1 条：#0 msg_idx 对上 type=0 正文 0 字 附件 image/jpeg×1 字段 attachments,author,content,message_type,msg_idx");
     assert.ok(!logs.some((line) => /CAKE|RKEY/.test(line)), "日志里不该有图片地址：\n" + logs.join("\n"));
@@ -980,7 +982,7 @@ test("读引用开着：引用里的图取不到时写明看不到；只 @ 不�
     const before = mock.state.sent.length;
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", quotedImageEvent({ content: " " }));
     assert.ok(await mock.waitFor(() => mock.state.sent.length > before));
-    assert.match(mock.state.sent.at(-1).body.content, /呜喵.*看不到/);
+    assert.match(lastText(mock), /呜喵.*看不到/);
     assert.equal(model.calls.length, 1, "这一句没进聊天模型");
   } finally { await bot.stop(); await mock.stop(); }
 });
@@ -1040,7 +1042,7 @@ test("回复里多转义的换行：发出去的是真换行（照常折成单�
   try {
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", quotedImageEvent());
     assert.ok(await mock.waitFor(() => mock.state.sent.length > 0));
-    assert.equal(mock.state.sent.at(-1).body.content, "呜喵！？这、这是美亚的蛋糕吗！\n话说回来，这真的是能吃的吗？\\(^o^)/",
+    assert.equal(lastText(mock), "呜喵！？这、这是美亚的蛋糕吗！\n话说回来，这真的是能吃的吗？\\(^o^)/",
       "颜文字里的反斜杠不是换行，原样留着");
     // 下一轮她会看到自己上一句：那里留着字面的 \n 的话，她会照着学
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "那你要先拍照吗" }));
@@ -1063,7 +1065,7 @@ test("纯文本降级那条路：模型直接写了字面的 \\n，同样还原�
   try {
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "美亚晚上好" }));
     assert.ok(await mock.waitFor(() => mock.state.sent.length > 0));
-    assert.equal(mock.state.sent.at(-1).body.content, "喵哼哼，收到啦！\n下次再来找美亚玩～");
+    assert.equal(lastText(mock), "喵哼哼，收到啦！\n下次再来找美亚玩～");
   } finally { await bot.stop(); await mock.stop(); }
 });
 
@@ -1142,7 +1144,7 @@ test("点名要表情不过语义路由：路由把它判成「在问图片」�
       const before = mock.state.sent.length;
       await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content }));
       assert.ok(await mock.waitFor(() => mock.state.sent.length > before));
-      assert.equal(mock.state.sent.at(-1).body.content, "哼，炸毛就炸毛！喏，这张给你。", content + " 应当是聊天这边的回话");
+      assert.equal(lastText(mock), "哼，炸毛就炸毛！喏，这张给你。", content + " 应当是聊天这边的回话");
     }
     assert.equal(routes, 0, "点名要表情不该去问语义路由");
     assert.deepEqual(sentExpressions(logs), ["21_猫猫炸毛.jpg", "42_捧杯取暖.gif"], logs.join("\n"));
@@ -1150,7 +1152,91 @@ test("点名要表情不过语义路由：路由把它判成「在问图片」�
     const before = mock.state.sent.length;
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "这张图片写了什么" }));
     assert.ok(await mock.waitFor(() => mock.state.sent.length > before));
-    assert.match(mock.state.sent.at(-1).body.content, /看不到图片里的内容/);
+    assert.match(lastText(mock), /看不到图片里的内容/);
     assert.equal(sentExpressions(logs).length, 2, "路由那句话不配表情图");
   } finally { await bot.stop(); await mock.stop(); }
 });
+
+test("翻页按钮：点了先应答，再以 event_id 回复那一页，带着新的按钮；不碰模型、不进绑定会话", async () => {
+  const restore = stubCore();
+  try {
+    const { mock, bot, model } = await setup();
+    bot.settings.c.limits.userCooldownSeconds = 0;
+    const click = (over) => ({
+      id: "itr-" + Math.random().toString(36).slice(2, 8), type: 11, chat_type: 1, scene: "group",
+      group_openid: GROUP, group_member_openid: "U1", timestamp: new Date().toISOString(),
+      data: { type: 11, resolved: { button_id: "next", button_data: "/搜索歌曲 a --page 2" } }, ...over,
+    });
+
+    const first = click();
+    mock.push("INTERACTION_CREATE", first, "INTERACTION_CREATE:frame-first");
+    assert.ok(await mock.waitFor(() => mock.state.sent.length >= 1));
+    assert.deepEqual(mock.state.acks.map((a) => [a.id, a.body.code]), [[first.id, 0]], "应答用回调 id");
+    const body = mock.state.sent.at(-1).body;
+    assert.equal(body.event_id, "INTERACTION_CREATE:frame-first", "回复用网关帧外层的事件 id");
+    assert.equal(body.msg_id, undefined);
+    assert.equal(body.msg_type, 2);
+    assert.match(body.markdown.content, /第 2\/\d+ 页，点下面的按钮翻页/);
+    assert.deepEqual(body.keyboard.content.rows.map((r) => r.buttons.map((b) => b.id)), [["prev", "page", "next"], ["first", "last"]]);
+    assert.equal(model.calls.length + model.routeCalls.length, 0, "按钮指令不碰模型");
+
+    // 按钮里不是指令的不接；白名单外的群只应答不回复。
+    const before = mock.state.sent.length;
+    mock.push("INTERACTION_CREATE", click({ data: { resolved: { button_data: "随便聊聊" } } }));
+    mock.push("INTERACTION_CREATE", click({ group_openid: "GROUP_OPENID_B" }));
+    assert.ok(await mock.waitFor(() => mock.state.acks.length >= 3));
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(mock.state.sent.length, before);
+    assert.equal(model.calls.length + model.routeCalls.length, 0);
+
+    // 正在群绑定的人点了翻页：翻页照常，那句指令不能被当成邮箱交给绑定流程。
+    mock.push("GROUP_AT_MESSAGE_CREATE", groupEvent({ id: "bind-start", content: "/绑定" }));
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > before));
+    const beforeClick = mock.state.sent.length;
+    mock.push("INTERACTION_CREATE", click());
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > beforeClick));
+    assert.match(mock.state.sent.at(-1).body.markdown?.content || "", /第 2\/\d+ 页/);
+    assert.ok(!sentText(mock).includes("邮箱收到"));
+    await bot.stop(); await mock.stop();
+  } finally { restore(); }
+});
+
+test("公共查询的翻页按钮：绑发起人；本人点了按存的查询翻页，别人点了回「没有权限」", async () => {
+  const fetchImpl = async (_, options) => {
+    const body = JSON.parse(options.body);
+    const decision = body.messages[0].content.includes("MIA_SEMANTIC_ROUTER_V1")
+      ? { route: "query", query: { filters: [{ field: "title", op: "contains", value: "ai" }], select: ["title"] } }
+      : { text: "喵", scene: "ordinary", expressionIds: [] };
+    return { ok: true, text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(decision) } }] }) };
+  };
+  const { mock, bot } = await setup({}, { botDeps: { fetchImpl } });
+  bot.settings.c.limits.userCooldownSeconds = 0;
+  const click = (data, user = "U1") => ({
+    id: "itr-" + Math.random().toString(36).slice(2, 8), group_openid: GROUP, group_member_openid: user,
+    timestamp: new Date().toISOString(), data: { resolved: { button_data: data } },
+  });
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "歌名包含ai的有哪些" }));
+    const first = mock.state.sent.at(-1).body;
+    assert.equal(first.msg_type, 2);
+    assert.match(first.markdown.content, /第 1\/\d+ 页/);
+    const buttons = first.keyboard.content.rows.flatMap((r) => r.buttons);
+    assert.deepEqual(buttons.map((b) => b.id), ["next", "last"], "公共查询没有页码按钮（没有可手填的指令）");
+    assert.equal(buttons[0].action.data, "mia:U1:第2页", "按钮绑着发起人");
+
+    const before = mock.state.sent.length;
+    await bot.handleEvent("INTERACTION_CREATE", click("mia:U1:第2页", "ANOTHER_USER"));
+    assert.deepEqual(mock.state.acks.map((a) => a.body.code), [4], "别人点了回「没有权限」");
+    assert.equal(mock.state.sent.length, before, "别人点了不翻");
+
+    await bot.handleEvent("INTERACTION_CREATE", click("mia:U1:第2页"));
+    assert.deepEqual(mock.state.acks.map((a) => a.body.code), [4, 0]);
+    assert.match(lastText(mock), /第 2\/\d+ 页/);
+    assert.match(lastText(mock), /歌名包含ai/);
+    const second = mock.state.sent.at(-1).body.keyboard.content.rows.map((r) => r.buttons.map((b) => b.action.data));
+    assert.deepEqual(second[0], ["mia:U1:第1页", "mia:U1:第3页"]);
+    assert.ok(!readContextTexts(bot).some((t) => t.includes("第2页")), "按钮翻页不记进群上下文");
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+function readContextTexts(bot) { return bot.readContext(GROUP, false); }

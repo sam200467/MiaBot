@@ -203,6 +203,20 @@ test("下一页沿用程序保存的查询；没有查询或已到末尾不猜",
   const empty = await routeIntent({ settings, specs, messages, fetchImpl: model.fetchImpl });
   assert.match(empty.text, /还没有/);
 });
+test("翻页按钮发来的「上一页」「第N页」也沿用保存的查询；不止一页时结果带 pager", async () => {
+  const model = scriptedRoute([]);
+  const queryState = queryDecision("title", "contains", "ai").query;
+  const turn = async (content, state = queryState) => routeIntent({ settings, specs, queryState: state, messages: [{ role: "user", content }], fetchImpl: model.fetchImpl });
+  const third = await turn("第3页");
+  assert.equal(third.queryState.page, 3);
+  assert.ok(third.pager.pages >= 3, "测试需要至少三页");
+  assert.deepEqual(third.pager, { page: 3, pages: third.pager.pages });
+  assert.equal((await turn("上一页", third.queryState)).queryState.page, 2);
+  assert.match((await turn("上一页")).text, /已经是第一页/);
+  assert.match((await turn("第999页")).text, new RegExp(`一共只有 ${third.pager.pages} 页`));
+  assert.match((await turn(`第${third.pager.pages}页`)).text, new RegExp(`第 ${third.pager.pages}/${third.pager.pages} 页`));
+  assert.equal(model.calls.length, 0, "翻页不经模型");
+});
 test("公共查询不能代替个人未鸟筛选，也不能由复核触发写操作", async () => {
   const personal = scriptedRoute([queryDecision("level", "eq", "14")]);
   assert.equal(await routeIntent({ settings, specs, messages: [{ role: "user", content: "推荐我没鸟过的14级歌" }], fetchImpl: personal.fetchImpl }), null);

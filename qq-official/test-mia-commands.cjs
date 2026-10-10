@@ -1042,3 +1042,71 @@ test("rinnet 登录途中取消：迟到的登录响应不能保存绑定", asyn
 test("已删除的查分开关及旧别名不能解析为功能", () => {
   for (const text of ["/允许查分", "/禁止查分", "/允许查询", "/禁止查询", "/allowquery", "/denyquery"]) assert.equal(parseCommand(text).name, null);
 });
+
+test("/等级 不止一页：发完图再补一条带翻页按钮的消息，翻页绑发起人；查别人和只有一页时不补", async () => {
+  const md = [];
+  const restore = stub({
+    getBinding: async () => ({ playerName: "测试玩家", email: "a@b.c", password: "x" }),
+    generateLevelChart: async (config, binding, level, page) => ({ name: "level.png", buffer: Buffer.from("png"), meta: { page, totalPages: level === "14.5" ? 1 : 4 } }),
+  });
+  try {
+    const { commands, sent } = setup({}, {
+      sendMarkdown: async (event, markdown, text, options) => { md.push({ markdown, text, options }); return { id: "md" }; },
+    });
+    await commands.handleCommand(groupEvent("/等级 14+ 2"), parseCommand("/等级 14+ 2"));
+    assert.ok(sent.some((s) => s.kind === "image"), "图照发");
+    assert.equal(md.length, 1);
+    assert.match(md[0].markdown, /第 2\/4 页，点下面的按钮翻页/);
+    assert.equal(md[0].text, "第 2/4 页；下一页：/等级 14+ 3", "按钮被拒时的纯文本");
+    const rows = md[0].options.keyboard.rows.map((r) => r.buttons.map((b) => [b.id, b.action.type, b.action.data]));
+    assert.deepEqual(rows, [
+      [["prev", 1, "mia:U1:/等级 14+ 1"], ["page", 2, "/等级 14+ "], ["next", 1, "mia:U1:/等级 14+ 3"]],
+      [["first", 1, "mia:U1:/等级 14+ 1"], ["last", 1, "mia:U1:/等级 14+ 4"]],
+    ]);
+
+    await commands.handleCommand(groupEvent("/等级 14.5", { userId: "U2" }), parseCommand("/等级 14.5"));
+    assert.equal(md.length, 1, "只有一页不补");
+    const images = sent.filter((s) => s.kind === "image").length;
+    await commands.runCapability(groupEvent("/等级 14+", { userId: "U3" }), "level", "14+", "", "FRIEND");
+    assert.equal(sent.filter((s) => s.kind === "image").length, images + 1, "别人的图照发");
+    assert.equal(md.length, 1, "查别人不补：按钮执行的是点的人自己的指令");
+  } finally { restore(); }
+});
+
+test("/等级 开了 pagedImageInMarkdown：图、图注和翻页按钮合成一条 Markdown；发不成就退回图片 + 翻页消息", async () => {
+  // 只有 IHDR 的最小 PNG：宽 1200、高 3400
+  const png = Buffer.alloc(24);
+  png.writeUInt32BE(0x89504e47, 0); png.writeUInt32BE(0x0d0a1a0a, 4); png.write("IHDR", 12, "ascii");
+  png.writeUInt32BE(1200, 16); png.writeUInt32BE(3400, 20);
+  const md = [], published = [];
+  let rejectMarkdown = false;
+  const restore = stub({
+    getBinding: async () => ({ playerName: "测*试_玩家", email: "a@b.c", password: "x" }),
+    generateLevelChart: async (config, binding, level, page) => ({ name: "level.png", buffer: png, meta: { page, totalPages: 3 } }),
+  });
+  try {
+    const { commands, sent } = setup({ pagedImageInMarkdown: true }, {
+      publishImage: (buffer) => { published.push(buffer); return { url: "http://203.0.113.5:47831/shared/" + "a".repeat(32) + ".png", width: 1200, height: 3400 }; },
+      sendMarkdown: async (event, markdown, text, options) => {
+        if (rejectMarkdown && options?.requireMarkdown) throw Object.assign(new Error("Markdown 被拒"), { status: 400 });
+        md.push({ markdown, text, options }); return { id: "md" };
+      },
+    });
+    await commands.handleCommand(groupEvent("/等级 12+"), parseCommand("/等级 12+"));
+    assert.ok(!sent.some((s) => s.kind === "image"), "合成一条时不再单独发图");
+    assert.equal(md.length, 1);
+    assert.equal(published[0], png);
+    const lines = md[0].markdown.split("\n");
+    assert.equal(lines[0], "![成绩图 #1200px #3400px](http://203.0.113.5:47831/shared/" + "a".repeat(32) + ".png)");
+    assert.match(md[0].markdown, /测\\\*试\\_玩家 的 LEVEL 12\+ 全谱面成绩 · 第 1 页/, "玩家名里的 Markdown 符号转义掉");
+    assert.match(md[0].markdown, /第 1\/3 页，点下面的按钮翻页/);
+    assert.equal(md[0].options.requireMarkdown, true, "离了 Markdown 图就丢了，不许退成纯文本");
+    assert.match(md[0].options.markdownWithoutKeyboard, /^!\[成绩图[\s\S]*下一页：\/等级 12\+ 2$/);
+    assert.deepEqual(md[0].options.keyboard.rows.flat().length, 2);
+
+    rejectMarkdown = true;
+    await commands.handleCommand(groupEvent("/等级 12+", { userId: "U5" }), parseCommand("/等级 12+"));
+    assert.equal(sent.filter((s) => s.kind === "image").length, 1, "退回单独发图");
+    assert.match(md.at(-1).markdown, /^第 1\/3 页，点下面的按钮翻页/, "再补翻页消息");
+  } finally { restore(); }
+});

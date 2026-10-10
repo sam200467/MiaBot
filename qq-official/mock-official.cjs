@@ -21,6 +21,7 @@ function createMockOfficial(options = {}) {
   const state = {
     sent: [],           // 发出去的消息 { path, body }
     uploads: [],        // 富媒体上传 { path, body }
+    acks: [],           // 按钮回调的应答 { id, body }
     identified: [],     // 收到的 Identify / Resume 帧
     heartbeats: 0,
     sockets: new Set(),
@@ -55,7 +56,9 @@ function createMockOfficial(options = {}) {
       }
 
       if (state.nextError) {
-        const e = state.nextError; state.nextError = null;
+        // times：连着失败几次（缺省一次）
+        const e = state.nextError;
+        if (e.times > 1) e.times -= 1; else state.nextError = null;
         return json(res, e.status || 400, { message: e.message || "mock error", err_code: e.err_code });
       }
 
@@ -65,6 +68,11 @@ function createMockOfficial(options = {}) {
       if (/^\/v2\/(groups|users)\/[^/]+\/files$/.test(url)) {
         state.uploads.push({ path: url, body });
         return json(res, 200, { file_uuid: "uuid-" + state.uploads.length, file_info: "fileinfo-" + state.uploads.length, ttl: 3600 });
+      }
+      const ack = url.match(/^\/interactions\/([^/]+)$/);
+      if (ack && req.method === "PUT") {
+        state.acks.push({ id: decodeURIComponent(ack[1]), body });
+        return json(res, 200, {});
       }
       if (/^\/v2\/(groups|users)\/[^/]+\/messages$/.test(url) && req.method === "POST") {
         state.sent.push({ path: url, body });
@@ -108,9 +116,10 @@ function createMockOfficial(options = {}) {
       state.sockets.clear();
       return new Promise((resolve) => { wss.close(() => server.close(() => resolve())); });
     },
-    // 推一条事件给已连接的客户端
-    push(eventName, d) {
-      const frame = JSON.stringify({ op: 0, s: (state.sent.length + 100), t: eventName, d });
+    // 推一条事件给已连接的客户端。真网关的帧最外层还有一个事件 id（形如 INTERACTION_CREATE:xxxx），
+    // 按钮回调的被动回复要用它当 event_id；不给就按这个格式造一个。
+    push(eventName, d, frameId = eventName + ":" + (d?.id || "x") + "-frame") {
+      const frame = JSON.stringify({ op: 0, s: (state.sent.length + 100), t: eventName, id: frameId, d });
       let n = 0;
       for (const ws of state.sockets) { if (ws.readyState === 1) { ws.send(frame); n++; } }
       if (!n) log("mock.push 时没有活动连接");

@@ -442,3 +442,112 @@ test("Markdown：被动回复过期不补发；关掉 markdown 配置就只发�
   assert.equal(off.mock.state.sent[0].body.msg_type, 0);
   await off.transport.stop(); await off.mock.stop();
 });
+
+test("按钮回调：订了 1<<26；群和单聊的点击都归一化成「这个人发了按钮里的指令」", async () => {
+  const { mock, transport, events } = await connected();
+  assert.ok(mock.state.identified[0].d.intents & (1 << 26), "缺少 INTERACTION(1<<26)，回调按钮点了收不到");
+  mock.push("INTERACTION_CREATE", {
+    id: "itr-1", type: 11, chat_type: 1, scene: "group", group_openid: "G1", group_member_openid: "U1",
+    timestamp: "2026-10-10T12:00:00+08:00", data: { type: 11, resolved: { button_id: "next", button_data: "/搜索歌曲 Ai --page 2" } },
+  });
+  await mock.waitFor(() => events.length >= 1);
+  const g = transport.normalize(events[0].name, events[0].d);
+  assert.deepEqual([g.type, g.openid, g.userId, g.content, g.msgId, g.interactionId, g.mentionsSelf],
+    ["group", "G1", "U1", "/搜索歌曲 Ai --page 2", "itr-1", "itr-1", true]);
+  const c = transport.normalize("INTERACTION_CREATE", { id: "itr-2", chat_type: 2, user_openid: "U2", data: { resolved: { button_data: "/搜索歌曲 a" } } });
+  assert.deepEqual([c.type, c.openid, c.userId], ["c2c", "U2", "U2"]);
+  assert.equal(transport.normalize("INTERACTION_CREATE", { id: "itr-3", group_openid: "G1", group_member_openid: "U1", data: { resolved: {} } }), null, "没有按钮数据不接");
+  assert.equal(transport.normalize("INTERACTION_CREATE", { id: "itr-4", guild_id: "X", channel_id: "C", data: { resolved: { button_data: "/x" } } }), null, "频道的回调不接");
+  await transport.stop(); await mock.stop();
+});
+
+test("按钮回调：应答走 PUT /interactions/{回调 id}；回复的 event_id 是网关帧外层的 id，msg_seq 照样递增", async () => {
+  const { mock, transport, events } = await connected();
+  await transport.ackInteraction("itr-9");
+  assert.deepEqual(mock.state.acks, [{ id: "itr-9", body: { code: 0 } }]);
+
+  mock.push("INTERACTION_CREATE", { id: "itr-5", group_openid: "G1", group_member_openid: "U1", data: { resolved: { button_data: "/搜索歌曲 a --page 2" } } }, "INTERACTION_CREATE:frame-5");
+  await mock.waitFor(() => events.length >= 1);
+  await transport.sendText({ kind: "group", openid: "G1" }, "第一条", "itr-5");
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**第二条**", "第二条", "itr-5");
+  const [first, second] = mock.state.sent.map((s) => s.body);
+  assert.equal(first.event_id, "INTERACTION_CREATE:frame-5", "回调 id（d.id）当 event_id 会被拒 40034025");
+  assert.equal(first.msg_id, undefined, "回调事件的 id 不是 msg_id");
+  assert.deepEqual([first.msg_seq, second.msg_seq], [1, 2]);
+
+  await transport.sendText({ kind: "group", openid: "G1" }, "普通消息", "m1");
+  assert.equal(mock.state.sent.at(-1).body.msg_id, "m1", "普通消息照旧用 msg_id");
+  await transport.stop(); await mock.stop();
+});
+
+test("按钮：挂在 Markdown 上发；被拒就去掉按钮、换上不带按钮的正文再发一次，之后不再带按钮", async () => {
+  const logs = [];
+  const { mock, transport } = await connected({ log: (m) => logs.push(m) });
+  const keyboard = { rows: [{ buttons: [{ id: "next" }] }] };
+  const options = { keyboard, markdownWithoutKeyboard: "**无按钮**" };
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**有按钮**", "纯文本", "m1", null, options);
+  assert.deepEqual(mock.state.sent[0].body.keyboard, { content: keyboard });
+  assert.equal(mock.state.sent[0].body.markdown.content, "**有按钮**");
+
+  mock.state.nextError = { status: 400, err_code: 40034999, message: "不允许发送按钮" };
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**有按钮2**", "纯文本2", "m2", null, options);
+  const retry = mock.state.sent.at(-1).body;
+  assert.equal(retry.msg_type, 2, "按钮被拒不等于 Markdown 被拒");
+  assert.equal(retry.keyboard, undefined);
+  assert.equal(retry.markdown.content, "**无按钮**");
+  assert.ok(logs.some((m) => /带按钮的消息被拒（40034999）/.test(m)));
+
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**有按钮3**", "纯文本3", "m3", null, options);
+  assert.equal(mock.state.sent.at(-1).body.keyboard, undefined, "拒过一次就不再带按钮");
+  assert.equal(mock.state.sent.at(-1).body.markdown.content, "**无按钮**");
+  await transport.stop(); await mock.stop();
+
+  const off = await connected({ keyboard: false });
+  await off.transport.sendMarkdown({ kind: "c2c", openid: "U1" }, "**有按钮**", "纯文本", "m1", null, options);
+  assert.equal(off.mock.state.sent[0].body.keyboard, undefined);
+  assert.equal(off.mock.state.sent[0].body.markdown.content, "**无按钮**");
+  await off.transport.stop(); await off.mock.stop();
+});
+
+test("按钮回调：开着 reuseLatestPassiveCredential 时也用这次点击的凭据，不换回群里更早的消息", async () => {
+  const { mock, transport, events } = await connected({ reuseLatestPassiveCredential: true });
+  mock.push("GROUP_AT_MESSAGE_CREATE", { id: "old-search", group_openid: "G1", content: "/搜索歌曲 a", author: { member_openid: "U1" } });
+  mock.push("INTERACTION_CREATE", { id: "itr-new", group_openid: "G1", group_member_openid: "U1", data: { resolved: { button_data: "/搜索歌曲 a --page 2" } } }, "INTERACTION_CREATE:frame-new");
+  await mock.waitFor(() => events.length >= 2);
+  await transport.sendText({ kind: "group", openid: "G1" }, "第二页", "itr-new");
+  const body = mock.state.sent.at(-1).body;
+  assert.equal(body.event_id, "INTERACTION_CREATE:frame-new");
+  assert.equal(body.msg_id, undefined);
+  await transport.stop(); await mock.stop();
+});
+
+test("凭据错了（三种格式全被拒）：原样报错，不记成「平台不收按钮 / Markdown」，也不熔断", async () => {
+  const { mock, transport } = await connected();
+  const options = { keyboard: { rows: [{ buttons: [{ id: "next" }] }] }, markdownWithoutKeyboard: "**无按钮**" };
+  // 带按钮、不带按钮、纯文本连着三次都被拒（2026-10-10 线上实测的形状）
+  mock.state.nextError = { status: 400, err_code: 40034025, message: "请求参数event_id无效", times: 3 };
+  await assert.rejects(() => transport.sendMarkdown({ kind: "group", openid: "G1" }, "**有按钮**", "纯文本", "m1", null, options), /event_id无效/);
+  assert.equal(mock.state.nextError, null, "三种格式都试过了");
+  assert.equal(transport.state.circuitOpen, false, "参数错误不是平台异常");
+
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**有按钮**", "纯文本", "m2", null, options);
+  const body = mock.state.sent.at(-1).body;
+  assert.equal(body.msg_type, 2, "Markdown 没被记成不能用");
+  assert.ok(body.keyboard, "按钮没被记成不能用");
+  await transport.stop(); await mock.stop();
+});
+
+test("requireMarkdown：Markdown 被拒或没开时抛出，不退成纯文本（正文里引用着图，退成纯文本图就丢了）", async () => {
+  const { mock, transport } = await connected();
+  mock.state.nextError = { status: 400, err_code: 40034012, message: "不允许发送原生 markdown" };
+  await assert.rejects(() => transport.sendMarkdown({ kind: "group", openid: "G1" }, "![图](http://x/a.png)", "纯文本", "m1", null, { requireMarkdown: true }));
+  assert.equal(mock.state.sent.length, 0, "没有补发纯文本");
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**普通**", "纯文本", "m2");
+  assert.equal(mock.state.sent.at(-1).body.msg_type, 2, "没被记成「平台不收 Markdown」");
+  await transport.stop(); await mock.stop();
+
+  const off = await connected({ markdown: false });
+  await assert.rejects(() => off.transport.sendMarkdown({ kind: "group", openid: "G1" }, "![图](http://x/a.png)", "纯文本", "m1", null, { requireMarkdown: true }), /Markdown 不可用/);
+  assert.equal(off.mock.state.sent.length, 0);
+  await off.transport.stop(); await off.mock.stop();
+});

@@ -26,6 +26,7 @@ const path = require("node:path");
 
 const core = require("../mia-core.cjs");
 const songSearch = require("./song-search.cjs");
+const { pagerKeyboard } = require("./pager-buttons.cjs");
 const { createSongJacket } = require("./song-jacket.cjs");
 const { continueRinnetBinding } = require("./rinnet-binding.cjs");
 const { RinnetError, diagnosticText } = require("../rinnet-client.cjs");
@@ -115,12 +116,15 @@ function parseCommand(text) {
 // 平台相关的三件事全部由调用方注入，这个文件不 require 任何 qq-official 的传输层：
 //   send(event, text)            回原地发一条文本
 //   sendImage(event, image, cap) 回原地发一张图（image 是 {buffer, meta}）
+//   publishImage(buffer)         可选：把图放到外网地址，供 Markdown 引用；返回 { url, width, height } 或 null
 //   transport                    只为 statusText 读「网关连上没有」
 function createMiaCommands(options = {}) {
   const config = options.config || {};
   const send = options.send;
   const sendImage = options.sendImage;
   const sendMarkdown = options.sendMarkdown;
+  // 把图放到外网能取的临时地址，返回网址（见 asset-browser.cjs 的 publishImage）；没有就不合成一条。
+  const publishImage = options.publishImage || null;
   const transport = options.transport;
   const log = options.log || (() => {});
   const now = options.now || Date.now;
@@ -257,7 +261,54 @@ function createMiaCommands(options = {}) {
     for (const chunk of chunks) await send(event, chunk);
   }
 
-  async function dispatch(event, plan, chatLine = "") {
+  // 分页出图（/等级）发完图之后补一条翻页消息：图片消息挂不了按钮（按钮只能跟 Markdown），所以另发一条。
+  // 只翻自己的：查别人（target）时按钮执行的是点的人自己的指令，会翻成自己的成绩，干脆不发。
+  // 翻页按钮绑发起人（别人点了回「没有权限」）；页码按钮把「/等级 14+ 」填进输入框，谁填谁查自己。
+  // 发不出去只记日志：图已经到了，翻页消息是锦上添花。
+  // 这一张图要不要翻页：要的话给出页码、总页数和按钮。
+  function pagingOf(event, plan, image, forOther) {
+    const pages = Number(image?.meta?.totalPages);
+    if (!plan.paging || forOther || !sendMarkdown || !(pages > 1) || plan.paging.page > pages) return null;
+    const { command, page } = plan.paging;
+    return {
+      hint: `第 ${page}/${pages} 页，点下面的按钮翻页；点页码可以自己填页数`,
+      text: `第 ${page}/${pages} 页` + (page < pages ? `；下一页：${command} ${page + 1}` : "；已到最后一页"),
+      keyboard: pagerKeyboard({ page, pages, owner: String(event.userId), jump: (target) => `${command} ${target}`, input: command + " " }),
+    };
+  }
+
+  async function sendPaging(event, paging) {
+    try {
+      await sendMarkdown(event, paging.hint, paging.text, { keyboard: paging.keyboard, markdownWithoutKeyboard: paging.text });
+    } catch (error) { log("翻页消息没发出去：" + core.safeError(error)); }
+  }
+
+  // 图、图注和翻页按钮合成一条 Markdown（跟「提比不想睡觉」一样）。Markdown 里的图只能写网址，
+  // 所以先把图交给素材检索网页的临时地址（publishImage，见 asset-browser.cjs）。
+  // 开关 pagedImageInMarkdown 默认关：QQ 取不到图（端口没放行、只认 https）时这边察觉不到，
+  // 用户看到的是一条没有图的消息 —— 所以要部署的人确认外网打得开之后再开。
+  // 发不成 Markdown（被拒、没开）就返回 false，调用方照旧发图片 + 翻页消息。
+  async function sendImageInMarkdown(event, image, caption, paging) {
+    if (!config.pagedImageInMarkdown) return false;
+    if (!publishImage) { log("图片合进 Markdown：素材检索网页没开，照旧发图片 + 翻页消息"); return false; }
+    const published = publishImage(image.buffer);   // { url, width, height }
+    if (!published) { log("图片合进 Markdown：没有临时地址（publicBaseUrl 没配，或图片不是 PNG/JPG），照旧发图片 + 翻页消息"); return false; }
+    const { url, width, height } = published;
+    // 图注里有玩家名，可能带 Markdown 符号；反斜杠转义掉，免得名字里的 * 或 _ 把排版弄乱。
+    const safeCaption = String(caption || "").replace(/[\\`*_~#<>\[\]()|]/g, (ch) => "\\" + ch);
+    const head = `![成绩图 #${width}px #${height}px](${url})` + (safeCaption ? "\n\n" + safeCaption : "");
+    try {
+      await sendMarkdown(event, head + "\n\n" + paging.hint, paging.text, {
+        keyboard: paging.keyboard, markdownWithoutKeyboard: head + "\n\n" + paging.text, requireMarkdown: true,
+      });
+      return true;
+    } catch (error) {
+      log("图片合进 Markdown 没发出去，改发图片 + 翻页消息：" + core.safeError(error));
+      return false;
+    }
+  }
+
+  async function dispatch(event, plan, chatLine = "", { forOther = false } = {}) {
     if (plan.kind === "notice") return send(event, plan.text);
     // 闲聊触发 /帮助 时，模型的角色化开场和长清单之间留一行；直接 /帮助 则不在
     // 消息开头塞空行。其他短结果仍只换一行，免得每条都显得松散。
@@ -274,7 +325,11 @@ function createMiaCommands(options = {}) {
     const done = await job.done;
     if (!done.ok) return send(event, done.reason);
     try {
-      return await sendImage(event, done.image, plan.caption);
+      const paging = pagingOf(event, plan, done.image, forOther);
+      if (paging && await sendImageInMarkdown(event, done.image, plan.caption, paging)) return null;
+      const sent = await sendImage(event, done.image, plan.caption);
+      if (paging) await sendPaging(event, paging);
+      return sent;
     } catch (error) {
       // 被动回复窗口过期。**只记日志、不补发文字** —— 补发会同样失败，
       // 结果是「操作失败」压在一条本来就只是超时的消息上，比静默更难懂。
@@ -405,7 +460,11 @@ function createMiaCommands(options = {}) {
     if (name === "songsearch") {
       // 曲名和白谱做成指令链接（点一下填好 /谱面分析）。没接 Markdown 发送器的宿主照旧发纯文本。
       if (!sendMarkdown) return sendLines(event, "", songSearch.reply(query).split("\n"));
-      for (const chunk of songSearch.replyChunks(query, LINES_LIMIT)) await sendMarkdown(event, chunk.markdown, chunk.text);
+      // 最后一块多页时带翻页按钮（chunk.keyboard），按钮被拒时传输层改发 markdownWithoutKeyboard。
+      for (const chunk of songSearch.replyChunks(query, LINES_LIMIT)) {
+        await sendMarkdown(event, chunk.markdown, chunk.text,
+          chunk.keyboard ? { keyboard: chunk.keyboard, markdownWithoutKeyboard: chunk.markdownWithoutKeyboard } : undefined);
+      }
       return;
     }
     if (name === "calculate" && !hasFullCalculateArgs(query)) {
@@ -418,7 +477,7 @@ function createMiaCommands(options = {}) {
     const plan = await core.resolveCapability(
       config, String(event.userId), name, query,
       (line) => log(core.safeError(line)), target);
-    return dispatch(event, plan, chatLine);
+    return dispatch(event, plan, chatLine, { forOther: Boolean(target) });
   }
 
   // ── 绑定会话 ──────────────────────────────────────────────────────

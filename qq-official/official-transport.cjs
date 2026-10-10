@@ -26,12 +26,15 @@ const OP = { DISPATCH: 0, HEARTBEAT: 1, IDENTIFY: 2, RESUME: 6, RECONNECT: 7, IN
 const INTENT_GROUP_AND_C2C = 1 << 25;
 const INTENT_GROUP_MEMBER = 1 << 24;
 const INTENT_PUBLIC_GUILD_MESSAGES = 1 << 30;
+// 1<<26 是消息按钮的回调（INTERACTION_CREATE）。回调按钮被点时平台推这个事件，
+// 不订的话按钮能显示、点了却什么都不会发生。
+const INTENT_INTERACTION = 1 << 26;
 
 const DEFAULTS = Object.freeze({
   appId: "",
   clientSecret: "",
   sandbox: false,
-  intents: INTENT_GROUP_AND_C2C | INTENT_GROUP_MEMBER | INTENT_PUBLIC_GUILD_MESSAGES,
+  intents: INTENT_GROUP_AND_C2C | INTENT_GROUP_MEMBER | INTENT_PUBLIC_GUILD_MESSAGES | INTENT_INTERACTION,
   tokenUrl: "https://bots.qq.com/app/getAppAccessToken",
   // 2026-08-10 起官方统一域名。沙箱仍走 sandbox。
   apiBase: "https://api.bot.qq.com",
@@ -46,6 +49,9 @@ const DEFAULTS = Object.freeze({
   // /搜索歌曲 用 Markdown 发，曲名和白谱可点（指令链接）。机器人没有 Markdown 权限时会自动退回纯文本，
   // 想彻底不发 Markdown 就在 config.local.json 里写 "markdown": false。
   markdown: true,
+  // Markdown 消息下面挂的按钮（/搜索歌曲 的翻页）。平台拒收按钮时自动去掉按钮再发，同样会记住；
+  // 想彻底不发按钮就写 "keyboard": false。
+  keyboard: true,
 
   // 官方有正式频控并会返回明确错误码，失败代价不再是封号（这点和 NapCat 版相反）。
   // 所以节流放宽，但**熔断保留** —— 它是识别「平台侧异常」的手段，不是为了保号。
@@ -88,6 +94,12 @@ function createOfficial(host) {
   // 6～10 分钟，等图出来时原始凭据往往已经过期。实测（2026-09-19）平台接受
   // 「用新消息的凭据 + 引用指向旧请求」这种搭配。
   const latestInbound = new Map();        // targetKey -> { msgId, at }
+  // 按钮回调（INTERACTION_CREATE）带两个 id，**不能混用**（2026-10-10 线上实测）：
+  //   - d.id：回调 id，只用来应答（PUT /interactions/{id}）；上层把它当 msgId 往下传
+  //   - 网关帧最外层的 id（形如 INTERACTION_CREATE:xxxx）：被动回复的 event_id。
+  //     拿 d.id 去当 event_id，平台回 40034025「请求参数event_id无效」
+  // 发的时候在这里按回调 id 查出 event_id 换上 —— 上层不用知道两种凭据的区别。
+  const interactions = new Map();         // 回调 id -> { eventId, expiry }
   const rateState = { day: "", dayCount: 0, lastSendAt: 0, byTarget: new Map() };
   let circuit = { failures: 0, openUntil: 0 };
 
@@ -133,7 +145,7 @@ function createOfficial(host) {
   }
 
   // 把 inbound 的 msg_id 按目标记下来。键的算法要和 targetKey 一致，
-  // 否则发的时候取不到。只认带 d.id 的普通消息事件。
+  // 否则发的时候取不到。只认带 d.id 的消息事件和按钮回调。
   function rememberInbound(eventName, d) {
     const id = d?.id;
     if (!id) return;
@@ -141,6 +153,9 @@ function createOfficial(host) {
     if (eventName === "GROUP_AT_MESSAGE_CREATE" || eventName === "GROUP_MESSAGE_CREATE") key = "group:" + String(d.group_openid || "");
     else if (eventName === "C2C_MESSAGE_CREATE") key = "c2c:" + String(d.author?.user_openid || d.author?.id || "");
     else if (eventName === "AT_MESSAGE_CREATE" || eventName === "MESSAGE_CREATE") key = "channel:" + String(d.channel_id || "");
+    // 按钮回调也是新鲜凭据（发的时候由 applyCredential 换成 event_id）。不记的话，点翻页的回复会被
+    // effectiveMsgId 换成这个群「最新一条消息」—— 可能就是十分钟前那条 /搜索歌曲，早过期了。
+    else if (eventName === "INTERACTION_CREATE") key = d.group_openid ? "group:" + String(d.group_openid) : "c2c:" + String(d.user_openid || "");
     if (!key || key.endsWith(":")) return;
     latestInbound.set(key, { msgId: String(id), at: now() });
   }
@@ -196,6 +211,8 @@ function createOfficial(host) {
     if (error.code === 40034100) return "rate_limited";
     if (error.status === 429) return "rate_limited";
     if (error.status >= 500) return "server";
+    // 其余 4xx 是平台明确拒收了这一条（参数、格式、权限）。毛病出在这条消息上，不是平台异常，不熔断。
+    if (error.status >= 400 && error.status < 500 && error.status !== 401) return "rejected";
     if (/ECONN|socket|timeout|超时/i.test(String(error.message || ""))) return "network";
     return "unknown";
   }
@@ -261,6 +278,17 @@ function createOfficial(host) {
 
   // target: { kind: "group" | "c2c", openid }
   function targetKey(target) { return target.kind + ":" + target.openid; }
+
+  // 被动回复凭据写进消息体。msg_seq 跟 msg_id 一样按凭据递增。
+  function applyCredential(body, useId) {
+    if (!useId) return;
+    const current = now();
+    for (const [k, v] of interactions) if (v.expiry <= current) interactions.delete(k);
+    const interaction = interactions.get(useId);
+    if (interaction) body.event_id = interaction.eventId;
+    else body.msg_id = useId;
+    body.msg_seq = nextSeq(useId);
+  }
   function messagePath(target) {
     if (target.kind === "group") return "/v2/groups/" + target.openid + "/messages";
     if (target.kind === "channel") return "/channels/" + target.openid + "/messages";
@@ -272,7 +300,7 @@ function createOfficial(host) {
     return "/v2/users/" + target.openid + "/files";
   }
 
-  async function sendText(target, text, msgId, refId, markdown) {
+  async function sendText(target, text, msgId, refId, markdown, keyboard) {
     const run = async () => {
       const key = targetKey(target);
       const suppress = suppressKey(key, text, msgId);
@@ -284,7 +312,8 @@ function createOfficial(host) {
       // 被动回复必须带 msg_id；msg_seq 对同一个 msg_id 要递增，否则被当成重复发送
       const useId = effectiveMsgId(target, msgId);
       const body = markdown ? { msg_type: 2, markdown: { content: String(markdown) } } : { content: String(text), msg_type: 0 };
-      if (useId) { body.msg_id = useId; body.msg_seq = nextSeq(useId); }
+      if (markdown && keyboard) body.keyboard = { content: keyboard };
+      applyCredential(body, useId);
       // 引用是**另一个**字段：填了才以「回复」形式展示，不填就是一条独立消息。
       // 拿不到 refId（对方引用的是更早的消息、ext 里没有 msg_idx）就退化成不引用。
       if (refId) body.message_reference = { message_id: String(refId) };
@@ -295,9 +324,8 @@ function createOfficial(host) {
         return data;
       } catch (error) {
         const kind = classify(error);
-        // Markdown 被拒是这条消息的格式问题，不是平台异常：不熔断，否则紧跟着的纯文本补发也会被挡下。
-        const markdownRejection = markdown && error?.status >= 400 && error.status < 500;
-        if (!markdownRejection && (kind === "server" || kind === "network" || kind === "unknown")) tripCircuit(kind + "：" + error.message);
+        // 被拒（4xx）是这条消息的问题，不是平台异常：不熔断，否则紧跟着的补发也会被挡下。
+        if (kind === "server" || kind === "network" || kind === "unknown") tripCircuit(kind + "：" + error.message);
         throw error;
       }
     };
@@ -310,18 +338,50 @@ function createOfficial(host) {
   // 只有平台明确拒收（4xx）才补发：网络错误、5xx 时那条可能已经到了，补发会变成两条。
   // 被动回复过期（40034128）和限流补发也一样会失败，原样抛出。
   // 拒收过一次就记住，之后直接发纯文本 —— 没开 Markdown 权限的机器人每条都先失败一次没有意义。
-  let markdownRejected = false;
-  async function sendMarkdown(target, markdown, text, msgId, refId) {
+  //
+  // 按钮（options.keyboard，即 keyboard.content 那一层 { rows }）也照这个办法：带按钮被拒就去掉按钮再发一次，
+  // 正文换成 options.markdownWithoutKeyboard —— 没了按钮，翻页得写回正文里。
+  //
+  // **降级成功了才记住**：被拒不一定是格式的错。2026-10-10 线上踩过：凭据填错（40034025 event_id 无效）时
+  // 三种格式全被拒，旧写法却把按钮和 Markdown 都记成「平台不收」，之后一直只发纯文本。
+  // 现在去掉按钮（或改纯文本）发成功了，才说明是按钮（或 Markdown）的问题；补发也失败就原样抛出，什么都不记。
+  // 没有 Markdown 权限的机器人两样都会被拒，各失败一次之后就只发纯文本了。
+  let markdownRejected = false, keyboardRejected = false;
+  const rejected = (error) => classify(error) === "rejected";
+  //
+  // options.requireMarkdown：这条离了 Markdown 就没意义（正文里引用着图片，纯文本补发等于把图丢了）。
+  // 发不成 Markdown 时抛出，由调用方换别的发法。这时不记「平台不收 Markdown」：没有纯文本补发成功来证明是格式的错。
+  async function sendMarkdown(target, markdown, text, msgId, refId, options = {}) {
     // QQ 频道是另一套接口，没实测过，照旧发纯文本。
-    if (markdownRejected || !config.markdown || target.kind === "channel") return sendText(target, text, msgId, refId);
-    try {
-      return await sendText(target, text, msgId, refId, markdown);
-    } catch (error) {
-      if (!(error?.status >= 400 && error.status < 500) || error.status === 429 || classify(error) !== "unknown") throw error;
-      markdownRejected = true;
-      log("Markdown 消息被拒（" + (error.code ?? error.status) + "），之后改发纯文本：" + error.message);
+    if (markdownRejected || !config.markdown || target.kind === "channel") {
+      if (options.requireMarkdown) throw new Error("Markdown 不可用（" + (markdownRejected ? "平台拒收过" : "没开或是频道") + "）");
       return sendText(target, text, msgId, refId);
     }
+    let keyboardError = null;
+    if (options.keyboard && config.keyboard && !keyboardRejected) {
+      try {
+        return await sendText(target, text, msgId, refId, markdown, options.keyboard);
+      } catch (error) {
+        if (!rejected(error)) throw error;
+        keyboardError = error;
+      }
+    }
+    if (options.keyboard) markdown = options.markdownWithoutKeyboard ?? markdown;
+    let result;
+    try {
+      result = await sendText(target, text, msgId, refId, markdown);
+    } catch (error) {
+      if (!rejected(error) || options.requireMarkdown) throw error;
+      result = await sendText(target, text, msgId, refId);
+      markdownRejected = true;
+      log("Markdown 消息被拒（" + (error.code ?? error.status) + "），之后改发纯文本：" + error.message);
+      return result;
+    }
+    if (keyboardError) {
+      keyboardRejected = true;
+      log("带按钮的消息被拒（" + (keyboardError.code ?? keyboardError.status) + "），之后不再发按钮：" + keyboardError.message);
+    }
+    return result;
   }
 
   async function sendImage(target, image, msgId, caption = "", refId) {
@@ -340,8 +400,7 @@ function createOfficial(host) {
       });
       if (!uploaded?.file_info) throw new Error("富媒体上传未返回 file_info：" + JSON.stringify(uploaded).slice(0, 200));
       const body = { content: caption || " ", msg_type: 7, media: { file_info: uploaded.file_info } };
-      const useId = effectiveMsgId(target, msgId);
-      if (useId) { body.msg_id = useId; body.msg_seq = nextSeq(useId); }
+      applyCredential(body, effectiveMsgId(target, msgId));
       if (refId) body.message_reference = { message_id: String(refId) };
       try {
         const data = await rest("POST", messagePath(target), body);
@@ -520,6 +579,32 @@ function createOfficial(host) {
         at, raw: d,
       };
     }
+    // 按钮回调：用户点了我们发出去的回调按钮。按钮里存的指令（button_data）就当这个人打的那句话，
+    // 上层照普通指令处理；msgId 放回调事件的 id，发送时由 applyCredential 换成 event_id。
+    // 点按钮就是在找美亚，所以算 @ 到了。频道的回调没接（频道整体没做白名单，上层本来也不处理）。
+    // 字段出处：bot.q.qq.com/wiki 的「互动事件 INTERACTION_CREATE」（chat_type 1 群、2 单聊）。
+    if (eventName === "INTERACTION_CREATE") {
+      const data = String(d?.data?.resolved?.button_data ?? "").trim();
+      const id = String(d?.id || "");
+      const group = Boolean(d?.group_openid);
+      const user = String((group ? d.group_member_openid : d?.user_openid) || "");
+      if (!id || !data || !user) return null;
+      return {
+        type: group ? "group" : "c2c", eventName,
+        openid: group ? String(d.group_openid) : user,
+        userId: user,
+        content: stripMentionMarkers(data),
+        msgId: id,
+        interactionId: id,
+        mentioned: true,
+        mentionedOpenids: [],
+        mentionsSelf: true,
+        refId: null,
+        quote: null,
+        quoteShape: "",
+        at, raw: d,
+      };
+    }
     // QQ 频道：openid 位置放 channel_id，发送路径是 /channels/{id}/messages。
     // 频道没有 openid 概念，author.id 就是用户 ID。
     if (eventName === "AT_MESSAGE_CREATE" || eventName === "MESSAGE_CREATE") {
@@ -611,6 +696,8 @@ function createOfficial(host) {
           if (recentIds.has(key)) return;
           prune(recentIds, key, 10 * 60 * 1000);
         }
+        // 帧外层没有 id 时只能退回 d.id —— 多半发不出去，但总比不带凭据强。
+        if (frame.t === "INTERACTION_CREATE" && id) interactions.set(String(id), { eventId: String(frame.id || id), expiry: now() + 60 * 60 * 1000 });
         rememberInbound(frame.t, frame.d);
         onEvent?.(frame.t, frame.d);
         return;
@@ -672,11 +759,20 @@ function createOfficial(host) {
     return now() - heartbeatAckAt < 90000;
   }
 
+  // 回调按钮被点之后要应答，客户端才会提示「操作成功」并停止转圈；不应答，用户看到的是操作失败。
+  // code：0 成功，1 操作失败，2 操作频繁，3 重复操作，4 没有权限，5 仅管理员操作。
+  // 应答不是消息，不进发送队列、不计限流；失败只记日志（按钮背后的指令照样执行）。
+  async function ackInteraction(id, code = 0) {
+    if (!id) return;
+    try { await rest("PUT", "/interactions/" + encodeURIComponent(id), { code }); }
+    catch (error) { log("按钮回调应答失败：" + (error?.message || error)); }
+  }
+
   // rest 是**给非消息类接口留的口子**（指令面板就是这样：它不是收发消息，
   // 但要用同一套 access_token 和 base URL）。默认不导出它是有意的 ——
   // 上层不该绕过 sendText/sendImage 自己拼消息，那会把限流、抑制、熔断全绕过去。
   // 用它的人要自己负责：这里**没有**限流、没有去重、没有熔断。
-  return { start, stop, sendText, sendMarkdown, sendImage, state, healthy, config, normalize, rest };
+  return { start, stop, sendText, sendMarkdown, sendImage, ackInteraction, state, healthy, config, normalize, rest };
 }
 
-module.exports = { createOfficial, DEFAULTS, OP, INTENT_GROUP_AND_C2C, INTENT_GROUP_MEMBER, INTENT_PUBLIC_GUILD_MESSAGES };
+module.exports = { createOfficial, DEFAULTS, OP, INTENT_GROUP_AND_C2C, INTENT_GROUP_MEMBER, INTENT_PUBLIC_GUILD_MESSAGES, INTENT_INTERACTION };
