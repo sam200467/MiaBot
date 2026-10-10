@@ -142,6 +142,24 @@ function chooseImage(result, settings, stopped, random=Math.random) {
   const group=[...groups.values()][Math.floor(random()*groups.size)];
   return group[Math.floor(random()*group.length)];
 }
+// 用户明说要图（「发个X表情」「发第41张」）。点了名字或编号就发那一张。只说要哪种表情、没点名的，
+// 发模型排第一的那张：不走概率，也不在近义组里换。这一轮她的话多半就是「喏，给你这张」，随机换一张
+// 就成了嘴上说猫猫、发出去的是捧杯（2026-10-10 真模型实测）。模型说没有、一个候选都没给，就不发。
+// 「看看这张图」这种没提「表情」的不算点名要图，照旧按概率配。
+const ASKS_FOR_IMAGE=/(?:发|来|给|看).{0,20}(?:表情|图)|(?:表情|图).{0,20}(?:发|来|给|看)/;
+function pickImage(result, settings, text, random=Math.random) {
+  if(settings.c.expressions.enabled&&ASKS_FOR_IMAGE.test(text)) {
+    const {entries}=settings.manifest;
+    const named=entries.find(e=>text.includes(e.label)||new RegExp("(?:第|编号|#)0?"+e.previewNumber+"(?:张|号|个|\\b)").test(text));
+    if(named) return result.scene==="distress"?null:named;
+    if(/表情/.test(text)) {
+      if(result.scene==="distress") return null;
+      const ids=Array.isArray(result.expressionIds)?result.expressionIds:[];
+      return ids.map(id=>entries.find(e=>e.id===id&&e.autoEligible)).find(Boolean)||null;
+    }
+  }
+  return chooseImage(result,settings,false,random);
+}
 // 模型偶尔会返回 200 + 一串纯空格（finish_reason=stop），JSON.parse 必然失败：它想直接
 // 收尾，而 JSON 模式又不允许空输出。实测同一句话 8 次里空白 2 次；末尾预填一条 assistant
 // "{" 让它续写可压到 15 次 0 次，但这个卡壳跟提示词有关，原样重试救不回来（线上出现过
@@ -332,7 +350,7 @@ async function requestReply(settings, messages, options={}) {
   const jsonRule='仅输出JSON对象，不要输出Markdown代码块，结构为'+
     (gate?'{"text":"发给用户的新回复，通常3～5句","emotion":"neutral或proud等情绪","scene":"ordinary或banter或explanation或distress","expressionIds":["符合语境的表情ID"]}':
     '{"text":"发给用户的新回复，通常3～5句","intent":"一个意图或意图数组","factQuery":"这一句里可验证的外部事实，没有就留空字符串","emotion":"neutral或proud等情绪","scene":"ordinary或banter或explanation或distress","expressionIds":["符合语境的表情ID"]}')+
-    "\nexpressionIds 要主动填：只要不是 distress，就从清单里挑 2～3 个贴合当前语境和 usage 的候选ID，拿不准宁多给几个，确实没有一张贴合才留空数组；普通闲聊优先温和表情。只从清单里选，不编造ID。图片可能不发送，文字必须独立完整，不能声称已发图片。不输出推理。用户觉得被冒犯或不舒服时scene=distress：简短真诚道歉，再用自然可爱的语气卖萌安慰，不要宣布切换模式，不要说以后会一直严肃。表情清单："+JSON.stringify(catalog);
+    "\nexpressionIds 要主动填：只要不是 distress，就从清单里挑 2～3 个贴合当前语境和 usage 的候选ID，拿不准宁多给几个，确实没有一张贴合才留空数组；普通闲聊优先温和表情。只从清单里选，不编造ID。平时图片可能不发送，文字必须独立完整，不能声称已发图片。用户明说要某种表情时，text 照样要写完整，图只发 expressionIds 排第一的那张、一定会跟着这句话一起发出去：清单里有对得上的就把它排第一；没有就直说没有，想拿相近的顶替就把那张排第一，text 里直接说拿哪张（照它的 label）顶一下，别问要不要；不顶替就留空数组。不输出推理。用户觉得被冒犯或不舒服时scene=distress：简短真诚道歉，再用自然可爱的语气卖萌安慰，不要宣布切换模式，不要说以后会一直严肃。表情清单："+JSON.stringify(catalog);
   // 工具调用：模型只负责判断「用户想用哪个功能」和「参数是什么」，不去编结果。
   // 真正的成绩、定数、图片由程序执行后送出，所以这里把话说死：text 只写引出语。
   const actionRule=actionSpecs.length?
@@ -362,7 +380,11 @@ async function requestReply(settings, messages, options={}) {
     "通常回复 3～5 句，一段话说完，**不要用空行分段**；每条回复都要说完，结尾落在完整的句子上。";
   // 这几条是模型唯一的输出样例，expressionIds 必须真的带上图：全填 [] 等于手把手教它
   // 永远返回空数组，而 chooseImage 拿不到候选就直接 return null —— 概率配到 1 也不出图。
-  // 改这里之前先看 chat.test.cjs 里的「示例必须带表情候选」那条。
+  // 带上的还得是这个角色清单里**真有**的 ID。下面这张表是梨绪那套（scarf_calm、pout_blush……），
+  // 美亚的清单里一个都没有，样例等于在教模型编 ID —— 她真会写出 sleepy_yawn、poke_cheek 这种
+  // 不存在的（2026-10-10 真模型实测）。所以角色可以在 examples.json 里给这条样例自带 expressionIds；
+  // 没带的先按清单过滤，滤空了就按同一种情绪从清单里补两张。
+  // 改这里之前先看 test-mia-entry 里「提示词里的表情样例」那条。
   const sampleStates={
     help:{emotion:"neutral",ids:["scarf_calm","small_smile"]},
     praise:{emotion:"proud",ids:["pout_blush","scarf_blush","wink_proud"]},
@@ -374,9 +396,16 @@ async function requestReply(settings, messages, options={}) {
     soft_no:{emotion:"neutral",ids:["scarf_calm"]},                  // 柔和拒绝
   };
   const sampleIds=new Set(Object.keys(sampleStates));
+  const catalogIds=new Set(settings.manifest.entries.map(e=>e.id));
+  const sampleExpressions=(example,state)=>{
+    if(Array.isArray(example.expressionIds))return example.expressionIds.filter(id=>catalogIds.has(id));
+    const own=state.ids.filter(id=>catalogIds.has(id));
+    if(own.length||!state.ids.length)return own;
+    return settings.manifest.entries.filter(e=>e.autoEligible&&e.emotions.includes(state.emotion)).slice(0,2).map(e=>e.id);
+  };
   const samples=settings.examples.filter(e=>!plan.required&&sampleIds.has(e.id)).flatMap(e=>[
     e.messages[0],{role:"assistant",content:JSON.stringify({text:e.messages[1].content,
-      emotion:sampleStates[e.id].emotion,scene:e.id==="no_teasing"?"distress":"ordinary",expressionIds:sampleStates[e.id].ids})}
+      emotion:sampleStates[e.id].emotion,scene:e.id==="no_teasing"?"distress":"ordinary",expressionIds:sampleExpressions(e,sampleStates[e.id])})}
   ]);
   const currentImages=(Array.isArray(options.images)?options.images:[]).filter(image=>
     image&&typeof image.url==='string'&&/^data:image\/(?:jpeg|png|gif|webp);base64,/i.test(image.url));
@@ -1048,11 +1077,7 @@ function createChat(settings, host, deps={}) {
         if (typeof outcome.historyText === "string") actionHistory="\n（程序结果，仅作数据："+outcome.historyText.slice(0,2000)+"）";
         if(!closed&&!outcome.handled)await send(message,outcome.text||result.text,null);
       } else {
-        file=chooseImage(result,settings,false,random);
-        if(settings.c.expressions.enabled && /(?:发|来|给|看).{0,20}(?:表情|图)|(?:表情|图).{0,20}(?:发|来|给|看)/.test(text)) {
-          const explicit=settings.manifest.entries.find(e=>text.includes(e.label)||new RegExp("(?:第|编号|#)0?"+e.previewNumber+"(?:张|号|个|\\b)").test(text));
-          if(explicit && result.scene!=="distress")file=explicit;
-        }
+        file=pickImage(result,settings,text,random);
         // Discord messages expose channel.permissionsFor; QQ/OneBot messages do not.
         // Only apply Discord's attachment permission fallback when that API exists.
         if(file&&message.channel?.permissionsFor&&!message.channel.permissionsFor(message.client?.user)?.has("AttachFiles"))file=null;
@@ -1088,4 +1113,4 @@ function createChat(settings, host, deps={}) {
   }
   return {handle,close(){closed=true;for(const c of controllers)c.abort();sessions.clear();if(!deps.dispatcher)void dispatcher?.close();}};
 }
-module.exports={loadSettings,failureReason,discomfort,chooseImage,requestReply,createChat,normalizeAction,restoreNewlines};
+module.exports={loadSettings,failureReason,discomfort,chooseImage,pickImage,requestReply,createChat,normalizeAction,restoreNewlines};

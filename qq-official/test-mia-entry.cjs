@@ -1063,3 +1063,60 @@ test("纯文本降级那条路：模型直接写了字面的 \\n，同样还原�
     assert.equal(mock.state.sent.at(-1).body.content, "喵哼哼，收到啦！\n下次再来找美亚玩～");
   } finally { await bot.stop(); await mock.stop(); }
 });
+
+// ── 表情：点名要图、提示词里的样例 ────────────────────────────────────
+// 2026-10-10 群里「发个睡觉表情」：41 号标成「眯眼犯困」、图其实是爱心眼，她照着标注说「眯眼犯困，送你」。
+// 标注在 expressions.json 里改好了；这里盯住程序侧的两件事。
+const sentExpressions = (logs) => logs.filter((line) => line.startsWith("发送表情 ")).map((line) => line.slice(5).replace(/（.*$/, ""));
+
+test("点名要表情：没点名字就发她排第一的那张，不再在候选里随机换；她说没有就不发；点了名字就发那张", async () => {
+  const { pickImage, chooseImage } = require("../chat-core/chat.cjs");
+  const logs = [];
+  const { mock, bot } = await setup({}, {
+    reply: "睡觉的没有哦，拿捧杯取暖那张顶一下～", expressionIds: ["warm_cup", "cat_hiss"], botDeps: { log: (line) => logs.push(line) },
+  });
+  bot.settings.c.limits.userCooldownSeconds = 0;
+  try {
+    // 她排第一的是捧杯；按概率配图时候选按清单顺序排，随机数 0 抽到的是排在前面的 21 号猫猫炸毛
+    const result = { scene: "ordinary", emotion: "happy", expressionIds: ["warm_cup", "cat_hiss"] };
+    const first = () => 0;
+    assert.equal(chooseImage(result, bot.settings, false, first).id, "cat_hiss", "夹具前提：按概率配图会换成别的那张");
+    assert.equal(pickImage(result, bot.settings, "发个睡觉表情", first).id, "warm_cup");
+    assert.equal(pickImage(result, bot.settings, "帮我看看这张图", first).id, "cat_hiss", "没提「表情」的照旧按概率配");
+    assert.equal(pickImage({ ...result, expressionIds: ["warm_cup"] }, bot.settings, "发个猫猫炸毛的表情", first).id, "cat_hiss", "点了名字就发那张");
+    assert.equal(pickImage({ ...result, expressionIds: ["sleepy_yawn", "warm_cup"] }, bot.settings, "发个睡觉表情", first).id, "warm_cup", "编出来的 ID 跳过");
+    assert.equal(pickImage({ ...result, scene: "distress" }, bot.settings, "发个睡觉表情", first), null);
+    // 走 QQ 入口：连发几次，每次都是她排第一的那张
+    for (let i = 0; i < 4; i++) {
+      const before = mock.state.sent.length;
+      await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "发个睡觉表情" }));
+      assert.ok(await mock.waitFor(() => mock.state.sent.length > before));
+    }
+    assert.deepEqual(sentExpressions(logs), Array(4).fill("42_捧杯取暖.gif"), logs.join("\n"));
+  } finally { await bot.stop(); await mock.stop(); }
+
+  const quiet = [];
+  const none = await setup({}, { reply: "美亚没有睡觉的表情啦。", expressionIds: [], botDeps: { log: (line) => quiet.push(line) } });
+  try {
+    await none.bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "发个睡觉表情" }));
+    assert.ok(await none.mock.waitFor(() => none.mock.state.sent.length > 0));
+    assert.deepEqual(sentExpressions(quiet), [], "她说没有、也没给候选，就只发文字");
+    assert.equal(none.mock.state.uploads.length, 0);
+  } finally { await none.bot.stop(); await none.mock.stop(); }
+});
+
+test("提示词里的表情样例只用美亚清单里真有的 ID（原来那套是梨绪的，一个都对不上），而且不是空的", async () => {
+  const { mock, bot, model } = await setup();
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "今天打歌好累啊" }));
+    assert.ok(await mock.waitFor(() => model.calls.length > 0));
+    const known = new Set(bot.settings.manifest.entries.map((e) => e.id));
+    const samples = model.calls[0].body.messages.filter((m) => m.role === "assistant" && m.content !== "{").map((m) => JSON.parse(m.content));
+    assert.ok(samples.length > 0, "应当至少有一条样例");
+    for (const sample of samples.filter((s) => s.scene !== "distress")) {
+      assert.ok(sample.expressionIds.length > 0, "样例要带表情候选，不然模型学会永远给空数组");
+      assert.deepEqual(sample.expressionIds.filter((id) => !known.has(id)), [], "样例里的表情 ID 必须是清单里真有的");
+    }
+    assert.ok(samples.some((s) => s.expressionIds.join() === "sparkle_wink,bashful_glance"), "被夸那条用 examples.json 里自带的表情");
+  } finally { await bot.stop(); await mock.stop(); }
+});

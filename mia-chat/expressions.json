@@ -2,7 +2,7 @@
  "schemaVersion": 1,
  "status": "美亚表情集（用户提供）。分类由目视检查得出。",
  "assetRoot": "emojis/",
- "inspectionNote": "GIF 只看了静态帧，动画过程未逐帧确认。若某张的实际动态与 label 不符，改 label/usage 即可。",
+ "inspectionNote": "GIF 只看了静态帧，动画过程未逐帧确认。若某张的实际动态与 label 不符，改 label/usage 即可。2026-10-10 逐张对着图重看了一遍，改了 18、21、25、29、34、35、41 的 id/label/usage（18、21、34 按用户的说明），图片文件名跟着改了：上服务器要先拷新名字的图，再换这份清单。",
  "selectionPolicy": {
   "ordinaryProbability": 0.6,
   "clearEmotionProbability": 1,
@@ -361,21 +361,20 @@
    "inspection": "目视检查"
   },
   {
-   "id": "aggrieved_tears",
+   "id": "savor_lick",
    "previewNumber": 18,
-   "label": "委屈忍泪",
-   "file": "emojis/18_委屈忍泪.gif",
+   "label": "伸舌舔舔",
+   "file": "emojis/18_伸舌舔舔.gif",
    "width": 560,
    "height": 560,
    "bytes": 414616,
    "animated": true,
-   "emotions": ["crying", "embarrassed"],
-   "usage": "被说中痛处、委屈又不肯痛快认输。比嚎啕大哭更克制。",
+   "emotions": ["happy", "playful"],
+   "usage": "闭着眼伸舌头舔舔嘴：吃到好吃的回味一下，或者对着喜欢的东西舔屏似的满足。",
    "autoEligible": true,
    "requiresMatchingContext": false,
    "weight": 1,
-   "variantGroup": "crying_sad",
-   "inspection": "目视检查（抽查 4 个动画帧）"
+   "inspection": "目视检查（抽查 4 个动画帧）；2026-10-10 用户确认是伸舌头舔的动图，原标「委屈忍泪」改标，移出 crying_sad 组；文件改名自 18_委屈忍泪.gif"
   },
   {
    "id": "happy_wave",
@@ -411,20 +410,20 @@
    "inspection": "目视检查"
   },
   {
-   "id": "cat_raise",
+   "id": "cat_hiss",
    "previewNumber": 21,
-   "label": "猫猫举手",
-   "file": "emojis/21_猫猫举手.jpg",
+   "label": "猫猫炸毛",
+   "file": "emojis/21_猫猫炸毛.jpg",
    "width": 1280,
    "height": 1280,
    "bytes": 172545,
    "animated": false,
-   "emotions": ["excited", "playful"],
-   "usage": "积极举手、抢答、宣布自己要上。适合元气十足的回应。",
+   "emotions": ["angry", "surprised"],
+   "usage": "像猫一样弓起背、尾巴炸开、龇牙哈气：被吓了一跳、被戳到痛处或被拆台时，玩笑式地炸毛抗议。用户真的不舒服时别用。",
    "autoEligible": true,
    "requiresMatchingContext": false,
    "weight": 1,
-   "inspection": "目视检查"
+   "inspection": "目视检查；2026-10-10 用户确认是「猫炸毛」，原标「猫猫举手」改标；文件改名自 21_猫猫举手.jpg"
   },
   {
    "id": "taiyaki_bite",
@@ -476,21 +475,21 @@
    "inspection": "目视检查（抽查 4 个动画帧）"
   },
   {
-   "id": "heart_prayer",
+   "id": "heart_chin",
    "previewNumber": 25,
-   "label": "双手祈愿心动",
-   "file": "emojis/25_双手祈愿心动.jpg",
+   "label": "托腮心动",
+   "file": "emojis/25_托腮心动.jpg",
    "width": 262,
    "height": 404,
    "bytes": 36707,
    "animated": false,
    "emotions": ["affection", "happy"],
-   "usage": "安静地心动、期待、拜托或许愿。",
+   "usage": "爱心眼、手抵着下巴傻乐，安静地心动、期待。",
    "autoEligible": true,
    "requiresMatchingContext": false,
    "weight": 1,
    "variantGroup": "heart_eyes_gentle",
-   "inspection": "目视检查"
+   "inspection": "目视检查；2026-10-10 重看：只有一只手抵在嘴边，没有双手祈愿，原标「双手祈愿心动」改标，用途去掉了「拜托或许愿」；文件改名自 25_双手祈愿心动.jpg"
   },
   {
    "id": "bashful_glance",
@@ -543,20 +542,20 @@
    "inspection": "目视检查"
   },
   {
-   "id": "awkward_smile",
+   "id": "paw_lick",
    "previewNumber": 29,
-   "label": "尴尬陪笑",
-   "file": "emojis/29_尴尬陪笑.jpg",
+   "label": "举爪舔嘴",
+   "file": "emojis/29_举爪舔嘴.jpg",
    "width": 596,
    "height": 596,
    "bytes": 64521,
    "animated": false,
-   "emotions": ["awkward", "playful"],
-   "usage": "场面有点尴尬、接不上话，只能挤出礼貌笑容。",
+   "emotions": ["playful", "happy"],
+   "usage": "举起猫爪、舔舔嘴唇嘿嘿笑：盯上了好吃的或可爱的人，或者准备小小地使个坏。轻松调皮的场合。",
    "autoEligible": true,
    "requiresMatchingContext": false,
    "weight": 1,
-   "inspection": "目视检查"
+   "inspection": "目视检查；2026-10-10 重看：图是举着猫爪舔嘴唇的调皮脸，不是尴尬陪笑，改标；文件改名自 29_尴尬陪笑.jpg"
   },
   {
    "id": "mischief_tongue",
@@ -627,37 +626,37 @@
    "inspection": "目视检查"
   },
   {
-   "id": "gift_hands",
+   "id": "lucky_beckon",
    "previewNumber": 34,
-   "label": "双手递礼",
-   "file": "emojis/34_双手递礼.jpg",
+   "label": "招财猫招手",
+   "file": "emojis/34_招财猫招手.jpg",
    "width": 220,
    "height": 286,
    "bytes": 18257,
    "animated": false,
-   "emotions": ["happy", "affection"],
-   "usage": "递出礼物、分享战利品、把好东西送到对方面前。",
+   "emotions": ["happy", "playful"],
+   "usage": "音击打完一首歌、结算画面上随身美亚那个招财猫似的招手：有人刚打完歌晒成绩时道喜，抽卡、冲分前讨个好彩头，或者招呼大家快来。",
    "autoEligible": true,
    "requiresMatchingContext": true,
    "weight": 1,
-   "inspection": "目视检查"
+   "inspection": "目视检查；2026-10-10 用户说明：是游戏里打完歌、结算画面上随身角色动作的一帧，像招财猫招手，原标「双手递礼」改标；文件改名自 34_双手递礼.jpg"
   },
   {
-   "id": "heart_tears",
+   "id": "heart_umbrella",
    "previewNumber": 35,
-   "label": "流泪花痴",
-   "file": "emojis/35_流泪花痴.jpg",
+   "label": "撑伞花痴",
+   "file": "emojis/35_撑伞花痴.jpg",
    "width": 337,
    "height": 323,
    "bytes": 29338,
    "animated": false,
    "emotions": ["affection", "excited"],
-   "usage": "可爱到流泪、激动失控。只留给情绪顶点。",
+   "usage": "撑着伞也挡不住的花痴：爱心眼、口水直流，激动失控。只留给情绪顶点。",
    "autoEligible": true,
    "requiresMatchingContext": false,
    "weight": 1,
    "variantGroup": "heart_eyes_extreme",
-   "inspection": "目视检查"
+   "inspection": "目视检查；2026-10-10 重看：图里撑着伞，流的是口水不是眼泪，原标「流泪花痴」改标；文件改名自 35_流泪花痴.jpg"
   },
   {
    "id": "puffy_slam",
@@ -742,20 +741,21 @@
    "inspection": "目视检查"
   },
   {
-   "id": "sleepy_squint",
+   "id": "dreamy_hearts",
    "previewNumber": 41,
-   "label": "眯眼犯困",
-   "file": "emojis/41_眯眼犯困.jpg",
+   "label": "陶醉爱心眼",
+   "file": "emojis/41_陶醉爱心眼.jpg",
    "width": 342,
    "height": 284,
    "bytes": 31624,
    "animated": false,
-   "emotions": ["relaxed", "tired"],
-   "usage": "困了、懒洋洋、想摸鱼或准备休息。",
+   "emotions": ["affection", "happy"],
+   "usage": "眯着爱心眼、红着脸傻乐，被可爱的人或东西迷得晕乎乎。比狂喜那几张安静。",
    "autoEligible": true,
    "requiresMatchingContext": false,
    "weight": 1,
-   "inspection": "目视检查"
+   "variantGroup": "heart_eyes_gentle",
+   "inspection": "目视检查；2026-10-10 重看：图是半眯的爱心眼、脸红猫嘴傻笑，原标「眯眼犯困」（relaxed/tired）跟图对不上，群里要睡觉表情时被当成困倦脸发了出去，改标；文件改名自 41_眯眼犯困.jpg"
   },
   {
    "id": "warm_cup",
