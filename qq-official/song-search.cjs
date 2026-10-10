@@ -125,14 +125,14 @@ function reply(query) {
   // 0 级白谱的定数就是 0。先判它：《Perfect Shining!!》那张在曲库里记的是「定数未知」，不能显示成漏填。
   const showConstant = (difficulty, { level, value, known }) => difficulty === "LUN" && String(level) === "0" ? 0
     : known && value != null ? value : "定数未知";
-  // 白谱在游戏里是单独一条曲目（见 song-id.cjs）。ID 跟本曲不同就单列一行，不然用户会拿本曲的 ID 去查白谱，
-  // 照着打「/谱面分析 id39 白」—— 那是一张不存在的谱面。
+  // 白谱在游戏里是单独一条曲目（见 song-id.cjs）。ID 跟本曲不同的，跟在绿黄红紫后面、一张一对括号写上它自己的 ID：
+  // 「MAS 11.5（id8003：LUN 0）（id8091：LUN 13.8）」。不写的话，用户会拿本曲的 ID 去查白谱，照着打「/谱面分析 id39 白」。
   const entries = r.matches.map(song => {
     const { id, main, lunatics } = entryBySong.get(song);
     const title = `${showId(id)}   ${song.meta.name}${song.meta.is_deleted ? "（已删除）" : ""}`;
-    const mainLine = main.map(chart => `${chart.difficulty} ${showConstant(chart.difficulty, chart)}`).join(" / ");
-    return [title, ...(mainLine ? [mainLine] : []),
-      ...lunatics.map(l => `白谱 ${showId(l.id)}：LUN ${showConstant("LUN", l)}${l.deleted ? "（已删除）" : ""}`)].join("\n");
+    const chartLine = main.map(chart => `${chart.difficulty} ${showConstant(chart.difficulty, chart)}`).join(" / ") +
+      lunatics.map(l => `（${showId(l.id)}：LUN ${showConstant("LUN", l)}${l.deleted ? "，已删除" : ""}）`).join("");
+    return chartLine ? `${title}\n${chartLine}` : title;
   });
   const sections = [`查到 ${r.total} 首：`, entries.join("\n\n")];
   if (r.fuzzy) sections.push("以上是曲名比较接近的候选。");
