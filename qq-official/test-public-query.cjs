@@ -132,12 +132,19 @@ test("组合筛选针对同一张谱面；等级与定数分别比较", () => {
   assert.throws(() => run([filter("level", "eq", "14.4")]), /等级/);
 });
 
-test("特殊 LUNATIC 0 的未定定数不等于0，也不满足不等于条件", () => {
-  const song = catalog.songs.find(s => s.meta.name === "Perfect Shining!!" && s.LUN?.const_status === "unknown");
+test("0 级白谱的定数就是 0；真正未知的字段仍然不满足任何比较", () => {
+  // 0 级白谱显示 LUN 0，不写「无定数」。《Perfect Shining!!》那张在曲库里记的是「定数未知」，也按 0 算。
+  const song = catalog.songs.find(s => s.meta.name === "Perfect Shining!!" && String(s.LUN?.level) === "0");
   const filters = [filter("title", "eq", song.meta.name), filter("difficulty", "eq", "LUN")];
-  assert.equal(run([...filters, filter("constant", "gte", 0)]).total, 0);
-  assert.equal(run([...filters, filter("constant", "ne", 0)]).total, 0);
-  assert.match(formatResult(run(filters, { select: ["title", "constant"] })), /无定数/);
+  const lunIds = extra => run([...filters, extra], { entity: "charts", select: ["title", "botId"] }).entries.flatMap(e => e.rows.map(r => r.botId));
+  assert.deepEqual(lunIds(filter("constant", "eq", 0)), [8003]);
+  assert.deepEqual(lunIds(filter("constant", "ne", 0)), [8091], "两张白谱各算各的：曲库漏收的 13+ 那张 8091 定数 13.8");
+  assert.match(formatResult(run(filters, { select: ["title", "constant"] })), /^定数：LUN 0 \/ LUN 13\.8$/m);
+  assert.doesNotMatch(formatResult(run([filter("title", "eq", "Gate of Doom")], { select: ["title", "constant"] })), /无定数/);
+  // 未知就是未知：曲库没记绿谱谱师，等于、不等于都不算满足。
+  const bas = [filter("title", "eq", "Gate of Doom"), filter("difficulty", "eq", "BAS")];
+  assert.equal(run([...bas, filter("designer", "eq", "ロシェ＠ペンギン")]).total, 0);
+  assert.equal(run([...bas, filter("designer", "ne", "ロシェ＠ペンギン")]).total, 0);
 });
 
 test("BPM/谱师/物量等数据库字段可组合，按谱面排序和计数不重复", () => {
@@ -257,4 +264,64 @@ test("问歌曲 ID 返回分表短 ID，明确问官方曲目 ID 仍返回官方
   assert.deepEqual(byShortId.entries.map(entry => entry.title), [song]);
   const official = run([filter("title", "eq", song)], { select: ["title", "officialId"] });
   assert.match(formatResult(official), /官方曲目ID：601129/);
+});
+
+test("白谱是单独一条曲目：LUN 那一行给白谱自己的 ID", () => {
+  // 公开曲库把白谱并在本曲里，原先每一行都给本曲的 ID，问「Gate of Doom 白谱的 id」会答成 39，其实是 8015。
+  const gate = run([filter("title", "eq", "Gate of Doom")], { select: ["title", "botId"] });
+  assert.deepEqual(gate.entries[0].rows.map(r => `${r.difficulty}:${r.botId}`), ["BAS:39", "ADV:39", "EXP:39", "MAS:39", "LUN:8015"]);
+  assert.match(formatResult(gate), /ID：39（BAS\/ADV\/EXP\/MAS） \/ 8015（LUN）/, "两个 ID 要注明各管哪几张谱面");
+  assert.deepEqual(run([filter("botId", "eq", 8015)], { entity: "charts", select: ["title", "difficulty"] }).entries.map(e => `${e.title} ${e.rows[0].difficulty}`), ["Gate of Doom LUN"]);
+  assert.ok(!queryMismatch(validateQuery({ filters: [filter("botId", "eq", 8015)], select: ["title"] }), "id8015是什么歌"), "白谱的 ID 也是认识的 ID");
+  // 主曲库缺录、从内部曲库补上的白谱，ID 就是那条内部曲目本身。
+  const umapi = run([filter("title", "eq", "うまぴょい伝説"), filter("difficulty", "eq", "LUN")], { select: ["title", "botId"] });
+  assert.deepEqual(umapi.entries[0].rows.map(r => r.botId), [8084]);
+  // 只有一个 ID 的歌照旧只写一个。
+  assert.match(formatResult(run([filter("title", "eq", "光焔のラテラルアーク")], { select: ["title", "botId"] })), /ID：728$/m);
+});
+
+test("游戏数据里的每张白谱都在表里，一张一行；曲库漏收的当补充谱面，连歌都没有的单独成一首", () => {
+  const internal = require("../ongeki-music-internal.json");
+  for (const song of internal.filter(s => s.isLunatic)) {
+    const found = run([filter("botId", "eq", song.id)], { entity: "charts", select: ["title", "botId"] });
+    assert.equal(found.total, 1, `${song.id} ${song.name}`);
+    assert.deepEqual(found.entries[0].rows.map(r => `${r.difficulty}:${r.botId}`), [`LUN:${song.id}`], `${song.id} ${song.name}`);
+  }
+  // 连歌都不在公开曲库里的：曲名搜索也找得到，标已删除，版本照曲库的写法补上「オンゲキ」前缀。
+  const hibachi = run([filter("title", "search", "緋蜂")], { select: ["title", "botId", "constant", "version", "deleted"] });
+  assert.deepEqual(hibachi.entries.map(e => e.rows.map(r => `${r.difficulty}:${r.botId}:${r.constant}:${r.version}:${r.deleted}`)), [["LUN:8042:14.7:オンゲキ SUMMER:true"]]);
+  assert.match(formatResult(hibachi), /已删除记录/);
+  assert.equal(run([filter("version", "eq", "オンゲキ SUMMER"), filter("botId", "eq", 8042)]).total, 1);
+  // 0 级白谱以前因为等级不在 1–15 里，配不上对手。
+  assert.deepEqual(run([filter("title", "eq", "Gate of Doom"), filter("difficulty", "eq", "LUN")], { select: ["title", "opponent"] }).entries[0].rows[0].opponent, ["三角 葵"]);
+});
+
+test("游戏数据里的每一条曲目都在表里：曲库没收的已删歌整首补上，跟 /搜索歌曲 一样多", () => {
+  const internal = require("../ongeki-music-internal.json");
+  for (const song of internal) {
+    const rows = run([filter("botId", "eq", song.id)], { entity: "charts", select: ["title", "botId"] }).entries.flatMap(e => e.rows);
+    assert.ok(rows.length >= 1, `${song.id} ${song.name}`);
+  }
+  // 本曲和白谱都不在曲库里：合成一首，本曲四张、白谱一张，都是补充谱面、标已删除。
+  const japari = run([filter("title", "search", "ジャパリパーク")], { entity: "charts", select: ["title", "botId", "deleted"] }).entries.flatMap(e => e.rows);
+  assert.deepEqual(japari.map(r => `${r.difficulty}:${r.botId}:${r.supplemental}:${r.deleted}`),
+    ["BAS:37:true:true", "ADV:37:true:true", "EXP:37:true:true", "MAS:37:true:true", "LUN:8022:true:true"]);
+  // ユーフィリア的《Hand in Hand》按自己的曲师成一首，对手是它自己的。
+  const euphyllia = run([filter("title", "eq", "Hand in Hand"), filter("artist", "contains", "ユーフィリア")], { entity: "charts", select: ["title", "botId", "opponent", "deleted"] }).entries.flatMap(e => e.rows);
+  assert.deepEqual([...new Set(euphyllia.map(r => `${r.botId}:${r.opponent.join("/")}:${r.deleted}`))], ["212:日向 美海:true"]);
+  assert.equal(euphyllia.length, 4);
+});
+
+test("同名不同曲的歌不互相借对手；曲库里只剩白谱的已删歌，绿黄红紫谱照样当补充谱面列出", () => {
+  // 原来按曲名去配：《Hand in Hand》（livetune）每个难度多出一行带着ユーフィリア版（id212）的对手，
+  // 三首《Singularity》各自带着另外两首的对手。
+  const opponents = (title, artist) => [...new Set(run([filter("title", "eq", title), filter("artist", "contains", artist)], { entity: "charts", select: ["title", "opponent"] })
+    .entries.flatMap(e => e.rows.flatMap(r => r.opponent)))];
+  assert.deepEqual(opponents("Hand in Hand", "livetune"), ["初音ミク"]);
+  assert.deepEqual(opponents("Singularity", "ETIA."), ["光"]);
+  assert.deepEqual(opponents("Singularity", "technoplanet"), ["井之原 小星"]);
+  assert.deepEqual(opponents("Realize!", "i☆Ris"), ["真中 らぁら"]);
+  // 《回レ！雪月花》在公开曲库里只剩白谱（8058），本曲（id25）的四张谱面要从游戏数据补上。
+  const setsugekka = run([filter("title", "eq", "回レ！雪月花")], { entity: "charts", select: ["title", "botId"] }).entries.flatMap(e => e.rows);
+  assert.deepEqual(setsugekka.map(r => `${r.difficulty}:${r.botId}:${r.supplemental}`), ["BAS:25:true", "ADV:25:true", "EXP:25:true", "MAS:25:true", "LUN:8058:false"]);
 });

@@ -7,7 +7,7 @@ const internal = require("../ongeki-music-internal.json");
 const { loadCharacters, normalize: titleKey } = require("../chat-core/knowledge.cjs");
 const path = require("node:path");
 const songSearch = require("./song-search.cjs");
-const { botSongId } = require("./song-id.cjs");
+const { botChartId, catalogCoverage } = require("./song-id.cjs");
 const { randomInt } = require("node:crypto");
 const { Converter } = require("opencc-js");
 const characters = loadCharacters(path.join(__dirname, "../chat-core"));
@@ -184,12 +184,9 @@ function validateQuery(input) {
   return { filters, entity, select: [...new Set(["title", ...select, ...(entity === "charts" ? ["difficulty"] : [])])], mode, page, sort, selection };
 }
 
-const internalByTitle = new Map();
-for (const item of internal) {
-  const key = titleKey(item.name);
-  if (!internalByTitle.has(key)) internalByTitle.set(key, []);
-  internalByTitle.get(key).push(item);
-}
+const internalById = new Map(internal.map(item => [item.id, item]));
+const { extraLunatics, attachedBase, uncataloged } = catalogCoverage(catalog.songs);
+const SUPPLEMENT_LEVEL = /^(?:[1-9]|1[0-5])\+?$/;
 const rolesByTitle = new Map();
 for (const char of characters?.characters || []) {
   for (const song of char.songs) {
@@ -201,30 +198,64 @@ for (const char of characters?.characters || []) {
     if (char.personal && titleKey(char.personal.title) === key) entry.personalFor.push(char.name);
   }
 }
-const rows = catalog.songs.flatMap((song, songIndex) => DIFFICULTIES.flatMap((difficulty, i) => {
-  // LUN variants can have a different boss: never join all versions into one list.
-  const variants = (internalByTitle.get(titleKey(song.meta.name)) || []).filter(v => Boolean(v.isLunatic) === (difficulty === "LUN") && /^(?:[1-9]|1[0-5])\+?$/.test(String(v.level?.[i])));
-  const catalogChart = song[difficulty];
-  if (!catalogChart?.has_chart && !variants.length) return [];
-  const roles = rolesByTitle.get(titleKey(song.meta.name)) || {};
-  return (variants.length ? variants : [null]).map(v => {
-    // Supplement only charts absent from the primary snapshot. An explicitly
-    // unknown constant in an existing chart stays unknown, not overwritten.
-    const chart = catalogChart?.has_chart ? catalogChart : { level: v.level[i], const: v.const?.[i], const_status: numeric(v.const?.[i]) > 0 ? "known" : "unknown", notes_all: v.noteTotal?.[i], bell: v.bellTotal?.[i], notesdesigner: v.creator?.[i] };
-    return {
-      songIndex, songKey: `${textKey(song.meta.name)}\0${textKey(song.meta.artist)}`,
-      chartKey: `${textKey(song.meta.name)}\0${textKey(song.meta.artist)}\0${difficulty}`, title: song.meta.name,
-      supplemental: !catalogChart?.has_chart,
-      artist: song.meta.artist, genre: song.meta.genre, version: song.meta.song_release_version,
-      release: song.meta.song_release, bpm: numeric(song.meta.bpm), deleted: Boolean(song.meta.is_deleted),
-      botId: botSongId(song), officialId: String(song.meta.official_id ?? ""), difficulty, level: chart.level,
-      constant: chart.const_status === "known" ? numeric(chart.const) : null,
-      notes: numeric(chart.notes_all), bells: numeric(chart.bell), designer: chart.notesdesigner,
-      opponent: v?.boss ? [v.boss] : [], bossLevel: numeric(v?.bossLevel), attribute: v?.attributeType ?? null,
-      singer: roles.singer || [], originalFor: roles.originalFor || [], personalFor: roles.personalFor || [],
-    };
-  });
-}));
+function songBase(songIndex, { title, artist, genre, version, release, bpm, deleted, officialId }) {
+  const roles = rolesByTitle.get(titleKey(title)) || {};
+  return {
+    songIndex, songKey: `${textKey(title)}\0${textKey(artist)}`, title, artist, genre, version, release, bpm: numeric(bpm), deleted, officialId,
+    singer: roles.singer || [], originalFor: roles.originalFor || [], personalFor: roles.personalFor || [],
+  };
+}
+// Supplement only charts absent from the primary snapshot. An explicitly
+// unknown constant in an existing chart stays unknown, not overwritten.
+const internalChart = (v, i) => ({ level: v.level[i], const: v.const?.[i], const_status: numeric(v.const?.[i]) > 0 ? "known" : "unknown", notes_all: v.noteTotal?.[i], bell: v.bellTotal?.[i], notesdesigner: v.creator?.[i] });
+// 一行一张谱面。对战相手取这张谱面实际对应的那条内部曲目：原来按曲名去配，同名不同曲的歌（《Hand in Hand》
+// 《Singularity》）会把另一首的对手配上来，一首歌的几张白谱（《Perfect Shining!!》）也会互相串。
+function chartRow(base, difficulty, chart, v, botId, supplemental) {
+  return {
+    ...base, supplemental, botId, difficulty, level: chart.level,
+    // 白谱一张一条、ID 各不相同（见 song-id.cjs），同一首歌的几张白谱要算几张谱面，不能并成一张。
+    chartKey: `${base.songKey}\0${difficulty}${difficulty === "LUN" ? `\0${botId}` : ""}`,
+    // 0 级白谱的定数就是 0（游戏数据里 23 张全是）；《Perfect Shining!!》那张在曲库里记成未知，也按 0 算。
+    constant: difficulty === "LUN" && String(chart.level) === "0" ? 0 : chart.const_status === "known" ? numeric(chart.const) : null,
+    notes: numeric(chart.notes_all), bells: numeric(chart.bell), designer: chart.notesdesigner,
+    opponent: v?.boss ? [v.boss] : [], bossLevel: numeric(v?.bossLevel), attribute: v?.attributeType ?? null,
+  };
+}
+const rows = [
+  ...catalog.songs.flatMap((song, songIndex) => {
+    const meta = song.meta;
+    const base = songBase(songIndex, { title: meta.name, artist: meta.artist, genre: meta.genre, version: meta.song_release_version,
+      release: meta.song_release, bpm: meta.bpm, deleted: Boolean(meta.is_deleted), officialId: String(meta.official_id ?? "") });
+    return DIFFICULTIES.flatMap((difficulty, i) => {
+      const found = [];
+      // 白谱单独编号：LUN 那一行给白谱自己的 ID 和对手；其余难度是本曲那条。曲库里只剩白谱的已删歌
+      // （《回レ！雪月花》），本曲是 catalogCoverage 挂上来的那条，它的绿黄红紫谱当补充谱面列出来。
+      const mapped = internalById.get(botChartId(song, difficulty)) ?? null;
+      const own = difficulty === "LUN" ? mapped : attachedBase.get(song) ?? (mapped?.isLunatic ? null : mapped);
+      const botId = own?.id ?? botChartId(song, difficulty);
+      if (song[difficulty]?.has_chart) found.push(chartRow(base, difficulty, song[difficulty], own, botId, false));
+      else if (difficulty !== "LUN" && own && SUPPLEMENT_LEVEL.test(String(own.level?.[i]))) found.push(chartRow(base, difficulty, internalChart(own, i), own, own.id, true));
+      // 曲库漏收的白谱，挂在这首歌下面当补充谱面。
+      if (difficulty === "LUN") for (const extra of extraLunatics.get(song) || []) found.push(chartRow(base, difficulty, internalChart(extra, i), extra, extra.id, true));
+      return found;
+    });
+  }),
+  // 连歌都不在曲库里的（ようこそジャパリパークへ、ユーフィリア的《Hand in Hand》、只有白谱的 No Remorse……）
+  // 从游戏数据整首补上，本曲和白谱都是补充谱面。公开曲库的版本写成「オンゲキ SUMMER」，游戏数据只写「SUMMER」，
+  // 照曲库的写法补上前缀，按版本筛才对得上。
+  ...uncataloged.flatMap(({ base: baseSong, lunatics }, k) => {
+    const head = baseSong ?? lunatics[0];
+    const version = String(head.versionID || "");
+    const base = songBase(catalog.songs.length + k, { title: head.name, artist: head.artistName, genre: head.genre ?? null,
+      version: version && !version.startsWith("オンゲキ") ? `オンゲキ ${version}` : version || null,
+      release: null, bpm: head.bpm, deleted: head.status !== "online", officialId: "" });
+    return [
+      ...(baseSong ? DIFFICULTIES.slice(0, 4).flatMap((difficulty, i) => SUPPLEMENT_LEVEL.test(String(baseSong.level?.[i]))
+        ? [chartRow(base, difficulty, internalChart(baseSong, i), baseSong, baseSong.id, true)] : []) : []),
+      ...lunatics.map(v => chartRow(base, "LUN", internalChart(v, 4), v, v.id, true)),
+    ];
+  }),
+];
 const knownBotIds = new Set(rows.map(row => row.botId));
 const levelValue = v => Number(String(v).replace("+", "")) + (String(v).endsWith("+") ? 0.5 : 0);
 function compare(value, filter) {
@@ -248,11 +279,12 @@ function executeQuery(input, { preview = false, selectionKeys, excludeKeys = [],
   let fuzzy = false;
   const predicates = query.filters.map(f => {
     if (f.op !== "search") return row => compare(row[f.field], f);
-    const first = songSearch.search(f.value);
+    // 连歌都不在曲库里的白谱也要搜得到：它们在这张表里单独成行，官方曲目 ID 是空的。
+    const first = songSearch.search(f.value, { uncataloged: true });
     fuzzy ||= Boolean(first.fuzzy);
     const found = [...(first.matches || [])];
-    for (let page = 2; page <= first.pages; page++) found.push(...songSearch.search(`${f.value} --page ${page}`).matches);
-    const keys = new Set(found.map(s => `${s.meta.official_id}:${s.meta.name}`));
+    for (let page = 2; page <= first.pages; page++) found.push(...songSearch.search(`${f.value} --page ${page}`, { uncataloged: true }).matches);
+    const keys = new Set(found.map(s => `${s.meta.official_id ?? ""}:${s.meta.name}`));
     return row => keys.has(`${row.officialId}:${row.title}`);
   });
   let matched = rows.filter(row => predicates.every(p => p(row)));
@@ -309,7 +341,6 @@ function executeQuery(input, { preview = false, selectionKeys, excludeKeys = [],
 }
 const opLabels = { eq: "＝", ne: "≠", gt: "＞", gte: "≥", lt: "＜", lte: "≤", contains: "包含", prefix: "开头是", suffix: "结尾是", search: "线索", in: "属于" };
 const show = value => Array.isArray(value) ? value.join("、") || "未知" : !known(value) ? "未知" : typeof value === "boolean" ? value ? "是" : "否" : String(value);
-const displayValue = (field, row) => field === "constant" && row.difficulty === "LUN" && String(row.level) === "0" ? "无定数" : show(row[field]);
 function describeQuery(query) {
   return query.filters.length ? query.filters.map(f => `${fields[f.field].label}${opLabels[f.op]}${show(f.value)}`).join("；") : "全部曲目";
 }
@@ -329,8 +360,12 @@ function formatResult(result) {
     lines.push(`《${entry.title}》${entry.rows.every(r => r.deleted) ? "（已删除记录）" : entry.rows.some(r => r.deleted) ? "（含历史记录）" : ""}`);
     for (const field of query.select.filter(f => f !== "title" && f !== "difficulty")) {
       const chartField = ["constant", "level", "notes", "bells", "designer", "opponent", "bossLevel", "attribute"].includes(field);
-      const values = [...new Set(entry.rows.map(r => `${chartField ? r.difficulty + " " : ""}${displayValue(field, r)}`))];
-      lines.push(`${fields[field].label}：${values.join(" / ")}`);
+      const values = [...new Set(entry.rows.map(r => `${chartField ? r.difficulty + " " : ""}${show(r[field])}`))];
+      // 带白谱的歌有两个 ID（本曲 39、白谱 8015），光列「39 / 8015」分不清哪个是哪个，就注上各管哪几张谱面。
+      const labelled = field === "botId" && values.length > 1
+        ? values.map(id => `${id}（${[...new Set(entry.rows.filter(r => show(r.botId) === id).map(r => r.difficulty))].join("/")}）`)
+        : values;
+      lines.push(`${fields[field].label}：${labelled.join(" / ")}`);
     }
     if (query.select.includes("difficulty")) lines.push(`难度：${[...new Set(entry.rows.map(r => r.difficulty))].join(" / ")}`);
     if (entry.rows.some(r => r.supplemental)) lines.push(`补充谱面记录：${[...new Set(entry.rows.filter(r => r.supplemental).map(r => r.difficulty))].join(" / ")}（来自内部曲库快照）`);

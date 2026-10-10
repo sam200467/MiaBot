@@ -61,6 +61,21 @@ assert.deepEqual(core.searchSongs("id2112410").map((song) => song.id), [], "id �
 assert.deepEqual(core.searchSongs("870").map((song) => song.id), [870], "普通的数字 ID 照旧");
 assert.deepEqual(core.searchSongClues("2112410").map((song) => song.id), [665], "/是什么歌 也一样");
 
+// 白谱在游戏数据里是单独一条曲目（8001 起），跟本曲各是各的 ID。群里照着 /搜索歌曲 打
+// /谱面分析 id39 白，回「没有找到符合要求的谱面」—— id39 确实没有白谱，白谱是 id8015。
+// 两条是独立的，查不到照旧，但要提示该查哪条。
+const chartInfo = (query) => {
+  const result = core.searchChartInfo(query);
+  return { matches: result.matches.map((match) => match.song.id), suggestions: result.suggestions.map((song) => song.id) };
+};
+assert.deepEqual(chartInfo("id39 白"), { matches: [], suggestions: [8015] }, "拿本曲的 ID 要白谱：不换过去，提示白谱那条");
+assert.deepEqual(chartInfo("id56 lunatic"), { matches: [], suggestions: [8021] }, "激唱也一样");
+assert.deepEqual(chartInfo("id8015 紫"), { matches: [], suggestions: [39] }, "反过来拿白谱的 ID 要紫谱，提示本曲");
+assert.deepEqual(chartInfo("id8015 白"), { matches: [8015], suggestions: [] }, "查到了就不提示");
+assert.deepEqual(chartInfo("Gate of Doom 白"), { matches: [8015], suggestions: [] }, "按曲名查本来就查得到");
+assert.deepEqual(chartInfo("id36 白"), { matches: [], suggestions: [8003, 8091] }, "《Perfect Shining!!》有两张白谱，两条都提示");
+assert.deepEqual(chartInfo("id870 白"), { matches: [], suggestions: [] }, "真没有白谱的不乱提示");
+
 // 自动补全
 assert.equal(core.songAutocomplete("song", "id870")[0].value, "id870");
 assert.equal(core.songAutocomplete("chartinfo", "id870 紫譜")[0].value, "id870 master");
@@ -159,6 +174,15 @@ assert.equal(core.selectBinding({ email: "o@x", password: "p" }).dataSource, "ot
 
   assert.equal((await core.resolveCapability({}, "free", "chartinfo", "id870 master")).kind, "image");
   assert.equal((await core.resolveCapability({}, "free", "chartinfo", "id870")).kind, "text");
+  // 拿本曲的 ID 要白谱：不出图，提示白谱那条，命令照抄就能用、难度沿用用户自己的写法
+  const otherEntry = await core.resolveCapability({}, "free", "chartinfo", "id39 白");
+  assert.equal(otherEntry.kind, "lines");
+  assert.equal(otherEntry.header, "没有找到符合要求的谱面。");
+  assert.deepEqual(otherEntry.lines, [
+    "是不是其实想查 id8015 的谱面？《Gate of Doom》的白谱单独编号，跟绿黄红紫谱不是同一个 ID。",
+    "/chartinfo id8015 白",
+  ]);
+  assert.deepEqual((await core.resolveCapability({}, "free", "chartinfo", "id870 lunatic")).lines, [], "真没有白谱的照旧只说查不到");
 
   // 算 Rating 不吃位置，自然语序也认；两种写法必须算出同一个结果
   const positional = await core.resolveCapability({}, "free", "calculate", "14.2 1000737 fb ab");

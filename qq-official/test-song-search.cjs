@@ -2,7 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { search, reply } = require("./song-search.cjs");
-const { botSongId } = require("./song-id.cjs");
+const { botSongId, botChartId } = require("./song-id.cjs");
 const { songs: catalogSongs } = require("../ongeki-song-catalog.json");
 
 test("查询、假名归一化和拼写纠错", () => {
@@ -92,18 +92,20 @@ test("单曲显示 Bot ID、曲名和定数，帮助不再宣传条件搜索", (
   assert.equal(search("id728").matches[0].meta.name, "光焔のラテラルアーク");
   assert.equal(search("id380").matches[0].meta.name, "Hand in Hand");
   assert.equal(search("id212").total, 0, "同名但不在公共曲库的 ID 不应错指到另一首歌");
-  assert.match(reply("Perfect Shining!!"), /LUN 无定数/, "特殊的 LUN 0 级不应显示成遗漏定数");
+  assert.match(reply("Perfect Shining!!"), /^白谱 id8003：LUN 0$/m, "特殊的 LUN 0 级不应显示成遗漏定数");
 });
 
 test("搜索列表按首数、空行、Bot ID 和曲名排版", () => {
   const blocks = reply("光").split("\n\n");
-  assert.equal(blocks[0], "查到 5 首：");
-  assert.equal(blocks.length, 6);
+  assert.equal(blocks[0], "查到 6 首：");
+  assert.equal(blocks.length, 7);
+  // 《怒槌～光吉猛修一部謎～》只有白谱、公开曲库里没有，是从游戏数据补进来单独成条的。
   assert.deepEqual(blocks.slice(1).map(block => block.split("\n")[0]), [
     "id1145   電光刹歌",
     "id222   光線チューニング",
     "id728   光焔のラテラルアーク",
     "id1136   光の惑星",
+    "id8025   怒槌～光吉猛修一部謎～（已删除）",
     "id708   キュアリアス光吉古牌　－祭－",
   ]);
   assert.ok(blocks.slice(1).every(block => block.split("\n").length === 2));
@@ -112,6 +114,7 @@ test("搜索列表按首数、空行、Bot ID 和曲名排版", () => {
     "BAS 3 / ADV 6 / EXP 10.7 / MAS 12.8",
     "BAS 5 / ADV 10.4 / EXP 14.2 / MAS 15.3",
     "BAS 3 / ADV 6 / EXP 10.4 / MAS 12.7",
+    "LUN 0",
     "BAS 2 / ADV 7.7 / EXP 10.4 / MAS 13.5",
   ]);
 });
@@ -124,4 +127,63 @@ test("官方曲目 ID 与 Bot ID 分开映射，同名和 LUNATIC 不串曲", ()
   assert.equal(botSongId(byOfficialId("910112")), 8057);
   assert.equal(botSongId(byOfficialId("200761")), 380);
   assert.equal(botSongId(byOfficialId("668300")), 1003);
+});
+
+test("白谱单列自己的 ID：游戏里白谱是单独一条曲目，跟本曲不同 ID", () => {
+  // 群里实测：/搜索歌曲 gate of doom 把 LUN 跟在 id39 后面，照着打 /谱面分析 id39 白 就查不到 ——
+  // 白谱在游戏数据里是 id8015。激唱的白谱是 id8021，也是这样被挂在 id56 下面。
+  assert.equal(reply("gate of doom"), "查到 1 首：\n\nid39   Gate of Doom\nBAS 4 / ADV 7.7 / EXP 10.7 / MAS 13.1\n白谱 id8015：LUN 0");
+  assert.equal(reply("初音ミクの激唱"), "查到 1 首：\n\nid56   初音ミクの激唱\nBAS 4 / ADV 7.7 / EXP 11.3 / MAS 14.2\n白谱 id8021：LUN 14.2");
+  assert.equal(reply("Perfect Shining!!"), "查到 1 首：\n\nid36   Perfect Shining!!\nBAS 3 / ADV 6 / EXP 8 / MAS 11.5\n白谱 id8003：LUN 0\n白谱 id8091：LUN 13.8",
+    "两张白谱都列：曲库那格按物量认出是 0 级的 8003，曲库漏收的 13+ 那张 8091 从游戏数据补上");
+  // 公开曲库里只有白谱的歌，整首的 ID 本来就是白谱的，不用另起一行。
+  assert.equal(reply("Red and Blue and Green"), "查到 1 首：\n\nid8051   Red and Blue and Green\nLUN 0");
+  // 白谱的 ID 也要搜得到这首歌。
+  assert.deepEqual(search("id8015").matches.map(s => s.meta.name), ["Gate of Doom"]);
+  assert.deepEqual(search("8021").matches.map(s => s.meta.name), ["初音ミクの激唱"]);
+});
+
+test("LUN 0 级一律显示「LUN 0」，不写「无定数」也不写「定数未知」", () => {
+  // 曲库给 19 张 0 级白谱里的 18 张记的是「已知定数 0」，《Perfect Shining!!》那张记的却是「定数未知」。
+  const zero = catalogSongs.filter(song => song.LUN?.has_chart && String(song.LUN.level) === "0");
+  assert.ok(zero.length >= 19);
+  for (const song of zero) {
+    const text = reply(`id${botChartId(song, "LUN")}`);
+    assert.match(text, /LUN 0$/m, song.meta.name);
+    assert.doesNotMatch(text, /无定数|LUN 定数未知/, song.meta.name);
+  }
+});
+
+test("游戏数据里的每一条都搜得到：曲库漏收的挂在那首歌下面，连歌都没有的整首补上", () => {
+  // 公开曲库漏收了 13 张白谱和 86 首已删歌的本曲。用户的要求：搜索要全部囊括进去。
+  const internal = require("../ongeki-music-internal.json");
+  assert.ok(internal.length >= 1294);
+  for (const song of internal) {
+    assert.match(reply(`id${song.id}`), new RegExp(`(^|白谱 )id${song.id}[ ：]`, "m"), `${song.id} ${song.name}`);
+  }
+  // 本曲和白谱都不在曲库里的已删歌，合成一首：本曲领头，白谱单列。
+  assert.equal(reply("ジャパリパーク"), "查到 1 首：\n\nid37   ようこそジャパリパークへ（已删除）\nBAS 3 / ADV 6 / EXP 8 / MAS 11.7\n白谱 id8022：LUN 13.2");
+  // 曲库里只剩白谱（8058）的已删歌，本曲 id25 挂上来领头。
+  assert.equal(reply("回レ！雪月花"), "查到 1 首：\n\nid25   回レ！雪月花（已删除）\nBAS 3 / ADV 6 / EXP 8.4 / MAS 11.8\n白谱 id8058：LUN 14");
+  // 同名不同曲：ユーフィリア那首（id212）单独一条，不会挂到 livetune 那首（id380）下面。
+  assert.equal(reply("Hand in Hand"), "查到 2 首：\n\nid380   Hand in Hand\nBAS 2 / ADV 5 / EXP 8.4 / MAS 11.7\n\nid212   Hand in Hand（已删除）\nBAS 2 / ADV 7 / EXP 8.7 / MAS 12.6");
+  assert.equal(search("ジャパリパーク").total, 0, "查曲绘用的 search() 照旧只认公开曲库");
+  assert.equal(reply("Titania"), "查到 1 首：\n\nid98   Titania\nBAS 5 / ADV 9.7 / EXP 13.2 / MAS 14.9\n白谱 id8158：LUN 0");
+  assert.equal(reply("No Remorse"), "查到 1 首：\n\nid8001   No Remorse（已删除）\nLUN 14");
+  assert.equal(reply("ブリキノダンス"), "查到 1 首：\n\nid150   ブリキノダンス（已删除）\nBAS 2 / ADV 5 / EXP 9 / MAS 11.7\n白谱 id8067：LUN 13.8",
+    "歌已经标了已删除，白谱那行就不再重复标");
+  // 单独成条的只进 /搜索歌曲 的回复：查曲绘拿 search() 去对公开曲库，曲库里没有的要让它走游戏数据那条路。
+  assert.equal(search("No Remorse").total, 0);
+  assert.equal(search("No Remorse", { uncataloged: true }).total, 1);
+  assert.deepEqual(search("id8091").matches.map(s => s.meta.name), ["Perfect Shining!!"], "挂上去的白谱 ID 照样搜得到那首歌");
+});
+
+test("每张公开曲库的白谱都对得上内部曲库里真有这张谱面的那条", () => {
+  const internal = new Map(require("../ongeki-music-internal.json").map(song => [song.id, song]));
+  for (const song of catalogSongs.filter(song => song.LUN?.has_chart)) {
+    const id = botChartId(song, "LUN");
+    assert.ok(Number.isInteger(id), song.meta.name);
+    assert.equal(String(internal.get(id).level[4]), String(song.LUN.level), song.meta.name);
+  }
+  assert.equal(botChartId(catalogSongs.find(song => song.meta.name === "Gate of Doom"), "MAS"), 39, "其他难度照旧是本曲的 ID");
 });

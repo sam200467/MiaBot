@@ -3,7 +3,7 @@
 // Public metadata only: never consult player bindings or send a model-written result.
 const { songs } = require("../ongeki-song-catalog.json");
 const core = require("../mia-core.cjs");
-const { botSongId } = require("./song-id.cjs");
+const { botSongId, botChartId, catalogCoverage } = require("./song-id.cjs");
 // 两级归一化。**符号不能在唯一那一级里抹掉**：曲名里真的有符号，而 `∀` 这种
 // 整条曲名就是一个符号的，抹完是空串 —— 空串 includes 一切，查询词抹成空串又会被
 // 下面判成「没给线索」，于是这首歌谁也搜不到。所以第一级保留符号。
@@ -14,7 +14,52 @@ const normalize = value => core.normalizeSongQuery(value)
 // 「ウキウキCandy」要能搜到《ウキウキ☆Candy!》。**只在前一级没结果时兜底**，
 // 两级同时用会把这个宽松度换成另一批噪声。
 const squash = value => normalize(value).replace(/\p{S}/gu, "");
-const index = songs.map(song => ({ song, title: normalize(song.meta.name), squashed: squash(song.meta.name) }));
+
+// 游戏数据里的每一条都要搜得到（见 song-id.cjs 的 catalogCoverage）。一条搜索结果是玩家眼里的一首歌：
+// 标题行是本曲的 ID，主行是本曲的谱面；白谱一张一行，各写各的 ID（《Gate of Doom》本曲 39、白谱 8015）。
+// 曲库漏收的白谱、曲库只剩白谱时的本曲，都挂到曲库那条下面；连歌都不在曲库里的已删歌，从游戏数据整首补上。
+const { extraLunatics, attachedBase, uncataloged } = catalogCoverage(songs);
+const BASE_DIFFICULTIES = ["BAS", "ADV", "EXP", "MAS"];
+const hasLevel = level => level != null && String(level) !== "-";
+const internalChart = (entry, index) => ({ level: entry.level[index], value: entry.const[index], known: Number(entry.const[index]) >= 0 });
+const internalBase = entry => BASE_DIFFICULTIES.flatMap((difficulty, i) => hasLevel(entry.level[i]) ? [{ difficulty, ...internalChart(entry, i) }] : []);
+
+function makeEntry(song, id, main, lunatics) {
+  lunatics.sort((a, b) => (a.id ?? Infinity) - (b.id ?? Infinity));
+  // 白谱的 ID 也算这首歌的 ID：「id8015」要搜得到《Gate of Doom》，「id8091」要搜得到《Perfect Shining!!》。
+  return { song, title: normalize(song.meta.name), squashed: squash(song.meta.name), id, main, lunatics, ids: [id, ...lunatics.map(l => l.id)] };
+}
+
+function catalogEntry(song) {
+  const base = attachedBase.get(song);
+  const id = base ? base.id : botSongId(song);
+  const lunId = song.LUN?.has_chart ? botChartId(song, "LUN") : id;
+  const catalogChart = d => ({ difficulty: d, level: song[d].level, value: song[d].const, known: song[d].const_status === "known" });
+  // 曲库里只剩白谱的已删歌（《回レ！雪月花》），主行是挂上来的本曲；白谱 ID 跟本曲不同时，白谱单列一行。
+  const main = base ? internalBase(base)
+    : [...BASE_DIFFICULTIES, "LUN"].filter(d => song[d]?.has_chart && !(d === "LUN" && lunId !== id)).map(catalogChart);
+  const lunatics = [
+    ...(song.LUN?.has_chart && lunId !== id ? [{ id: lunId, ...catalogChart("LUN"), deleted: false }] : []),
+    ...(extraLunatics.get(song) || []).map(other => ({ id: other.id, ...internalChart(other, 4), deleted: other.status !== "online" && !song.meta.is_deleted })),
+  ];
+  return makeEntry(song, id, main, lunatics);
+}
+
+// 曲库里连这首歌都没有的，照曲库的格式造一条，检索不用分两套。本曲领头；没有本曲的，第一张白谱领头，LUN 写在主行。
+function uncatalogedEntry({ base, lunatics }) {
+  const head = base ?? lunatics[0];
+  const song = { meta: { official_id: null, name: head.name, artist: head.artistName, is_deleted: head.status !== "online" } };
+  const main = base ? internalBase(base) : [{ difficulty: "LUN", ...internalChart(head, 4) }];
+  const rest = (base ? lunatics : lunatics.slice(1))
+    .map(other => ({ id: other.id, ...internalChart(other, 4), deleted: other.status !== "online" && !song.meta.is_deleted }));
+  return makeEntry(song, head.id, main, rest);
+}
+
+const catalogIndex = songs.map(catalogEntry);
+// 单独成条的只进 /搜索歌曲 的回复（和美亚查曲库）。查曲绘拿 search() 的结果去对公开曲库，这种条目塞进去，
+// 它就不走「曲库没有就按游戏数据找、用本地曲绘缓存」那条路了。
+const fullIndex = [...catalogIndex, ...uncataloged.map(uncatalogedEntry)];
+const entryBySong = new Map(fullIndex.map(entry => [entry.song, entry]));
 const SEARCH_SPEC = { name: "songsearch", label: "搜索本地音击歌曲资料（不是个人成绩）", argHint: "只填曲名线索、别名或 id；可加 --page 2 翻页；不支持前缀或等级条件语法；无需绑定", needsBinding: false };
 
 function distance(a, b) {
@@ -27,7 +72,7 @@ function distance(a, b) {
   return row[b.length];
 }
 
-function search(raw) {
+function search(raw, { uncataloged = false } = {}) {
   let query = String(raw || "").normalize("NFKC").trim();
   const pageMatch = query.match(/\s+--page\s+(\d+)$/i);
   const page = pageMatch ? Math.max(1, Number(pageMatch[1])) : 1;
@@ -39,11 +84,11 @@ function search(raw) {
   // 去符号的那一级可能是**空串**（查询词整个都是符号，比如「☆」）。空串 includes 一切，
   // 直接拿去匹配会把整库倒出来，所以那一支必须判非空 —— 这正是原代码要拦的东西。
   const squashedNeedle = squash(query);
-  const pool = index;
+  const pool = uncataloged ? fullIndex : catalogIndex;
   // 数字跟 mia-core 的 searchSongs 同一套规矩：「id870」只认 ID；光是一串数字先当 ID，跟它完全相同的
   // 曲名（《39》《2112410403927243233368》）一起列出；两样都不是，就当曲名片段往下找。
   const idMatch = query.match(/^(id\s*)?(\d+)$/i);
-  const byId = idMatch ? pool.filter(({ song }) => botSongId(song) === Number(idMatch[2])) : [];
+  const byId = idMatch ? pool.filter(({ ids }) => ids.includes(Number(idMatch[2]))) : [];
   const sameTitle = idMatch && !idMatch[1] ? pool.filter(item => item.title === needle && !byId.includes(item)) : [];
   const asNumber = Boolean(idMatch && (idMatch[1] || byId.length || sameTitle.length));
   const aliasTitles = asNumber ? null : new Set(core.searchSongs(query).map(s => normalize(s.name)));
@@ -72,21 +117,22 @@ function search(raw) {
 }
 
 function reply(query) {
-  const r = search(query);
+  const r = search(query, { uncataloged: true });
   if (r.usage) return "给我一点曲名线索吧♪\n/搜索歌曲 サド\n也能用别名或 id；结果多时加 --page 2 翻页。";
   if (!r.total) return "本地音击曲库里没有找到匹配这个关键词的歌。换一小段曲名试试？";
   if (r.page > r.pages) return `这一页没有结果，一共只有 ${r.pages} 页。`;
+  const showId = id => id == null ? "ID待核实" : `id${id}`;
+  // 0 级白谱的定数就是 0。先判它：《Perfect Shining!!》那张在曲库里记的是「定数未知」，不能显示成漏填。
+  const showConstant = (difficulty, { level, value, known }) => difficulty === "LUN" && String(level) === "0" ? 0
+    : known && value != null ? value : "定数未知";
+  // 白谱在游戏里是单独一条曲目（见 song-id.cjs）。ID 跟本曲不同就单列一行，不然用户会拿本曲的 ID 去查白谱，
+  // 照着打「/谱面分析 id39 白」—— 那是一张不存在的谱面。
   const entries = r.matches.map(song => {
-    const id = botSongId(song);
-    const title = `${id == null ? "ID待核实" : `id${id}`}   ${song.meta.name}${song.meta.is_deleted ? "（已删除）" : ""}`;
-    const constants = ["BAS", "ADV", "EXP", "MAS", "LUN"].filter(d => song[d]?.has_chart)
-      .map(d => {
-        const chart = song[d];
-        const value = chart.const_status === "known" && chart.const != null ? chart.const
-          : d === "LUN" && String(chart.level) === "0" ? "无定数" : "定数未知";
-        return `${d} ${value}`;
-      }).join(" / ");
-    return constants ? `${title}\n${constants}` : title;
+    const { id, main, lunatics } = entryBySong.get(song);
+    const title = `${showId(id)}   ${song.meta.name}${song.meta.is_deleted ? "（已删除）" : ""}`;
+    const mainLine = main.map(chart => `${chart.difficulty} ${showConstant(chart.difficulty, chart)}`).join(" / ");
+    return [title, ...(mainLine ? [mainLine] : []),
+      ...lunatics.map(l => `白谱 ${showId(l.id)}：LUN ${showConstant("LUN", l)}${l.deleted ? "（已删除）" : ""}`)].join("\n");
   });
   const sections = [`查到 ${r.total} 首：`, entries.join("\n\n")];
   if (r.fuzzy) sections.push("以上是曲名比较接近的候选。");

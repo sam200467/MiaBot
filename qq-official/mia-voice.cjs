@@ -100,6 +100,7 @@ const MIA_HINTS = Object.freeze({
   ],
 
   chartInfoUsage: "还差一个难度啦～像 /谱面分析 id870 master，或者 /谱面分析 初音ミクの激唱 lunatic。绿黄红紫白，美亚都认得。",
+  chartInfoCommand: "/谱面分析",
   levelUsage: "等级要这样递给美亚：/等级 14、/等级 14+、/等级 14.1 或 /等级 ABFB；想翻页就在后面加 1 到 99。",
   constantUsage: "给美亚一个 0 到 20 的数嘛，整数或一位小数都行——比如 /定数表 14.2。",
   calculateUsage: "四样都要有哦：/计算 <定数> <技术分> <铃铛 none/fb> <连击 none/fc/ab/ab-plus>。比如 /计算 14.2 1000737 fb none。",

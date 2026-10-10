@@ -53,6 +53,26 @@ test("数字曲名：/单曲 打曲名片段就能出图；数字同时对上 ID
   });
 });
 
+test("谱面分析：拿本曲的 ID 要白谱不出图，提示白谱那条，给的命令照抄就能用", async () => {
+  // 群里实测：照着 /搜索歌曲 打 /谱面分析 id39 白，只回「没有找到符合要求的谱面」。白谱是单独的 id8015，
+  // 跟 id39 各是各的 —— 不替人换过去，但要告诉他该查哪条。
+  const drawn = [];
+  await run({}, {
+    generateChartInfo: async (config, match) => { drawn.push(match.song.id); return { name: "ci.png", buffer: Buffer.from("png"), meta: {} }; },
+  }, async ({ commands, sent }) => {
+    await commands.handleCommand(groupEvent("/谱面分析 id39 白"), parseCommand("/谱面分析 id39 白"));
+    assert.deepEqual(drawn, []);
+    assert.equal(sent.at(-1).text.trimEnd(), [
+      "没有找到符合要求的谱面。",
+      "是不是其实想查 id8015 的谱面？《Gate of Doom》的白谱单独编号，跟绿黄红紫谱不是同一个 ID。",
+      "/谱面分析 id8015 白",
+    ].join("\n"));
+    await commands.handleCommand(groupEvent("/谱面分析 id8015 白", { userId: "U3" }), parseCommand("/谱面分析 id8015 白"));
+    assert.ok(await waitUntil(() => drawn.length === 1), "照着提示打就出图");
+    assert.deepEqual(drawn, [8015]);
+  });
+});
+
 // ── 夹具 ────────────────────────────────────────────────────────────
 // 每个用例一份独立的临时目录：别名库是 mia-core 的模块级单例，
 // 让它们各自指向自己的目录，用例之间就不会串。

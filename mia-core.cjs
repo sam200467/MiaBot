@@ -232,7 +232,7 @@ function parseChartInfoQuery(value) {
   if (!match) return null;
   const difficultyId = CHART_INFO_DIFFICULTY_ALIASES.get(match[2].toLowerCase());
   if (difficultyId === undefined) return null;
-  return { songQuery: match[1].trim(), difficultyId, difficultyName: CHART_INFO_DIFFICULTY_NAMES[difficultyId] };
+  return { songQuery: match[1].trim(), difficultyId, difficultyName: CHART_INFO_DIFFICULTY_NAMES[difficultyId], difficultyWord: match[2] };
 }
 
 function songHasChartDifficulty(song, difficultyId) {
@@ -245,13 +245,24 @@ function songHasChartDifficulty(song, difficultyId) {
     Number.isFinite(constant) && constant >= 0 && Number.isFinite(notes) && notes > 0;
 }
 
+// 游戏数据里白谱是单独一条曲目（8001 起），跟本曲各是各的 ID：《Gate of Doom》本曲 id39、白谱 id8015。
+// 拿本曲的 ID 要白谱（或反过来）查不到是对的，但得告诉用户该查哪条：同曲名同曲师、白谱与否正相反、
+// 又真有这个难度的那条。只在一张都没对上时才给，查到了的就不拿另一条去打扰。
+function chartInfoSuggestions(songs, difficultyId) {
+  const same = (a, b) => String(a ?? "").normalize("NFKC").trim() === String(b ?? "").normalize("NFKC").trim();
+  return INTERNAL_SONGS.filter((other) => songHasChartDifficulty(other, difficultyId) && songs.some((song) =>
+    Boolean(other.isLunatic) !== Boolean(song.isLunatic) && same(other.name, song.name) && same(other.artistName, song.artistName)))
+    .sort((a, b) => Number(a.id) - Number(b.id));
+}
+
 function searchChartInfo(value) {
   const parsed = parseChartInfoQuery(value);
-  if (!parsed) return { parsed: null, matches: [] };
-  const matches = searchSongs(parsed.songQuery)
+  if (!parsed) return { parsed: null, matches: [], suggestions: [] };
+  const songs = searchSongs(parsed.songQuery);
+  const matches = songs
     .filter((song) => songHasChartDifficulty(song, parsed.difficultyId))
     .map((song) => ({ song, difficultyId: parsed.difficultyId, difficultyName: parsed.difficultyName }));
-  return { parsed, matches };
+  return { parsed, matches, suggestions: matches.length ? [] : chartInfoSuggestions(songs, parsed.difficultyId) };
 }
 
 // Candidate values use IDs so duplicate titles and shortened labels stay unambiguous.
@@ -329,6 +340,17 @@ function chartInfoMatchLines(matches) {
   return matches.map(({ song, difficultyName }) =>
     `id${song.id}　${escapeText(song.name)}　[${difficultyName}]　— ${escapeText(song.artistName)}`
   );
+}
+
+// 「是不是其实想查 id8015 的谱面」：说清白谱单独编号，再给照抄就能用的整条命令。
+function chartInfoSuggestionLines({ parsed, suggestions }) {
+  if (!suggestions?.length) return [];
+  const titles = [...new Set(suggestions.map((song) => "《" + escapeText(song.name) + "》"))].join("、");
+  return [
+    "是不是其实想查 " + suggestions.map((song) => "id" + song.id).join(" 或 ") + " 的谱面？" +
+      titles + "的白谱单独编号，跟绿黄红紫谱不是同一个 ID。",
+    ...suggestions.map((song) => pickHint(capabilityHints.chartInfoCommand) + " id" + song.id + " " + parsed.difficultyWord),
+  ];
 }
 
 function songMatchLines(matches) {
@@ -881,6 +903,8 @@ let capabilityHints = Object.freeze({
   ],
   helpText: "发送 `/help` 查看 MiaBot 的功能清单。",
   chartInfoUsage: "请在曲名或 Song ID 后写明难度，例如 `id870 master`、`初音ミクの激唱 lunatic`。支持 BASIC / ADVANCED / EXPERT / MASTER / LUNATIC 及常用缩写。",
+  // 查不到谱面、提示「是不是其实想查 id8015」时，后面那条照抄就能用的命令以它开头。
+  chartInfoCommand: "/chartinfo",
   levelUsage: "请输入显示等级（如 14、14+）、一位小数定数（如 14.1）或 ABFB。",
   constantUsage: "请输入 0–20 的整数或一位小数，例如 14、14.2。",
   calculateUsage: "请给出定数、技术分、铃铛（none 或 fb）和连击（none / fc / ab / ab-plus），例如 14.2 1000737 fb none。",
@@ -1011,7 +1035,7 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
     const result = searchChartInfo(q);
     if (!result.parsed) return text(capabilityHints.chartInfoUsage);
     if (result.matches.length !== 1) {
-      return { kind: "lines", header: result.matches.length ? "找到多张谱面，请用完整 Song ID 明确选择：" : "没有找到符合要求的谱面。", lines: chartInfoMatchLines(result.matches), footer: "" };
+      return { kind: "lines", header: result.matches.length ? "找到多张谱面，请用完整 Song ID 明确选择：" : "没有找到符合要求的谱面。", lines: [...chartInfoMatchLines(result.matches), ...chartInfoSuggestionLines(result)], footer: "" };
     }
     const match = result.matches[0];
     return {
