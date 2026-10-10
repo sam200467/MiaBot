@@ -57,6 +57,9 @@
   "_Markdown": "markdown=true（缺省）时 /搜索歌曲 用 Markdown 发，曲名和白谱是指令链接，点一下把 /谱面分析 填进输入框。机器人没有 Markdown 权限时平台会拒收，自动改发纯文本并记住，不用改这里；想彻底不发 Markdown 就写 false。",
   "markdown": true,
 
+  "_按钮": "keyboard=true（缺省）时 /搜索歌曲 结果不止一页会在下面挂翻页按钮：首页/上一页/下一页/末页是回调按钮，点了直接翻页、群里不多一条指令；页码按钮把「/搜索歌曲 … --page 」填进输入框。平台拒收按钮时自动去掉按钮、正文写回下一页指令并记住；想彻底不发按钮就写 false。",
+  "keyboard": true,
+
   "_限流": "官方有正式频控且失败代价不是封号，所以比 NapCat 版宽松；熔断保留，用于识别平台侧异常。不填用 official-transport.cjs 的默认值。",
   "minSendIntervalMs": 500,
   "jitterMs": 200,

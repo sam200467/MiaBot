@@ -122,9 +122,10 @@ function search(raw, { uncataloged = false } = {}) {
 // （点一下把 command 填进输入框，用户自己按回车），纯文本里只显示 text；{ hint } 只在发 Markdown 时出现。
 // 链接只给曲名和白谱（2026-10-10 定的）：曲名填到「/谱面分析 id36 」为止，难度让用户自己补一个颜色字；
 // 白谱各有各的 ID，难度只能是白，整条命令填好。绿黄红紫不单独做链接，一行里蓝字太多。
+// 结果不止一页时还给出 pager（翻页按钮用）和 pagerLine（正文里写着「下一页：…」的那一行，有按钮时换掉它）。
 function replyLines(query) {
   const r = search(query, { uncataloged: true });
-  const lines = text => text.split("\n").map(line => [line]);
+  const lines = text => ({ lines: text.split("\n").map(line => [line]) });
   if (r.usage) return lines("给我一点曲名线索吧♪\n/搜索歌曲 サド\n也能用别名或 id；结果多时加 --page 2 翻页。");
   if (!r.total) return lines("本地音击曲库里没有找到匹配这个关键词的歌。换一小段曲名试试？");
   if (r.page > r.pages) return lines(`这一页没有结果，一共只有 ${r.pages} 页。`);
@@ -152,12 +153,38 @@ function replyLines(query) {
     if (chartLine.length) out.push(chartLine);
   }
   if (r.fuzzy) out.push([""], ["以上是曲名比较接近的候选。"]);
+  let pager = null, pagerLine = null;
   if (r.pages > 1) {
     const next = `/搜索歌曲 ${r.repeatQuery} --page ${r.page + 1}`;
-    out.push([""], [`第 ${r.page}/${r.pages} 页；`, ...(r.page < r.pages ? ["下一页：", { text: next, command: next }] : ["已到最后一页"])]);
+    pager = { query: r.repeatQuery, page: r.page, pages: r.pages };
+    pagerLine = [`第 ${r.page}/${r.pages} 页；`, ...(r.page < r.pages ? ["下一页：", { text: next, command: next }] : ["已到最后一页"])];
+    out.push([""], pagerLine);
   }
   if (linked) out.push([""], [{ hint: "（点曲名会填入 /谱面分析 和曲目 ID，再补一个难度字：绿/黄/红/紫；点括号里的白谱，回车即可）" }]);
-  return out;
+  return { lines: out, pager, pagerLine };
+}
+
+// 翻页按钮，照「提比不想睡觉」那种排法：首页、上一页、页码、下一页、末页一行。
+// 翻页四个是回调按钮（type 1）：点了平台推 INTERACTION_CREATE，美亚把 data 当这个人发的指令执行，
+// 群里不会多出一条指令消息。页码是指令按钮（type 2，enter=false）：只把「/搜索歌曲 … --page 」
+// 填进输入框，页数让用户自己补。到头的方向不放按钮，免得点了只得到一句「没有这一页」。
+// 字段出处：bot.q.qq.com/wiki 的「消息按钮」。permission.type=2 是所有人可点（搜的是公开曲库）。
+function pagerKeyboard({ query, page, pages }) {
+  const command = `/搜索歌曲 ${query} --page `;
+  const button = (id, label, style, action) => ({
+    id, render_data: { label, visited_label: label, style },
+    action: { permission: { type: 2 }, unsupport_tips: "这个版本的 QQ 不支持按钮，请手动发送翻页指令", ...action },
+  });
+  const jump = (id, label, target) => button(id, label, 1, { type: 1, data: command + target });
+  return {
+    rows: [{
+      buttons: [
+        ...(page > 1 ? [jump("first", "⏮ 首页", 1), jump("prev", "◀ 上一页", page - 1)] : []),
+        button("page", `第${page}/${pages}页`, 0, { type: 2, data: command, enter: false }),
+        ...(page < pages ? [jump("next", "下一页 ▶", page + 1), jump("last", "末页 ⏭", pages)] : []),
+      ],
+    }],
+  };
 }
 
 const plainLine = line => line.map(part => typeof part === "string" ? part : part.text ?? "").join("");
@@ -177,13 +204,15 @@ function markdownLine(line) {
 
 // 纯文本：跟以前逐字一样，提示行不出现（没有链接可点）。
 function reply(query) {
-  return replyLines(query).filter(line => !isHintLine(line)).map(plainLine).join("\n").replace(/\n+$/, "");
+  return replyLines(query).lines.filter(line => !isHintLine(line)).map(plainLine).join("\n").replace(/\n+$/, "");
 }
 
 // 按纯文本长度切块（跟 core.splitLines 同一个规则），每块同时给出 Markdown 和纯文本，
 // Markdown 被拒时传输层用纯文本补发。提示行跟着最后一块走。
+// 翻页那一块另带 keyboard：带按钮发时正文里那行「下一页：…」换成一句提示，
+// 按钮被拒时传输层改发 markdownWithoutKeyboard（原来那行指令链接还在）。
 function replyChunks(query, limit) {
-  const lines = replyLines(query);
+  const { lines, pager, pagerLine } = replyLines(query);
   const hints = lines.filter(isHintLine);
   const body = lines.filter(line => !isHintLine(line));
   while (body.length && plainLine(body[body.length - 1]) === "") body.pop();
@@ -203,10 +232,18 @@ function replyChunks(query, limit) {
   }
   if (current.length) chunks.push(current);
   if (hints.length && chunks.length) chunks[chunks.length - 1].push([""], ...hints);
-  return chunks.map(chunk => ({
-    markdown: chunk.map(markdownLine).join("\n"),
-    text: chunk.filter(line => !isHintLine(line)).map(plainLine).join("\n").replace(/\n+$/, ""),
-  }));
+  return chunks.map(chunk => {
+    const markdown = chunk.map(markdownLine).join("\n");
+    const text = chunk.filter(line => !isHintLine(line)).map(plainLine).join("\n").replace(/\n+$/, "");
+    if (!pager || !chunk.includes(pagerLine)) return { markdown, text };
+    const buttonsHint = `第 ${pager.page}/${pager.pages} 页，点下面的按钮翻页；点页码可以自己填页数`;
+    return {
+      markdown: chunk.map(line => line === pagerLine ? buttonsHint : markdownLine(line)).join("\n"),
+      text,
+      keyboard: pagerKeyboard(pager),
+      markdownWithoutKeyboard: markdown,
+    };
+  });
 }
 
 module.exports = { search, reply, replyChunks, SEARCH_SPEC };

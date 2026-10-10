@@ -1154,3 +1154,47 @@ test("点名要表情不过语义路由：路由把它判成「在问图片」�
     assert.equal(sentExpressions(logs).length, 2, "路由那句话不配表情图");
   } finally { await bot.stop(); await mock.stop(); }
 });
+
+test("翻页按钮：点了先应答，再以 event_id 回复那一页，带着新的按钮；不碰模型、不进绑定会话", async () => {
+  const restore = stubCore();
+  try {
+    const { mock, bot, model } = await setup();
+    bot.settings.c.limits.userCooldownSeconds = 0;
+    const click = (over) => ({
+      id: "itr-" + Math.random().toString(36).slice(2, 8), type: 11, chat_type: 1, scene: "group",
+      group_openid: GROUP, group_member_openid: "U1", timestamp: new Date().toISOString(),
+      data: { type: 11, resolved: { button_id: "next", button_data: "/搜索歌曲 a --page 2" } }, ...over,
+    });
+
+    const first = click();
+    mock.push("INTERACTION_CREATE", first);
+    assert.ok(await mock.waitFor(() => mock.state.sent.length >= 1));
+    assert.deepEqual(mock.state.acks.map((a) => [a.id, a.body.code]), [[first.id, 0]]);
+    const body = mock.state.sent.at(-1).body;
+    assert.equal(body.event_id, first.id);
+    assert.equal(body.msg_id, undefined);
+    assert.equal(body.msg_type, 2);
+    assert.match(body.markdown.content, /第 2\/\d+ 页，点下面的按钮翻页/);
+    assert.deepEqual(body.keyboard.content.rows[0].buttons.map((b) => b.id), ["first", "prev", "page", "next", "last"]);
+    assert.equal(model.calls.length + model.routeCalls.length, 0, "按钮指令不碰模型");
+
+    // 按钮里不是指令的不接；白名单外的群只应答不回复。
+    const before = mock.state.sent.length;
+    mock.push("INTERACTION_CREATE", click({ data: { resolved: { button_data: "随便聊聊" } } }));
+    mock.push("INTERACTION_CREATE", click({ group_openid: "GROUP_OPENID_B" }));
+    assert.ok(await mock.waitFor(() => mock.state.acks.length >= 3));
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(mock.state.sent.length, before);
+    assert.equal(model.calls.length + model.routeCalls.length, 0);
+
+    // 正在群绑定的人点了翻页：翻页照常，那句指令不能被当成邮箱交给绑定流程。
+    mock.push("GROUP_AT_MESSAGE_CREATE", groupEvent({ id: "bind-start", content: "/绑定" }));
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > before));
+    const beforeClick = mock.state.sent.length;
+    mock.push("INTERACTION_CREATE", click());
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > beforeClick));
+    assert.match(mock.state.sent.at(-1).body.markdown?.content || "", /第 2\/\d+ 页/);
+    assert.ok(!sentText(mock).includes("邮箱收到"));
+    await bot.stop(); await mock.stop();
+  } finally { restore(); }
+});

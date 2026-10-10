@@ -246,7 +246,8 @@ function makeCommandSenders(transport, log) {
   return {
     send: (event, text) => transport.sendText(makeTarget(event), text, event.msgId, event.refId),
     // Markdown 发不出去时传输层用 text 补发，见 official-transport.cjs 的 sendMarkdown。
-    sendMarkdown: (event, markdown, text) => transport.sendMarkdown(makeTarget(event), markdown, text, event.msgId, event.refId),
+    // options 里可以带按钮（keyboard），见 official-transport.cjs 的 sendMarkdown。
+    sendMarkdown: (event, markdown, text, options) => transport.sendMarkdown(makeTarget(event), markdown, text, event.msgId, event.refId, options),
     sendImage: (event, image, caption) => {
       const buffer = image?.buffer;
       if (!Buffer.isBuffer(buffer)) throw new Error("出图结果里没有图片数据");
@@ -547,6 +548,8 @@ function createMiaBot(config, deps = {}) {
   async function handleEvent(eventName, d) {
     const event = transport.normalize(eventName, d);
     if (!event) return;
+    // 按钮回调先应答（客户端据此提示「操作成功」），再照普通指令执行按钮里存的那句。
+    if (event.interactionId) await transport.ackInteraction?.(event.interactionId);
 
     // ── 1. 白名单 ───────────────────────────────────────────────────
     // 放在幂等闸**之前**：不在名单里的群整条忽略，连去重表都不该占一格。
@@ -588,6 +591,21 @@ function createMiaBot(config, deps = {}) {
 
     const isDirect = event.type === "c2c";
     let command = commands ? commands.parseCommand(text) : null;
+
+    // 按钮里存的只会是指令（翻页）。不是指令的不接；也不进绑定会话 ——
+    // 正在输邮箱密码的人顺手点了翻页，不能把「/搜索歌曲 … --page 2」当成密码交上去。
+    // 群上下文也不记：这句不是谁在群里说的话。
+    if (event.interactionId) {
+      if (!command?.name) return;
+      event.__target = null;
+      log("收到按钮指令 " + (commands.ALIASES[command.name]?.[0] || command.name) +
+        "（" + event.type + " user=" + String(event.userId).slice(0, 12) + "…）");
+      mark("MIA_BUSY:正在处理指令…");
+      try { await commands.handleCommand(event, command); }
+      catch (error) { log("⚠ 指令处理失败：" + core.safeError(error)); }
+      finally { mark("MIA_BUSY:0"); }
+      return;
+    }
 
     // 群绑定的邮箱/密码必须在进入上下文缓冲、日志或模型之前截走。
     // 会话已经按 user + group 绑定，不会吞掉别人的话或同一用户在别群的消息。

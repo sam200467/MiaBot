@@ -405,7 +405,11 @@ function createMiaCommands(options = {}) {
     if (name === "songsearch") {
       // 曲名和白谱做成指令链接（点一下填好 /谱面分析）。没接 Markdown 发送器的宿主照旧发纯文本。
       if (!sendMarkdown) return sendLines(event, "", songSearch.reply(query).split("\n"));
-      for (const chunk of songSearch.replyChunks(query, LINES_LIMIT)) await sendMarkdown(event, chunk.markdown, chunk.text);
+      // 最后一块多页时带翻页按钮（chunk.keyboard），按钮被拒时传输层改发 markdownWithoutKeyboard。
+      for (const chunk of songSearch.replyChunks(query, LINES_LIMIT)) {
+        await sendMarkdown(event, chunk.markdown, chunk.text,
+          chunk.keyboard ? { keyboard: chunk.keyboard, markdownWithoutKeyboard: chunk.markdownWithoutKeyboard } : undefined);
+      }
       return;
     }
     if (name === "calculate" && !hasFullCalculateArgs(query)) {

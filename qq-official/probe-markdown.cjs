@@ -7,10 +7,13 @@
 // /搜索歌曲 想把曲名和白谱 ID 做成「点一下就把 /谱面分析 填进输入框」的链接，前提就是这里能过。
 //
 // 它做什么：连上网关，等你私聊它或在群里 @ 它一句话（随便说什么），然后用那条消息的
-// 被动凭据回两条 Markdown：
+// 被动凭据回三条 Markdown：
 //   A｜新写法 <qqbot-cmd-input text="…" show="…" />，顺带测换行规则
 //   B｜旧写法 [显示文字](mqqapi://aio/inlinecmd?command=…&enter=false&reply=false)
-// 每条成功还是被拒（含错误码和响应原文）都打在控制台。私聊和群各测一次，测完自动退出。
+//   C｜带按钮（keyboard）：两个回调按钮（type 1）和一个只填输入框的指令按钮（type 2），跟 /搜索歌曲 的翻页同一种
+// 点 C 的回调按钮时平台推 INTERACTION_CREATE：探针先应答（PUT /interactions/{id}），
+// 再用这个事件的 id 当 event_id 回一条（D｜按钮回调的回复）—— 这两步能不能过，正是翻页按钮要的。
+// 每条成功还是被拒（含错误码和响应原文）都打在控制台。私聊和群各测一次、并点过一次回调按钮后自动退出。
 //
 // 用法：
 //   node qq-official/stop-mia.cjs                 # 先停掉正在跑的美亚，免得同一个 AppID 两条网关连接互相挤
@@ -20,6 +23,7 @@
 //   1. 控制台：A、B 是「✔ 接受」还是「✘ 被拒 + 错误码」
 //   2. 手机/电脑 QQ 上：链接显示成蓝字了吗？哪种写法能点？单个换行有没有换行？
 //   3. 点一下链接：输入框里填进去的是什么？**群里有没有自动带上 @美亚**（不带的话群里发出去美亚收不到）
+//   4. C 的按钮显示出来了吗？点「回调」：QQ 提示「操作成功」了吗、有没有收到 D？点「页码」：输入框里是什么、群里带没带 @
 //
 // 凭据只从 config.local.json 读，跟 probe-official.cjs 一样。
 
@@ -58,6 +62,13 @@ const cmdInput = ({ show, command }) => `<qqbot-cmd-input text="${attr(command)}
 const inlineCmd = ({ show, command }) =>
   `[${show}](mqqapi://aio/inlinecmd?command=${encodeURIComponent(command)}&enter=false&reply=false)`;
 
+function probeButton(id, label, style, action) {
+  return {
+    id, render_data: { label, visited_label: label, style },
+    action: { permission: { type: 2 }, unsupport_tips: "这个版本的 QQ 不支持按钮", ...action },
+  };
+}
+
 const MESSAGES = [
   {
     name: "A｜新写法 qqbot-cmd-input",
@@ -81,6 +92,19 @@ const MESSAGES = [
       "BAS 3 / ADV 6 / EXP 8 / MAS 11.5" + inlineCmd(SAMPLE[1]) + inlineCmd(SAMPLE[2]),
     ].join("\n"),
   },
+  {
+    name: "C｜带按钮 keyboard",
+    content: "**Markdown 探针 C**（下面应有一行按钮：点「回调」应提示操作成功并收到 D；点「页码」只把指令填进输入框）",
+    keyboard: {
+      rows: [{
+        buttons: [
+          probeButton("cb1", "◀ 回调一", 1, { type: 1, data: "/搜索歌曲 Ai --page 1" }),
+          probeButton("page", "第2/4页", 0, { type: 2, data: "/搜索歌曲 Ai --page ", enter: false }),
+          probeButton("cb2", "回调二 ▶", 1, { type: 1, data: "/搜索歌曲 Ai --page 3" }),
+        ],
+      }],
+    },
+  },
 ];
 
 console.log("appId :", cfg.appId, "（secret 不回显）");
@@ -90,31 +114,53 @@ console.log("");
 
 const transport = createOfficial({ ...cfg, log: (m) => console.log("[传输] " + m) });
 const tested = new Map();   // "c2c" | "group" -> [{ name, ok, code, message, payload }]
+const clicks = [];          // 回调按钮被点之后：[{ name, ok, code, ... }]，应答和回复各一条
 const KIND = { group: "群聊", c2c: "私聊", channel: "QQ频道" };
+
+const messagePath = (target) => target.kind === "group" ? "/v2/groups/" + target.openid + "/messages" : "/v2/users/" + target.openid + "/messages";
+
+// 调一次接口，成功还是被拒都记进 results 并打出来。
+async function attempt(results, name, method, path, body) {
+  try {
+    await transport.rest(method, path, body);
+    results.push({ name, ok: true });
+    console.log("  ✔ " + name + "：平台接受了");
+  } catch (error) {
+    const r = { name, ok: false, status: error.status, code: error.code, message: String(error.message || error), payload: error.payload };
+    results.push(r);
+    console.log("  ✘ " + name + "：被拒 HTTP " + (r.status ?? "?") + "，err_code " + (r.code ?? "（无）"));
+    console.log("    " + r.message);
+    if (r.payload) console.log("    响应原文：" + JSON.stringify(r.payload).slice(0, 400));
+  }
+}
+
+function maybeFinish() {
+  if (tested.has("c2c") && tested.has("group") && clicks.length) setTimeout(finish, 2000);
+}
 
 async function runFor(target, msgId) {
   const results = [];
   tested.set(target.kind, results);
-  console.log("\n── 在" + KIND[target.kind] + "里回两条 Markdown（凭据 " + msgId + "）──");
+  console.log("\n── 在" + KIND[target.kind] + "里回三条 Markdown（凭据 " + msgId + "）──");
   let seq = 0;
-  for (const { name, content } of MESSAGES) {
-    const body = { msg_type: 2, markdown: { content }, msg_id: msgId, msg_seq: ++seq };
-    const path = target.kind === "group" ? "/v2/groups/" + target.openid + "/messages" : "/v2/users/" + target.openid + "/messages";
-    try {
-      await transport.rest("POST", path, body);
-      results.push({ name, ok: true });
-      console.log("  ✔ " + name + "：平台接受了");
-    } catch (error) {
-      const r = { name, ok: false, status: error.status, code: error.code, message: String(error.message || error), payload: error.payload };
-      results.push(r);
-      console.log("  ✘ " + name + "：被拒 HTTP " + (r.status ?? "?") + "，err_code " + (r.code ?? "（无）"));
-      console.log("    " + r.message);
-      if (r.payload) console.log("    响应原文：" + JSON.stringify(r.payload).slice(0, 400));
-    }
+  for (const { name, content, keyboard } of MESSAGES) {
+    const body = { msg_type: 2, markdown: { content }, msg_id: msgId, msg_seq: ++seq, ...(keyboard ? { keyboard: { content: keyboard } } : {}) };
+    await attempt(results, name, "POST", messagePath(target), body);
     await new Promise((r) => setTimeout(r, 1200));
   }
-  if (tested.has("c2c") && tested.has("group")) setTimeout(finish, 2000);
-  else console.log("\n  还可以去" + (target.kind === "group" ? "私聊" : "群里 @ ") + "它一下，测另一种场景。");
+  if (!clicks.length) console.log("\n  去点一下 C 下面的「回调」按钮，测应答和 event_id 回复。");
+  if (!(tested.has("c2c") && tested.has("group"))) console.log("  还可以去" + (target.kind === "group" ? "私聊" : "群里 @ ") + "它一下，测另一种场景。");
+  maybeFinish();
+}
+
+// 回调按钮被点了：先应答，再用事件 id 当 event_id 回一条。
+async function onClick(shape) {
+  console.log("\n收到按钮回调（" + KIND[shape.type] + "，事件 " + shape.interactionId + "）：按钮数据「" + shape.content + "」");
+  await attempt(clicks, "应答 PUT /interactions/{id}", "PUT", "/interactions/" + encodeURIComponent(shape.interactionId), { code: 0 });
+  await attempt(clicks, "D｜按钮回调的回复（event_id 凭据）", "POST", messagePath({ kind: shape.type, openid: shape.openid }), {
+    msg_type: 0, content: "探针 D：收到按钮「" + shape.content + "」（这条用的是 event_id）", event_id: shape.interactionId, msg_seq: 1,
+  });
+  maybeFinish();
 }
 
 function finish() {
@@ -125,6 +171,12 @@ function finish() {
   for (const [kind, results] of tested) {
     console.log(KIND[kind] + "：");
     for (const r of results) console.log("  " + (r.ok ? "✔" : "✘") + " " + r.name + (r.ok ? "" : "  err_code=" + (r.code ?? "?")));
+  }
+  if (clicks.length) {
+    console.log("按钮回调：");
+    for (const r of clicks) console.log("  " + (r.ok ? "✔" : "✘") + " " + r.name + (r.ok ? "" : "  err_code=" + (r.code ?? "?")));
+  } else if (tested.size) {
+    console.log("按钮回调：没收到。C 被接受了却点了没反应的话，看开放平台里有没有开「消息按钮 / 回调」相关的能力。");
   }
   const all = [...tested.values()].flat();
   if (all.some((r) => r.code === 40034012)) {
@@ -143,6 +195,10 @@ function finish() {
   await transport.start((eventName, d) => {
     const shape = transport.normalize(eventName, d);
     if (!shape || (shape.type !== "c2c" && shape.type !== "group")) return;
+    if (shape.interactionId) {
+      onClick(shape).catch((e) => console.log("  出错：" + (e?.message || e)));
+      return;
+    }
     if (tested.has(shape.type)) return;
     const msgId = String(d?.id || "");
     if (!msgId) return;

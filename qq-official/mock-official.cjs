@@ -21,6 +21,7 @@ function createMockOfficial(options = {}) {
   const state = {
     sent: [],           // 发出去的消息 { path, body }
     uploads: [],        // 富媒体上传 { path, body }
+    acks: [],           // 按钮回调的应答 { id, body }
     identified: [],     // 收到的 Identify / Resume 帧
     heartbeats: 0,
     sockets: new Set(),
@@ -65,6 +66,11 @@ function createMockOfficial(options = {}) {
       if (/^\/v2\/(groups|users)\/[^/]+\/files$/.test(url)) {
         state.uploads.push({ path: url, body });
         return json(res, 200, { file_uuid: "uuid-" + state.uploads.length, file_info: "fileinfo-" + state.uploads.length, ttl: 3600 });
+      }
+      const ack = url.match(/^\/interactions\/([^/]+)$/);
+      if (ack && req.method === "PUT") {
+        state.acks.push({ id: decodeURIComponent(ack[1]), body });
+        return json(res, 200, {});
       }
       if (/^\/v2\/(groups|users)\/[^/]+\/messages$/.test(url) && req.method === "POST") {
         state.sent.push({ path: url, body });

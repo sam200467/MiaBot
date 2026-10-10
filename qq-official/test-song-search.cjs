@@ -219,13 +219,41 @@ test("Markdown 版：「id36 曲名」整段填到「/谱面分析 id36 」，�
   assert.match(many, /text="\/谱面分析 id8025 白" show="id8025   怒槌～光吉猛修一部謎～"/, "只有白谱的歌没得挑，直接填白");
 });
 
-test("Markdown 版：曲名里有半角引号放不进属性值，照原样显示不做链接；翻页的下一页也可点", () => {
+test("Markdown 版：曲名里有半角引号放不进属性值，照原样显示不做链接；按钮被拒时翻页的下一页也可点", () => {
   const { replyChunks } = require("./song-search.cjs");
   const snow = replyChunks("Snow in", 900).map(c => c.markdown).join("\n");
   assert.match(snow, /Snow in "I love you"/);
   assert.doesNotMatch(snow, /show="id\d+   Snow in/);
-  const paged = replyChunks("a", 900).map(c => c.markdown).join("\n");
-  assert.match(paged, /<qqbot-cmd-input text="\/搜索歌曲 a --page 2" show="\/搜索歌曲 a --page 2" reference="false" \/>/);
+  const paged = replyChunks("a", 900).at(-1);
+  assert.match(paged.markdownWithoutKeyboard, /<qqbot-cmd-input text="\/搜索歌曲 a --page 2" show="\/搜索歌曲 a --page 2" reference="false" \/>/);
+  assert.doesNotMatch(paged.markdown, /--page 2/, "带按钮时正文不再写下一页指令");
+  assert.match(paged.markdown, /第 1\/\d+ 页，点下面的按钮翻页/);
+});
+
+test("翻页按钮：翻页是回调按钮，页码只填输入框；到头的方向不放按钮；只有一页不带按钮", () => {
+  const { replyChunks, search } = require("./song-search.cjs");
+  const { pages } = search("a", { uncataloged: true });
+  assert.ok(pages >= 3, "测试需要至少三页");
+  const buttonsOf = query => replyChunks(query, 900).at(-1).keyboard.rows[0].buttons;
+  const summary = buttons => buttons.map(b => [b.id, b.action.type, b.action.data]);
+
+  assert.deepEqual(summary(buttonsOf("a")), [
+    ["page", 2, "/搜索歌曲 a --page "],
+    ["next", 1, "/搜索歌曲 a --page 2"],
+    ["last", 1, `/搜索歌曲 a --page ${pages}`],
+  ]);
+  assert.equal(buttonsOf("a")[0].action.enter, false, "页码只填输入框，页数让用户补");
+  assert.equal(buttonsOf("a")[0].render_data.label, `第1/${pages}页`);
+  assert.deepEqual(summary(buttonsOf("a --page 2")).map(b => b[0]), ["first", "prev", "page", "next", "last"]);
+  assert.equal(buttonsOf("a --page 2")[1].action.data, "/搜索歌曲 a --page 1");
+  assert.deepEqual(summary(buttonsOf(`a --page ${pages}`)).map(b => b[0]), ["first", "prev", "page"]);
+  for (const b of buttonsOf("a --page 2")) assert.equal(b.action.permission.type, 2, "公开曲库，谁都能点");
+
+  const single = replyChunks("Perfect Shining!!", 900);
+  assert.ok(single.every(c => !c.keyboard && !c.markdownWithoutKeyboard));
+  const split = replyChunks("a", 200);
+  assert.ok(split.slice(0, -1).every(c => !c.keyboard), "按钮只跟着最后一块");
+  assert.ok(split.at(-1).keyboard);
 });
 
 test("Markdown 版按纯文本长度切块，每块的纯文本拼起来就是原来的回复", () => {
