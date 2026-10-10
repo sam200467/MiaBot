@@ -1024,3 +1024,42 @@ test("读引用开着：聊天记录里记下她看到的那条引用，不记�
     assert.doesNotMatch(JSON.stringify(r), /CAKE|RKEY|base64/);
   } finally { await bot.stop(); await mock.stop(); }
 });
+
+// ── 回复里的字面 \n ──────────────────────────────────────────────────
+// 线上出现过：读引用那条蛋糕图，美亚的回复中间露出了「\n\n」。模型把换行在 JSON 里多转义了一层，
+// 解出来是反斜杠加 n 两个字符，formatReply 折叠空行时认不出来，就原样发了出去。
+const ESCAPED_REPLY = "呜喵！？这、这是美亚的蛋糕吗！\\n\\n话说回来，这真的是能吃的吗？\\(^o^)/";
+
+test("回复里多转义的换行：发出去的是真换行（照常折成单个换行），会话历史里存的也是真换行", async () => {
+  const fetched = [];
+  const { mock, bot, model } = await setup({ quotedMessage: "read" }, { reply: ESCAPED_REPLY, botDeps: { mediaFetchImpl: imageFetcher(fetched) } });
+  bot.settings.c.limits.userCooldownSeconds = 0;
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", quotedImageEvent());
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > 0));
+    assert.equal(mock.state.sent.at(-1).body.content, "呜喵！？这、这是美亚的蛋糕吗！\n话说回来，这真的是能吃的吗？\\(^o^)/",
+      "颜文字里的反斜杠不是换行，原样留着");
+    // 下一轮她会看到自己上一句：那里留着字面的 \n 的话，她会照着学
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "那你要先拍照吗" }));
+    assert.equal(model.calls.length, 2);
+    const mine = model.calls[1].body.messages.filter((m) => m.role === "assistant" && String(m.content).includes("蛋糕吗"));
+    assert.deepEqual(mine.map((m) => m.content), ["呜喵！？这、这是美亚的蛋糕吗！\n\n话说回来，这真的是能吃的吗？\\(^o^)/"]);
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+test("纯文本降级那条路：模型直接写了字面的 \\n，同样还原成换行再发", async () => {
+  const respond = (content) => ({ ok: true, status: 200, text: async () => JSON.stringify({ choices: [{ message: { content } }] }) });
+  const fetchImpl = async (_, options) => {
+    const body = JSON.parse(options.body);
+    if (String(body.messages[0].content).includes("MIA_SEMANTIC_ROUTER_V1")) return respond(JSON.stringify({ route: "chat" }));
+    // JSON 模式两次都只给空白，逼它走纯文本降级（见 chat.cjs 的 parseReply 上方）
+    if (body.response_format) return respond(" ");
+    return respond("喵哼哼，收到啦！\\n\\n下次再来找美亚玩～");
+  };
+  const { mock, bot } = await setup({}, { botDeps: { fetchImpl } });
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "美亚晚上好" }));
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > 0));
+    assert.equal(mock.state.sent.at(-1).body.content, "喵哼哼，收到啦！\n下次再来找美亚玩～");
+  } finally { await bot.stop(); await mock.stop(); }
+});

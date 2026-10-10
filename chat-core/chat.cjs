@@ -148,9 +148,20 @@ function chooseImage(result, settings, stopped, random=Math.random) {
 // 两次尝试全空白）。所以这里分三层：JSON → 原样重试一次 JSON → 纯文本降级。
 function parseReply(content) {
   for(const candidate of [content,"{"+content]) {
-    try { const result=JSON.parse(candidate); if(result&&typeof result==="object") return result; } catch {}
+    try {
+      const result=JSON.parse(candidate);
+      if(result&&typeof result==="object"){if(typeof result.text==="string")result.text=restoreNewlines(result.text);return result;}
+    } catch {}
   }
   return null;
+}
+// 模型偶尔把换行在 JSON 里多转义一层（写成 \\n），解出来是「反斜杠 + n」两个字符。
+// QQ 那边折叠空行时认不出它，就原样发到群里（线上出现过：读引用那条蛋糕图的回复中间露出了 \n\n）。
+// 所以在解析这一步就还原成真换行：会话历史存的也是这份，留着字面的 \n，她下一轮会照着学。
+// 曲库、剧情、档案、表情清单解码后都没有反斜杠，还原不会误伤；只认 \n 和 \r，
+// 颜文字里别的反斜杠（\(^o^)/）原样留着。
+function restoreNewlines(text) {
+  return String(text).replace(/\\r\\n|\\r|\\n/g,"\n");
 }
 // 工具调用清单由宿主提供（mia-core 的 CAPABILITY_SPECS）：chat.cjs 不认得任何
 // 具体功能，只认「名字 + 一句参数」这个形状，便于两边各自 dispatch。
@@ -686,7 +697,7 @@ async function requestReply(settings, messages, options={}) {
     if(text) {
       const parsed=parseReply(text);
       result=typeof parsed?.text==="string"?{...parsed,degraded:true}
-        :{text,emotion:"neutral",scene:"ordinary",expressionIds:[],degraded:true};
+        :{text:restoreNewlines(text),emotion:"neutral",scene:"ordinary",expressionIds:[],degraded:true};
     }
   }
   if(!result) throw Error("DeepSeek返回格式无效（JSON 两次、纯文本一次都没拿到内容）："+JSON.stringify(String(content??"").slice(0,160)));
@@ -1077,4 +1088,4 @@ function createChat(settings, host, deps={}) {
   }
   return {handle,close(){closed=true;for(const c of controllers)c.abort();sessions.clear();if(!deps.dispatcher)void dispatcher?.close();}};
 }
-module.exports={loadSettings,failureReason,discomfort,chooseImage,requestReply,createChat,normalizeAction};
+module.exports={loadSettings,failureReason,discomfort,chooseImage,requestReply,createChat,normalizeAction,restoreNewlines};

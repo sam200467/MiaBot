@@ -3,6 +3,7 @@
 const publicQuery = require("./public-query.cjs");
 const core = require("../mia-core.cjs");
 const { needsPersonalRecords } = require("../chat-core/personal-recommendation.cjs");
+const { restoreNewlines } = require("../chat-core/chat.cjs");
 const SELF_CHARACTER = "柏木 美亜";
 const ROUTER_MARKER = "MIA_SEMANTIC_ROUTER_V1";
 const REVIEW_MARKER = "MIA_QUERY_REVIEW_V1";
@@ -37,7 +38,8 @@ function validateDecision(value, specs, targets = []) {
   if (value?.route === "media") return clarification("呜喵，这边暂时看不到图片里的内容。你描述一下，或者把图上的文字发来，我再陪你一起看吧。");
   if (value?.route === "query") return { query: publicQuery.validateQuery(value.query) };
   if (value?.route === "clarify" && typeof value.question === "string" && value.question.trim()) {
-    return { ...clarification(value.question.trim().slice(0, 200)), queryState: null };
+    // 追问也是模型写的字，换行同样可能多转义一层（见 chat.cjs 的 restoreNewlines）
+    return { ...clarification(restoreNewlines(value.question).trim().slice(0, 200)), queryState: null };
   }
   if (value?.route !== "action" || !value.action || typeof value.action !== "object") throw Error("invalid route");
   const a = value.action;

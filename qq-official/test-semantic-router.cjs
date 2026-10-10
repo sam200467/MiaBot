@@ -13,6 +13,14 @@ test("结构校验：拒绝未知工具、空参数和陌生对象", () => {
   assert.equal(validateDecision({ route: "action", action: { name: "calculate", args: { constant: 14.2, score: 1000737, bell: "fb", combo: "fc" } } }, specs).action.query, "14.2 1000737 fb fc");
 });
 
+test("追问里多转义的换行还原成真换行，颜文字里的反斜杠不动", () => {
+  // 模型偶尔把换行写成 \\n，JSON 解出来是反斜杠加 n 两个字符，原样发出去群里就看见「\n」
+  const ask = (question) => validateDecision({ route: "clarify", question }, specs).text;
+  assert.equal(ask("你想查哪首呀？\\n曲名或 ID 都行"), "你想查哪首呀？\n曲名或 ID 都行");
+  assert.equal(ask("第一行\\r\\n第二行"), "第一行\n第二行");
+  assert.equal(ask("说个曲名嘛\\(^o^)/"), "说个曲名嘛\\(^o^)/");
+});
+
 test("calculate：理论值锁死的灯由程序补齐，缺什么只点名什么", () => {
   const calc = (args) => validateDecision({ route: "action", action: { name: "calculate", args } }, specs);
   // 群里实测：「我打了14.2的理论值，以及full bell」—— 模型把 combo 留成 null，被打回追问。
