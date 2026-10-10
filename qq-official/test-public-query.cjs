@@ -192,13 +192,18 @@ test("翻页不漏不重，零结果/页码越界/计数都保留条件与来源
   assert.match(formatResult(run([], { mode: "count" })), /本地音击曲库快照/);
 });
 
-test("同曲同作者的全半角历史记录合并计数，并标明历史收录", () => {
-  const r = run([filter("title", "eq", "TiamaT:F minor")]);
-  assert.equal(r.total, 1);
-  assert.match(formatResult(r), /历史记录/);
-  const deleted = run([filter("title", "eq", "TiamaT:F minor"), filter("deleted", "eq", true)]);
-  assert.equal(deleted.total, 1);
-  assert.match(formatResult(deleted), /已删除记录/);
+test("换了新条目重新上架的歌，已删除的旧条目不再算进来", () => {
+  // TiamaT:F minor 在公开曲库里还留着 2024-09-05 删掉的旧条目（全角冒号），原来合成一首、标「含历史记录」；
+  // Cogito ergo sum 的旧条目曲名拼成了 Cogit，还单独成一首、带着旧定数 MAS 14.7。两首都还在线，同一个游戏 ID。
+  const tiamat = run([filter("title", "eq", "TiamaT:F minor")]);
+  assert.equal(tiamat.total, 1);
+  assert.doesNotMatch(formatResult(tiamat), /历史记录|已删除/);
+  assert.equal(run([filter("title", "eq", "TiamaT:F minor"), filter("deleted", "eq", true)]).total, 0);
+  const cogito = run([filter("title", "search", "Cogit")], { select: ["title", "constant"] });
+  assert.deepEqual(cogito.entries.map(e => e.title), ["Cogito ergo sum"]);
+  assert.doesNotMatch(formatResult(cogito), /14\.7/);
+  // 只去掉跟在线条目同一个 ID 的旧条目，别的已删除曲照常算、照常标。
+  assert.match(formatResult(run([filter("title", "eq", "ブリキノダンス")])), /已删除记录/);
 });
 
 const pickQuery = (selection, extra = {}) => ({ filters: [filter("constant", "eq", 14.5)], entity: "charts", select: ["title", "constant"], selection, ...extra });

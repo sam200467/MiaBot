@@ -7,7 +7,7 @@ const internal = require("../ongeki-music-internal.json");
 const { loadCharacters, normalize: titleKey } = require("../chat-core/knowledge.cjs");
 const path = require("node:path");
 const songSearch = require("./song-search.cjs");
-const { botChartId, catalogCoverage } = require("./song-id.cjs");
+const { botChartId, catalogCoverage, currentCatalogSongs } = require("./song-id.cjs");
 const { randomInt } = require("node:crypto");
 const { Converter } = require("opencc-js");
 const characters = loadCharacters(path.join(__dirname, "../chat-core"));
@@ -185,7 +185,10 @@ function validateQuery(input) {
 }
 
 const internalById = new Map(internal.map(item => [item.id, item]));
-const { extraLunatics, attachedBase, uncataloged } = catalogCoverage(catalog.songs);
+// 换了新条目重新上架的歌，公开曲库里那条「已删除」的旧条目不算（见 song-id.cjs）：原来 TiamaT:F minor
+// 会标「含历史记录」，Cogito ergo sum 还多出一首带旧定数的《Cogit ergo sum》。
+const catalogSongs = currentCatalogSongs(catalog.songs);
+const { extraLunatics, attachedBase, uncataloged } = catalogCoverage(catalogSongs);
 const SUPPLEMENT_LEVEL = /^(?:[1-9]|1[0-5])\+?$/;
 const rolesByTitle = new Map();
 for (const char of characters?.characters || []) {
@@ -222,7 +225,7 @@ function chartRow(base, difficulty, chart, v, botId, supplemental) {
   };
 }
 const rows = [
-  ...catalog.songs.flatMap((song, songIndex) => {
+  ...catalogSongs.flatMap((song, songIndex) => {
     const meta = song.meta;
     const base = songBase(songIndex, { title: meta.name, artist: meta.artist, genre: meta.genre, version: meta.song_release_version,
       release: meta.song_release, bpm: meta.bpm, deleted: Boolean(meta.is_deleted), officialId: String(meta.official_id ?? "") });
@@ -246,7 +249,7 @@ const rows = [
   ...uncataloged.flatMap(({ base: baseSong, lunatics }, k) => {
     const head = baseSong ?? lunatics[0];
     const version = String(head.versionID || "");
-    const base = songBase(catalog.songs.length + k, { title: head.name, artist: head.artistName, genre: head.genre ?? null,
+    const base = songBase(catalogSongs.length + k, { title: head.name, artist: head.artistName, genre: head.genre ?? null,
       version: version && !version.startsWith("オンゲキ") ? `オンゲキ ${version}` : version || null,
       release: null, bpm: head.bpm, deleted: head.status !== "online", officialId: "" });
     return [

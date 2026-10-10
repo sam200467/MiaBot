@@ -1,9 +1,11 @@
 "use strict";
 
 // Public metadata only: never consult player bindings or send a model-written result.
-const { songs } = require("../ongeki-song-catalog.json");
+const { songs: catalogSongs } = require("../ongeki-song-catalog.json");
 const core = require("../mia-core.cjs");
-const { botSongId, botChartId, catalogCoverage } = require("./song-id.cjs");
+const { botSongId, botChartId, catalogCoverage, currentCatalogSongs } = require("./song-id.cjs");
+// 换了新条目重新上架的歌，公开曲库里那条「已删除」的旧条目不再单独列出（见 song-id.cjs）。
+const songs = currentCatalogSongs(catalogSongs);
 // 两级归一化。**符号不能在唯一那一级里抹掉**：曲名里真的有符号，而 `∀` 这种
 // 整条曲名就是一个符号的，抹完是空串 —— 空串 includes 一切，查询词抹成空串又会被
 // 下面判成「没给线索」，于是这首歌谁也搜不到。所以第一级保留符号。

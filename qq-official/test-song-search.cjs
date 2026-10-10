@@ -179,6 +179,17 @@ test("游戏数据里的每一条都搜得到：曲库漏收的挂在那首歌�
   assert.deepEqual(search("id8091").matches.map(s => s.meta.name), ["Perfect Shining!!"], "挂上去的白谱 ID 照样搜得到那首歌");
 });
 
+test("换了新条目重新上架的歌只列在线那条，旧的已删除条目不再单独出现", () => {
+  // 群里问搜出来的已删除曲是不是都会标出来：会，但 TiamaT:F minor 和 Cogito ergo sum 各多出一条已删除。
+  // 公开曲库留着它们 2024 年删掉的旧条目，跟在线那条是同一个游戏 ID，于是同一个 ID 既在线又已删除。
+  assert.equal(reply("TiamaT"), "查到 1 首：\n\nid574   TiamaT:F minor\nBAS 5 / ADV 9.7 / EXP 13.1 / MAS 14.8");
+  assert.equal(reply("Cogit"), "查到 1 首：\n\nid1003   Cogito ergo sum\nBAS 3 / ADV 9.7 / EXP 13 / MAS 14.5", "旧条目的 MAS 14.7 是旧定数");
+  assert.equal(search("id574").total, 1);
+  assert.equal(search("id1003").total, 1);
+  // 只去掉跟在线条目同一个 ID 的旧条目，别的已删除曲照常列、照常标。
+  assert.match(reply("ブリキノダンス"), /id150   ブリキノダンス（已删除）/);
+});
+
 test("每张公开曲库的白谱都对得上内部曲库里真有这张谱面的那条", () => {
   const internal = new Map(require("../ongeki-music-internal.json").map(song => [song.id, song]));
   for (const song of catalogSongs.filter(song => song.LUN?.has_chart)) {

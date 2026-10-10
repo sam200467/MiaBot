@@ -46,6 +46,14 @@ function botSongId(catalogSong) {
   return ranked[0].song.id;
 }
 
+// 公开曲库里还留着几条「已删除」的旧条目，那首歌后来换了新条目重新上架：TiamaT:F minor（旧条目 2024-09-05 删）、
+// Cogito ergo sum（旧条目 2024-06-06 删，曲名还拼成了 Cogit）。它们跟在线那条对上同一个游戏 ID，
+// 再列一遍只会让同一个 ID 既在线又已删除，定数也是旧的（Cogit 那条 MAS 还是 14.7）。同一个 ID 有在线那条，就只留在线那条。
+function currentCatalogSongs(catalogSongs) {
+  const live = new Set(catalogSongs.filter(song => !song.meta?.is_deleted).map(botSongId).filter(id => id != null));
+  return catalogSongs.filter(song => !song.meta?.is_deleted || !live.has(botSongId(song)));
+}
+
 // 同曲名同曲师、带白谱的那几条。一首歌可以有好几张白谱：《Perfect Shining!!》有 8003、8091 两张。
 function lunaticHolders(catalogSong) {
   return peersOf(catalogSong).filter(song => song.level?.[4] != null && String(song.level[4]) !== "-");
@@ -106,4 +114,4 @@ function catalogCoverage(catalogSongs) {
   return { extraLunatics, attachedBase, uncataloged };
 }
 
-module.exports = { botSongId, botChartId, lunaticHolders, catalogCoverage };
+module.exports = { botSongId, botChartId, lunaticHolders, catalogCoverage, currentCatalogSongs };
