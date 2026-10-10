@@ -141,9 +141,10 @@ function replyLines(query) {
     const { id, main, lunatics } = entryBySong.get(song);
     // 只有白谱的（《怒槌～光吉猛修一部謎～》id8025）没得挑，难度直接填上白。
     const onlyLunatic = main.length > 0 && main.every(chart => chart.difficulty === "LUN");
-    const title = link(song.meta.name, id, `/谱面分析 id${id} ${onlyLunatic ? "白" : ""}`);
+    // 链接文字连同前面的 ID 一起（「id36   Perfect Shining!!」整段可点），点的范围大一些。
+    const title = link(`${showId(id)}   ${song.meta.name}`, id, `/谱面分析 id${id} ${onlyLunatic ? "白" : ""}`);
     linked ||= id != null;
-    out.push([""], [`${showId(id)}   `, title, ...(song.meta.is_deleted ? ["（已删除）"] : [])]);
+    out.push([""], [title, ...(song.meta.is_deleted ? ["（已删除）"] : [])]);
     const chartLine = [
       ...(main.length ? [main.map(chart => `${chart.difficulty} ${showConstant(chart.difficulty, chart)}`).join(" / ")] : []),
       ...lunatics.map(l => link(`（${showId(l.id)}：LUN ${showConstant("LUN", l)}${l.deleted ? "，已删除" : ""}）`, l.id, `/谱面分析 id${l.id} 白`)),
