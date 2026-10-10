@@ -11,6 +11,7 @@ qq-official/
 ├── mia-voice.cjs            文案：美亚腔的所有字符串（只有字面量，没有逻辑）
 ├── mock-official.cjs        假的开放平台（token + REST + 网关），测试用
 ├── probe-official.cjs       连接探针：验凭据、拿 group_openid / user_openid
+├── probe-markdown.cjs       Markdown 探针：实测能不能发 Markdown、指令链接怎么显示
 ├── test-*.cjs               测试，全走 mock，不碰真接口
 ├── config.example.json      可提交的模板
 └── config.local.json        **含 AppSecret，已 gitignore**
