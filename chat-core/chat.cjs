@@ -147,15 +147,21 @@ function chooseImage(result, settings, stopped, random=Math.random) {
 // 就成了嘴上说猫猫、发出去的是捧杯（2026-10-10 真模型实测）。模型说没有、一个候选都没给，就不发。
 // 「看看这张图」这种没提「表情」的不算点名要图，照旧按概率配。
 const ASKS_FOR_IMAGE=/(?:发|来|给|看).{0,20}(?:表情|图)|(?:表情|图).{0,20}(?:发|来|给|看)/;
+const namedExpression=(text,settings)=>settings.manifest.entries.find(e=>text.includes(e.label)||new RegExp("(?:第|编号|#)0?"+e.previewNumber+"(?:张|号|个|\\b)").test(text));
+// 点名要美亚发表情（「发个X表情」「来个表情」「发第41张」）。这是聊天这边的事：她说一句、配一张图。
+// 不交给语义路由——路由模型会把它误判成「在问图片内容」（media），回一句「这边暂时看不到图片里的内容」，
+// 程序再按名字把表情贴上去，成了图对、话不对（2026-10-10 线上实测；真模型 4 次里 2 次，规则里写了也没用）。
+function asksForExpression(text, settings) {
+  return Boolean(settings.c.expressions.enabled&&ASKS_FOR_IMAGE.test(text)&&(/表情/.test(text)||namedExpression(text,settings)));
+}
 function pickImage(result, settings, text, random=Math.random) {
   if(settings.c.expressions.enabled&&ASKS_FOR_IMAGE.test(text)) {
-    const {entries}=settings.manifest;
-    const named=entries.find(e=>text.includes(e.label)||new RegExp("(?:第|编号|#)0?"+e.previewNumber+"(?:张|号|个|\\b)").test(text));
+    const named=namedExpression(text,settings);
     if(named) return result.scene==="distress"?null:named;
     if(/表情/.test(text)) {
       if(result.scene==="distress") return null;
       const ids=Array.isArray(result.expressionIds)?result.expressionIds:[];
-      return ids.map(id=>entries.find(e=>e.id===id&&e.autoEligible)).find(Boolean)||null;
+      return ids.map(id=>settings.manifest.entries.find(e=>e.id===id&&e.autoEligible)).find(Boolean)||null;
     }
   }
   return chooseImage(result,settings,false,random);
@@ -350,7 +356,7 @@ async function requestReply(settings, messages, options={}) {
   const jsonRule='仅输出JSON对象，不要输出Markdown代码块，结构为'+
     (gate?'{"text":"发给用户的新回复，通常3～5句","emotion":"neutral或proud等情绪","scene":"ordinary或banter或explanation或distress","expressionIds":["符合语境的表情ID"]}':
     '{"text":"发给用户的新回复，通常3～5句","intent":"一个意图或意图数组","factQuery":"这一句里可验证的外部事实，没有就留空字符串","emotion":"neutral或proud等情绪","scene":"ordinary或banter或explanation或distress","expressionIds":["符合语境的表情ID"]}')+
-    "\nexpressionIds 要主动填：只要不是 distress，就从清单里挑 2～3 个贴合当前语境和 usage 的候选ID，拿不准宁多给几个，确实没有一张贴合才留空数组；普通闲聊优先温和表情。只从清单里选，不编造ID。平时图片可能不发送，文字必须独立完整，不能声称已发图片。用户明说要某种表情时，text 照样要写完整，图只发 expressionIds 排第一的那张、一定会跟着这句话一起发出去：清单里有对得上的就把它排第一；没有就直说没有，想拿相近的顶替就把那张排第一，text 里直接说拿哪张（照它的 label）顶一下，别问要不要；不顶替就留空数组。不输出推理。用户觉得被冒犯或不舒服时scene=distress：简短真诚道歉，再用自然可爱的语气卖萌安慰，不要宣布切换模式，不要说以后会一直严肃。表情清单："+JSON.stringify(catalog);
+    "\nexpressionIds 要主动填：只要不是 distress，就从清单里挑 2～3 个贴合当前语境和 usage 的候选ID，拿不准宁多给几个，确实没有一张贴合才留空数组；普通闲聊优先温和表情。只从清单里选，不编造ID。平时图片可能不发送，文字必须独立完整，不能声称已发图片。用户明说要某种表情时，text 照样要写完整，图只发 expressionIds 排第一的那张、一定会跟着这句话一起发出去：清单里有对得上的就把它排第一；没有就直说没有，想拿相近的顶替就把那张排第一，text 里直接说拿哪张（照它的 label）顶一下，别问要不要；不顶替、或者想先反问对方要哪一张，就留空数组。不输出推理。用户觉得被冒犯或不舒服时scene=distress：简短真诚道歉，再用自然可爱的语气卖萌安慰，不要宣布切换模式，不要说以后会一直严肃。表情清单："+JSON.stringify(catalog);
   // 工具调用：模型只负责判断「用户想用哪个功能」和「参数是什么」，不去编结果。
   // 真正的成绩、定数、图片由程序执行后送出，所以这里把话说死：text 只写引出语。
   const actionRule=actionSpecs.length?
@@ -1046,7 +1052,8 @@ function createChat(settings, host, deps={}) {
       // 路由看不到那个提议，一句「要」到它手里可能被判成别的。
       const confirming=gateMode!=="off"&&Boolean(searchState.pending&&searchState.pending.expiresAt>time&&affirmative(text));
       // webFetchImpl 也要透传：不然宿主注入的假 fetch 只挡得住模型调用，检索仍会真联网。
-      const routed=!confirming&&typeof adapter.routeIntent==="function"
+      // 点名要表情的也跳过路由（见 asksForExpression）。
+      const routed=!confirming&&!asksForExpression(text,settings)&&typeof adapter.routeIntent==="function"
         ? await adapter.routeIntent({messages,message,queryState:old?.queryState,querySelection:old?.querySelection,signal:controller.signal,dispatcher}) : null;
       const images=typeof adapter.images==="function"?(adapter.images(message)||[]):[];
       const result=routed || await requestReply(settings,messages,{fetchImpl:deps.fetchImpl,webFetchImpl:deps.webFetchImpl,dispatcher,signal:controller.signal,ability:ability,
@@ -1077,7 +1084,8 @@ function createChat(settings, host, deps={}) {
         if (typeof outcome.historyText === "string") actionHistory="\n（程序结果，仅作数据："+outcome.historyText.slice(0,2000)+"）";
         if(!closed&&!outcome.handled)await send(message,outcome.text||result.text,null);
       } else {
-        file=pickImage(result,settings,text,random);
+        // 路由给的是程序写好的话（追问、查询结果、「看不到图」），不配表情图
+        file=routed?null:pickImage(result,settings,text,random);
         // Discord messages expose channel.permissionsFor; QQ/OneBot messages do not.
         // Only apply Discord's attachment permission fallback when that API exists.
         if(file&&message.channel?.permissionsFor&&!message.channel.permissionsFor(message.client?.user)?.has("AttachFiles"))file=null;
@@ -1113,4 +1121,4 @@ function createChat(settings, host, deps={}) {
   }
   return {handle,close(){closed=true;for(const c of controllers)c.abort();sessions.clear();if(!deps.dispatcher)void dispatcher?.close();}};
 }
-module.exports={loadSettings,failureReason,discomfort,chooseImage,pickImage,requestReply,createChat,normalizeAction,restoreNewlines};
+module.exports={loadSettings,failureReason,discomfort,chooseImage,pickImage,asksForExpression,requestReply,createChat,normalizeAction,restoreNewlines};

@@ -1120,3 +1120,34 @@ test("提示词里的表情样例只用美亚清单里真有的 ID（原来那�
     assert.ok(samples.some((s) => s.expressionIds.join() === "sparkle_wink,bashful_glance"), "被夸那条用 examples.json 里自带的表情");
   } finally { await bot.stop(); await mock.stop(); }
 });
+
+test("点名要表情不过语义路由：路由把它判成「在问图片」时，也是聊天这边回话配图，不会图对话不对", async () => {
+  // 2026-10-10 线上：「发个猫猫炸毛的表情」被路由判成 media，回了一句「这边暂时看不到图片里的内容」，
+  // 程序又按名字贴上了 21 号；「发个睡觉表情」只剩那句话。真模型 4 次里 2 次这么判，路由规则里写了也没用。
+  const respond = (content) => ({ ok: true, status: 200, text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }) });
+  let routes = 0;
+  const logs = [];
+  const fetchImpl = async (_, options) => {
+    const body = JSON.parse(options.body);
+    if (String(body.messages[0].content).includes("MIA_SEMANTIC_ROUTER_V1")) { routes++; return respond({ route: "media" }); }
+    return respond({ text: "哼，炸毛就炸毛！喏，这张给你。", emotion: "angry", scene: "banter", expressionIds: ["warm_cup", "cat_hiss"] });
+  };
+  const { mock, bot } = await setup({}, { botDeps: { fetchImpl, log: (line) => logs.push(line) } });
+  bot.settings.c.limits.userCooldownSeconds = 0;
+  try {
+    for (const content of ["发个猫猫炸毛的表情", "发个睡觉表情"]) {
+      const before = mock.state.sent.length;
+      await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content }));
+      assert.ok(await mock.waitFor(() => mock.state.sent.length > before));
+      assert.equal(mock.state.sent.at(-1).body.content, "哼，炸毛就炸毛！喏，这张给你。", content + " 应当是聊天这边的回话");
+    }
+    assert.equal(routes, 0, "点名要表情不该去问语义路由");
+    assert.deepEqual(sentExpressions(logs), ["21_猫猫炸毛.jpg", "42_捧杯取暖.gif"], logs.join("\n"));
+    // 真在问图片内容的照旧走路由；路由那句「看不到」不配表情图
+    const before = mock.state.sent.length;
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "这张图片写了什么" }));
+    assert.ok(await mock.waitFor(() => mock.state.sent.length > before));
+    assert.match(mock.state.sent.at(-1).body.content, /看不到图片里的内容/);
+    assert.equal(sentExpressions(logs).length, 2, "路由那句话不配表情图");
+  } finally { await bot.stop(); await mock.stop(); }
+});
