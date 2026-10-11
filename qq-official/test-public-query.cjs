@@ -409,3 +409,13 @@ test("按歌名排序用读音（五十音），不按汉字的拼音；只在�
   assert.ok(at("君の知らない物語") < at("紅蓮華"));
   assert.ok(at("ADAMAS") < at("あの世行きのバスに乗ってさらば。"), "英文在假名前面");
 });
+
+test("boss 卡：能查卡名，几张谱面同一张卡只写一次；问 boss 卡不能只回对战相手", () => {
+  const query = { filters: [filter("title", "eq", "Love & Justice")], select: ["title", "opponent", "bossCard"] };
+  const text = formatResult(run(query.filters, { select: query.select }));
+  assert.match(text, /^对战相手卡牌：【R】日向 千夏\[制服 表情：わーい！\]$/m);
+  assert.match(text, /^对战相手：日向 千夏$/m);
+  const text2 = "@MiaBot 爱正义boss卡名字叫什么";
+  assert.match(queryMismatch(validateQuery({ ...query, select: ["title", "opponent"] }), text2), /bossCard/);
+  assert.ok(!queryMismatch(validateQuery(query), text2));
+});

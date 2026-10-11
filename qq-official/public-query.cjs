@@ -110,6 +110,7 @@ const fields = {
   originalFor: { label: "原创曲归属角色", type: "character", note: "按本地策展口径，包含 solo 版，不等于对战相手" },
   personalFor: { label: "个人曲归属角色", type: "character", note: "仅限有记载的个人曲，不等于原创曲" },
   bossLevel: { label: "对战相手等级", type: "number" },
+  bossCard: { label: "对战相手卡牌", type: "text", note: "boss 卡/对手卡的卡名（游戏数据原文，如「【R】日向 千夏[制服 表情：わーい！]」）；用户问某首歌的 boss 卡叫什么时 select 这个字段，按 songs 查即可" },
   attribute: { label: "对战属性", type: "enum", values: ["Fire", "Leaf", "Aqua"] },
 };
 const operations = {
@@ -190,7 +191,7 @@ function validateQuery(input) {
   if (!Array.isArray(select) || !select.length || select.length > 8 || select.some(f => !Object.hasOwn(fields, f))) reject("返回字段不在本地资料范围内");
   const sort = input.sort ?? { field: "title", direction: "asc" };
   if (!sort || Object.keys(sort).some(k => !["field", "direction"].includes(k)) || !Object.hasOwn(fields, sort.field) || !["asc", "desc"].includes(sort.direction) || fields[sort.field].type === "character") reject("排序字段或顺序不受支持");
-  if (entity === "songs" && ["difficulty", "level", "constant", "notes", "bells", "designer", "bossLevel", "attribute"].includes(sort.field)) reject("按谱面数据排序时请使用 charts，避免一首歌的多张谱面混算");
+  if (entity === "songs" && ["difficulty", "level", "constant", "notes", "bells", "designer", "bossLevel", "bossCard", "attribute"].includes(sort.field)) reject("按谱面数据排序时请使用 charts，避免一首歌的多张谱面混算");
   const choice = input.selection ?? { kind: "all" };
   if (!choice || typeof choice !== "object" || Object.keys(choice).some(k => !["kind", "count", "excludePrevious"].includes(k)) || !["all", "first", "random"].includes(choice.kind)) reject("selection需要all/first/random选取方式");
   if (choice.excludePrevious !== undefined && typeof choice.excludePrevious !== "boolean") reject("excludePrevious需要布尔值");
@@ -254,7 +255,7 @@ function chartRow(base, difficulty, chart, v, botId, supplemental) {
     // 0 级白谱的定数就是 0（游戏数据里 23 张全是）；《Perfect Shining!!》那张在曲库里记成未知，也按 0 算。
     constant: difficulty === "LUN" && String(chart.level) === "0" ? 0 : chart.const_status === "known" ? numeric(chart.const) : null,
     notes: numeric(chart.notes_all), bells: numeric(chart.bell), designer: chart.notesdesigner,
-    opponent: v?.boss ? [v.boss] : [], bossLevel: numeric(v?.bossLevel), attribute: v?.attributeType ?? null,
+    opponent: v?.boss ? [v.boss] : [], bossLevel: numeric(v?.bossLevel), bossCard: v?.bossCardName || null, attribute: v?.attributeType ?? null,
   };
 }
 const rows = [
@@ -381,7 +382,7 @@ const show = value => Array.isArray(value) ? value.join("、") || "未知" : !kn
 function describeQuery(query) {
   return query.filters.length ? query.filters.map(f => `${fields[f.field].label}${opLabels[f.op]}${f.op === "charset" ? CHARSET_LABELS[f.value] : show(f.value)}`).join("；") : "全部曲目";
 }
-const CHART_FIELDS = ["difficulty", "level", "constant", "notes", "bells", "designer", "opponent", "bossLevel", "attribute"];
+const CHART_FIELDS = ["difficulty", "level", "constant", "notes", "bells", "designer", "opponent", "bossLevel", "bossCard", "attribute"];
 // 排版分三段，段与段之间空一行：开头的说明（筛选、条数、排序……）、结果列表、结尾的说明和页码。
 // 每首只有一行（只问歌名）时列表紧挨着排；带 ID、定数这些附加行时，每首之间也空一行，免得看串。
 // 空行要发得出去，QQ 入口靠路由结果上的 preformatted 不折叠它（见 semantic-router.cjs 的 queryReply）。
@@ -405,7 +406,9 @@ function layout(result) {
     const out = [{ title: entry.title, mark, command: titleCommand(entry) }];
     for (const field of query.select.filter(f => f !== "title" && f !== "difficulty")) {
       const chartField = CHART_FIELDS.includes(field);
-      const values = [...new Set(entry.rows.map(r => `${chartField ? r.difficulty + " " : ""}${show(r[field])}`))];
+      // 几张谱面取值都一样（同一首歌的对战相手、boss 卡）就只写一次，不排成「BAS X / ADV X / EXP X / MAS X」。
+      const same = entry.rows.length > 1 && new Set(entry.rows.map(r => show(r[field]))).size === 1;
+      const values = [...new Set(entry.rows.map(r => `${chartField && !same ? r.difficulty + " " : ""}${show(r[field])}`))];
       // 带白谱的歌有两个 ID（本曲 39、白谱 8015），光列「39 / 8015」分不清哪个是哪个，就注上各管哪几张谱面。
       const labelled = field === "botId" && values.length > 1
         ? values.map(id => `${id}（${[...new Set(entry.rows.filter(r => show(r.botId) === id).map(r => r.difficulty))].join("/")}）`)
@@ -537,6 +540,7 @@ function queryMismatch(query, text, { self } = {}) {
     : /(?:全是|全都是|纯|純|只有)\s*符号|没有(?:字母|文字)/.test(text) ? "symbol" : null;
   if (charset && !title.some(f => f.op === "charset" && f.value === charset)) return `用户问曲名全由某类字符组成，歌名用 charset 筛选，value=${charset}`;
   if (/对战相手|對戰相手/.test(text) && !query.filters.some(f => f.field === "opponent") && !query.select.includes("opponent")) return "用户问对战相手，查询必须筛选或返回 opponent，不能只查演唱者";
+  if (/(?:boss|ボス|对手|對手|相手)\s*(?:卡|カード|card)/i.test(text) && !query.select.includes("bossCard")) return "用户问 boss 卡（对战相手卡牌），查询必须返回 bossCard，不能只返回对战相手的角色名";
   return characterMismatch(query, text, self);
 }
 
