@@ -46,6 +46,10 @@ assert.deepEqual(core.searchSongs("愛"), core.searchSongs("爱"));
 assert.equal(core.searchSongs("id870")[0].id, 870);
 assert.deepEqual(core.searchSongs("omega4").map(s => s.name), ["ω4"]);
 assert.ok(core.searchSongs("倒A").some(s => s.name === "∀"));
+// /是什么歌 在 searchSongs 之后还有一道筛选，曾把按读法命中的歌筛掉。
+assert.deepEqual(core.searchSongClues("omega4").map(s => s.name), ["ω4"]);
+assert.deepEqual(core.searchSongClues("ataraxia").map(s => s.name), ["Ἀταραξία"]);
+assert.ok(core.searchSongClues("倒A").some(s => s.name === "∀"));
 assert.deepEqual(core.searchSongs("冬花").map((song) => song.id), [1076], "部分曲名应能定位歌曲");
 for (const query of ["光焔", "光焰", "光燄"]) {
   assert.deepEqual(core.searchSongs(query).map((song) => song.id), [728], query + " 应命中同一首歌");

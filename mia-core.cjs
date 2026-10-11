@@ -231,9 +231,12 @@ function searchSongClues(query) {
   if (/^(?:id\s*)?\d+$/i.test(raw)) return searchSongs(raw);
   const needle = normalizeSongQuery(raw);
   const aliasTitles = new Set(songAliases.names(raw, "ongeki").map((hit) => normalizeSongQuery(hit.title)));
+  // 曲名读法（希腊字母转写、《∀》叫「倒A」）也要留下：原来这里只认曲名和别名，
+  // 「omega4」「ataraxia」在 /单曲 查得到、到 /是什么歌 却被筛成空。
+  const readingsBySong = new Map(SONG_SEARCH_INDEX.map(({ song, readings }) => [song, readings]));
   return searchSongs(raw).filter((song) => {
     const title = normalizeSongQuery(song.name);
-    return title.includes(needle) || aliasTitles.has(title);
+    return title.includes(needle) || aliasTitles.has(title) || matchesReading(readingsBySong.get(song), needle);
   });
 }
 
