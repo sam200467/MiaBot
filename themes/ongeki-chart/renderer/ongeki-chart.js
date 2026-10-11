@@ -242,7 +242,7 @@
   }
 
   const DEFAULTS = {
-    measurePx: 288,         // 一个 4/4 小节的高度
+    measurePx: 320,         // 一个 4/4 小节的高度
     columnMeasures: 4,      // 一栏约放几个 4/4 小节
     xMin: -30, xMax: 30,    // 显示的横向范围
     unitPx: 2.5,            // 每个 X 单位的像素
@@ -582,7 +582,7 @@
 
   // FLICK 文件里没有长度：同一拍横向挨着的几个 FLICK 在游戏里连成一根长条，这里也合并画。
   // 细条压在判定那一拍上（和 TAP 差不多粗），箭头画在条的上方，不挡时间位置。
-  const FLICK_HALF_UNITS = 4;       // 单个 FLICK 半宽（X 单位）
+  const FLICK_HALF_UNITS = 6;       // 单个 FLICK 半宽（X 单位）：30px，约 2.5 个 TAP 宽
   const FLICK_JOIN_UNITS = 12.5;    // 中心相距不超过这个就算挨着
 
   function flickRuns(flicks) {

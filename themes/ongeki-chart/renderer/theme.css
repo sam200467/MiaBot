@@ -197,7 +197,7 @@ h1 {
 .overlap { fill: #0b0e16; opacity: .55; }
 .seam { stroke: rgba(255, 255, 255, .35); stroke-width: 1; stroke-dasharray: 4 3; }
 
-.rail { fill: none; stroke-width: 1.4; opacity: .55; stroke-linejoin: round; }
+.rail { fill: none; stroke-width: 1.2; opacity: .3; stroke-linejoin: round; }
 .wall { fill: none; stroke-width: 2; opacity: .95; stroke-linejoin: round; }
 .block { fill: none; stroke: #ff3b4f; stroke-width: 4; stroke-dasharray: 3 3; opacity: .9; }
 .k-L { stroke: #ff4f6e; fill: #ff4f6e; }
