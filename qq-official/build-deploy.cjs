@@ -193,6 +193,14 @@ for (const key of ["corePath", "vaultHelperPath"]) {
   if (fs.existsSync(src)) { fs.copyFileSync(src, path.join(outEntryDir, "stop-mia.cjs")); console.log("带上 stop-mia.cjs"); }
   else console.log("⚠ 没找到 stop-mia.cjs");
 }
+// 排版探针也打成单文件带上：查 Markdown 开头空行、反斜杠转义要在线上那个 AppID 实测。
+execFileSync(process.execPath, [
+  ESBUILD, path.join(HERE, "probe-layout.cjs"),
+  "--bundle", "--platform=node", "--format=cjs", "--target=node22",
+  "--external:bufferutil", "--external:utf-8-validate",
+  "--outfile=" + path.join(outEntryDir, "probe-layout.cjs"),
+], { stdio: "inherit" });
+console.log("带上 probe-layout.cjs");
 
 // ── 5. 启动器（用同一套生成器，只是输出到部署目录）──────────────────
 {
