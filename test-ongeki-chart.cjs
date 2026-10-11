@@ -163,6 +163,25 @@ test("FLICK：同一拍、同方向、相邻的合并成一根长条", () => {
   ]);
 });
 
+test("分音：按全音符约分，HOLD 尾也算击打时刻，超过一小节不标", () => {
+  assert.equal(C.rhythmLabel(120, 1920), "1/16");
+  assert.equal(C.rhythmLabel(360, 1920), "3/16");
+  assert.equal(C.rhythmLabel(80, 1920), "1/24");
+  assert.equal(C.rhythmLabel(1920, 1920), "");
+  assert.equal(C.rhythmLabel(7, 1920), "", "分母超过 64 的不标");
+
+  const model = C.parseOgkr(SAMPLE);
+  const marks = C.rhythmMarks(model);
+  // 击打时刻：960(TAP) 1920(CTP 与侧键同拍) 4320(FLK) 4800(CFK) 5760(HLD 头) 9600(HLD 尾/CHD 头) 11520(CHD 尾)
+  assert.deepEqual(marks.map((m) => m.t), [960, 1920, 4320, 4800, 5760, 9600, 11520]);
+  assert.deepEqual(marks.map((m) => m.label), ["", "1/2", "", "1/4", "1/2", "", ""]);
+  assert.deepEqual(marks.map((m) => m.changed), [false, true, true, true, true, true, false]);
+
+  const svg = C.renderSvg(model, C.layoutChart(model));
+  assert.ok(svg.includes(">1/4</text>"));
+  assert.ok(svg.includes('class="rhythm-tick"'));
+});
+
 test("空谱面和坏行不会抛错", () => {
   const model = C.parseOgkr("[HEADER]\nTRESOLUTION\tabc\nTAP\t9\nHLD\nBLT\n[NOTES]\n");
   assert.equal(model.header.tResolution, 1920);

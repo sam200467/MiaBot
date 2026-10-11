@@ -214,13 +214,41 @@
     return marks;
   }
 
+  // 分音：每个击打时刻（TAP、侧键、HOLD 头尾、FLICK）与上一个击打时刻的间隔，
+  // 按全音符（TRESOLUTION）约分写成 1/16、3/16 这样。超过一整小节、或分母大于 64 的不写（只留刻度）。
+  function gcd(a, b) { while (b) [a, b] = [b, a % b]; return a; }
+
+  function rhythmLabel(gap, TR) {
+    if (!(gap > 0) || gap >= TR) return "";
+    const g = gcd(gap, TR);
+    const n = gap / g, d = TR / g;
+    return d > 64 ? "" : `${n}/${d}`;
+  }
+
+  function rhythmMarks(model) {
+    const times = new Set();
+    for (const n of model.taps) times.add(n.t);
+    for (const n of model.holds) { times.add(n.t); times.add(n.end); }
+    for (const n of model.flicks) times.add(n.t);
+    const sorted = [...times].sort((a, b) => a - b);
+    const marks = [];
+    let previous = "";
+    for (let i = 0; i < sorted.length; i++) {
+      const label = i ? rhythmLabel(sorted[i] - sorted[i - 1], model.header.tResolution) : "";
+      marks.push({ t: sorted[i], label, changed: label !== previous });
+      previous = label;
+    }
+    return marks;
+  }
+
   const DEFAULTS = {
     measurePx: 196,         // 一个 4/4 小节的高度
     columnMeasures: 4,      // 一栏约放几个 4/4 小节
     xMin: -30, xMax: 30,    // 显示的横向范围
     unitPx: 2.5,            // 每个 X 单位的像素
     gutter: 30,             // 栏左侧小节号宽度
-    gap: 14,                // 栏与栏之间的空白
+    rightGutter: 28,        // 栏右侧分音标注宽度
+    gap: 8,                 // 栏与栏之间的空白
     rowGap: 34,
     maxWidth: 1840,
     maxWidthLimit: 2800,    // 长谱面放宽每行栏数，避免图片过长
@@ -255,7 +283,7 @@
 
     const pxPerTick = o.measurePx / TR;
     const fieldWidth = (o.xMax - o.xMin) * o.unitPx;
-    const pitch = o.gutter + fieldWidth + o.gap;
+    const pitch = o.gutter + fieldWidth + o.rightGutter + o.gap;
     const fit = (width) => Math.max(1, Math.floor((width + o.gap) / pitch));
     let perRow = fit(o.maxWidth);
     if (Math.ceil(columns.length / perRow) > o.targetRows) {
@@ -279,6 +307,7 @@
     return {
       options: o, measures, meterMarks: meterMarks(model, measures), columns: placed, pxPerTick, fieldWidth,
       width: Math.max(0, usedColumns * pitch - o.gap),
+      rhythm: rhythmMarks(model),
       height: Math.max(0, y - o.rowGap),
     };
   }
@@ -448,7 +477,7 @@
       const a = Math.max(s.t, from), b = Math.min(s.end, to);
       if (b <= a) continue;
       const cls = s.speed <= 0.001 ? "sv-stop" : s.speed < 1 ? "sv-slow" : "sv-fast";
-      out.push(`<rect class="sv ${cls}" x="${f1(left + col.width + 1.5)}" y="${Y(b)}" width="3" height="${f1(Y(a) - Y(b))}"/>`);
+      out.push(`<rect class="sv ${cls}" x="${f1(left - 4.5)}" y="${Y(b)}" width="3" height="${f1(Y(a) - Y(b))}"/>`);
     }
 
     // 左侧刻度：小节号、BPM、拍号、事件
@@ -477,9 +506,31 @@
       kept.push({ ...label, y });
     }
     for (const label of kept) {
-      out.push(`<text class="${label.cls}" x="${f1(left - 4)}" y="${f1(Number(label.y) + 3.5)}" text-anchor="end">${esc(label.text)}</text>`);
+      out.push(`<text class="${label.cls}" x="${f1(left - 7)}" y="${f1(Number(label.y) + 3.5)}" text-anchor="end">${esc(label.text)}</text>`);
     }
+    out.push(renderRhythm(layout, col, left + col.width, Y));
     return `<g class="column">${out.join("")}</g>`;
+  }
+
+  // 栏右侧：每个击打时刻一道短刻度，旁边写与上一个的间隔。
+  // 字放不下时先保证节奏变化处的数字，再在空隙里补上连续相同的数字。
+  function renderRhythm(layout, col, right, Y) {
+    const marks = layout.rhythm.filter((m) => m.t >= col.start && m.t < col.end);
+    const out = [];
+    for (const m of marks) out.push(`<line class="rhythm-tick" x1="${f1(right + 1)}" x2="${f1(right + 4)}" y1="${Y(m.t)}" y2="${Y(m.t)}"/>`);
+    const placed = [];
+    const fits = (y) => placed.every((other) => Math.abs(other - y) >= 9.5);
+    const labelled = marks.filter((m) => m.label);
+    for (const pass of [true, false]) {
+      for (const m of labelled) {
+        if (m.changed !== pass) continue;
+        const y = Number(Y(m.t));
+        if (!fits(y)) continue;
+        placed.push(y);
+        out.push(`<text class="rhythm" x="${f1(right + 6)}" y="${f1(y + 3.3)}">${m.label}</text>`);
+      }
+    }
+    return out.join("");
   }
 
   function holdPath(hold, lane) {
@@ -611,5 +662,5 @@
     return lo === hi ? trimNumber(lo) : `${trimNumber(lo)}–${trimNumber(hi)}`;
   }
 
-  return { parseOgkr, layoutChart, renderSvg, legendSvg, measuresOf, interpolate, flickRuns, formatDuration, bpmText, DEFAULTS, COLORS };
+  return { parseOgkr, layoutChart, renderSvg, legendSvg, measuresOf, interpolate, flickRuns, rhythmMarks, rhythmLabel, formatDuration, bpmText, DEFAULTS, COLORS };
 });
