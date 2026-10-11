@@ -48,8 +48,9 @@
       let m = LANE_COMMAND.exec(cmd);
       if (m) {
         const id = p[1];
-        // 装饰轨道（CL）多两列：颜色号、亮度
-        if (!lanes.has(id)) lanes.set(id, { id, kind: LANE_KINDS[m[1]], color: m[1] === "CL" ? num(p[5], -1) : undefined, points: [] });
+        // 起点行第 7 列是 isTransparent（> 0 不显示这条线，轨道照样起作用）；装饰轨道（CL）第 5、6 列是颜色号、亮度
+        if (!lanes.has(id)) lanes.set(id, { id, kind: LANE_KINDS[m[1]], color: m[1] === "CL" ? num(p[5], -1) : undefined, hidden: false, points: [] });
+        if (m[2] === "S" && num(p[7]) > 0) lanes.get(id).hidden = true;
         lanes.get(id).points.push({ u: num(p[2]), g: num(p[3]), x: num(p[4]) });
         continue;
       }
@@ -73,10 +74,14 @@
         case "FLK": case "CFK":
           raw.flicks.push({ u: num(p[1]), g: num(p[2]), x: num(p[3]), dir: p[4] === "L" ? -1 : 1, critical: cmd === "CFK" });
           break;
-        case "BEL": raw.bells.push({ u: num(p[1]), g: num(p[2]), x: num(p[3]) }); break;
+        case "BEL": raw.bells.push({ u: num(p[1]), g: num(p[2]), x: num(p[3]), palette: p[4] }); break;
         case "BLT": raw.bullets.push({ palette: p[1], u: num(p[2]), g: num(p[3]), x: num(p[4]), damage: String(p[5] || "NML").toUpperCase() }); break;
-        // BPL 编号 发射源 偏移 目标 速度 大小(N/L) 形状(CIR/NDL/SQR) 随机偏移
-        case "BPL": palettes.set(p[1], { shape: String(p[7] || "CIR").toUpperCase(), large: String(p[6] || "N").toUpperCase() === "L" }); break;
+        // BPL 编号 发射源(UPS/ENE/CEN) 偏移 目标(FIX/PLR) 速度 大小(N/L) 形状(CIR/NDL/SQR) 随机偏移
+        // 落点 = 目标位置 + 偏移：FIX 的目标位置是 BLT 写的 X，PLR 是子弹出现时玩家所在的 X（谱面里无从得知）
+        case "BPL": palettes.set(p[1], {
+          offset: num(p[3]), aimed: String(p[4] || "FIX").toUpperCase() === "PLR",
+          shape: String(p[7] || "CIR").toUpperCase(), large: String(p[6] || "N").toUpperCase() === "L",
+        }); break;
         case "LBK": raw.blocks.push({ lane: p[1], u: num(p[2]), g: num(p[3]), eu: num(p[6]), eg: num(p[7]) }); break;
         case "SFL": raw.soflans.push({ u: num(p[1]), g: num(p[2]), length: num(p[3]), speed: num(p[4], 1) }); break;
         case "BPM": raw.bpms.push({ u: num(p[1]), g: num(p[2]), bpm: num(p[3]) }); break;
@@ -91,7 +96,7 @@
     const byTick = (a, b) => a.t - b.t;
 
     const laneList = [...lanes.values()].map((lane) => ({
-      id: lane.id, kind: lane.kind, color: lane.color,
+      id: lane.id, kind: lane.kind, color: lane.color, hidden: lane.hidden,
       points: lane.points.map((pt) => ({ t: tick(pt.u, pt.g), x: pt.x })).sort(byTick),
     })).filter((lane) => lane.points.length);
     const laneById = new Map(laneList.map((lane) => [lane.id, lane]));
@@ -111,10 +116,17 @@
       taps: taps.sort(byTick),
       holds: holds.sort(byTick),
       flicks: raw.flicks.map((n) => ({ t: tick(n.u, n.g), x: n.x, dir: n.dir, critical: n.critical })).sort(byTick),
-      bells: raw.bells.map((n) => ({ t: tick(n.u, n.g), x: n.x })).sort(byTick),
+      // 带调色板的 BELL 像子弹一样飞，落点同样要加偏移
+      bells: raw.bells.map((n) => {
+        const palette = palettes.get(n.palette);
+        return { t: tick(n.u, n.g), x: n.x + (palette && !palette.aimed ? palette.offset : 0), aimed: !!palette?.aimed };
+      }).sort(byTick),
       bullets: raw.bullets.map((n) => {
-        const palette = palettes.get(n.palette) || { shape: "CIR", large: false };
-        return { t: tick(n.u, n.g), x: n.x, damage: n.damage, shape: palette.shape, large: palette.large };
+        const palette = palettes.get(n.palette) || { offset: 0, aimed: false, shape: "CIR", large: false };
+        return {
+          t: tick(n.u, n.g), x: n.x + (palette.aimed ? 0 : palette.offset), aimed: palette.aimed,
+          damage: n.damage, shape: palette.shape, large: palette.large,
+        };
       }).sort(byTick),
       beams: [...beams.values()].map((beam) => ({
         width: beam.width, points: beam.points.map((pt) => ({ t: tick(pt.u, pt.g), x: pt.x })).sort(byTick),
@@ -365,8 +377,12 @@
 
   const FLOOR_LIMIT = 40;
 
-  // 装饰轨道的颜色号：常见的 0 / 1 / 19 对着游戏画面取红、绿、蓝，其余一律淡紫
-  const CL_COLORS = { 0: "#ff4f6e", 1: "#35d68f", 19: "#5aa8ff", other: "#b9a6ff" };
+  // 装饰轨道的颜色号 0–19 是角色代表色（ColorfulLaneAkari、…Yuzu、…Aoi 等），这里取近似色
+  const CL_COLORS = {
+    0: "#ff4f6e", 1: "#35d68f", 2: "#9a6bff", 3: "#ffb43c", 4: "#4a7bd8", 5: "#ff7fbf", 6: "#7a5cc8",
+    7: "#9fd8ff", 8: "#ffd23c", 9: "#c9a0ff", 10: "#ff9ad5", 11: "#ff9a3c", 12: "#5fd3c8", 13: "#c03a5a",
+    14: "#a0703c", 15: "#ffa0b4", 16: "#5a6070", 17: "#ff5a3c", 18: "#9aa0aa", 19: "#5aa8ff", other: "#b9a6ff",
+  };
 
   const f1 = (v) => Math.round(v * 10) / 10;
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
@@ -393,7 +409,7 @@
   }
 
   // 折线在 [from, to] 内的部分（端点插值补齐）。起点取瞬移之后、终点取瞬移之前的位置，
-  // 否则在瞬移那一刻截断的线段（比如墙封锁）会被拉到跳过去的位置上
+  // 否则在瞬移那一刻截断的线段（比如保护墙）会被拉到跳过去的位置上
   function clipPath(points, from, to) {
     if (points.length < 2 || points[points.length - 1].t < from || points[0].t > to) return [];
     const out = [];
@@ -520,19 +536,20 @@
       if (lane.kind !== "CL") continue;
       const pts = clipPath(lane.points, from, to);
       if (pts.length < 2) continue;
+      if (lane.hidden) continue;
       body.push(`<polyline class="deco" stroke="${CL_COLORS[lane.color] || CL_COLORS.other}" points="${pts.map((pt) => `${X(pt.x)},${Y(pt.t)}`).join(" ")}"/>`);
     }
 
     // 轨道和墙线
     for (const lane of model.lanes) {
-      if (!COLORS[lane.kind]) continue;
+      if (!COLORS[lane.kind] || lane.hidden) continue;
       const pts = clipPath(lane.points, from, to);
       if (pts.length < 2) continue;
       const cls = lane.kind === "WL" || lane.kind === "WR" ? "wall" : "rail";
       body.push(`<polyline class="${cls} k-${lane.kind}" points="${pts.map((pt) => `${X(pt.x)},${Y(pt.t)}`).join(" ")}"/>`);
     }
 
-    // 墙封锁（LBK）：墙线加粗成虚线
+    // 保护墙（LBK）：墙线加粗成虚线
     for (const block of model.blocks) {
       const lane = model.laneById.get(block.lane);
       if (!lane || block.end < from || block.t > to) continue;
@@ -568,7 +585,7 @@
     }
     for (const n of inRange(model.bells, from, to)) {
       if (n.x < o.xMin - 2 || n.x > o.xMax + 2) continue;
-      body.push(bellShape(X(n.x), Y(n.t)));
+      body.push(bellShape(X(n.x), Y(n.t), n.aimed));
     }
 
     // 首尾重叠区：盖一层半透明，提示这是前后栏的内容
@@ -580,12 +597,12 @@
 
     out.push(`<g clip-path="url(#c${col.index})">${body.join("")}</g>`);
 
-    // 变速条：栏右缘一条细带，慢＝青、快＝橙、停/倒退＝白
+    // 变速条：栏左缘一条细带，慢＝青、快＝橙、停＝灰、倒退＝红
     for (const s of model.soflans) {
       if (s.end < from || s.t > to || Math.abs(s.speed - 1) < 0.001) continue;
       const a = Math.max(s.t, from), b = Math.min(s.end, to);
       if (b <= a) continue;
-      const cls = s.speed <= 0.001 ? "sv-stop" : s.speed < 1 ? "sv-slow" : "sv-fast";
+      const cls = s.speed < -0.001 ? "sv-reverse" : s.speed <= 0.001 ? "sv-stop" : s.speed < 1 ? "sv-slow" : "sv-fast";
       out.push(`<rect class="sv ${cls}" x="${f1(left - 4.5)}" y="${Y(b)}" width="3" height="${f1(Y(a) - Y(b))}"/>`);
     }
 
@@ -718,6 +735,7 @@
   }
 
   function bulletShape(b, x, y) {
+    if (b.aimed) return `<g class="aimed">${bulletShape({ ...b, aimed: false }, x, y)}</g>`;
     // 弹幕常常很密，整体按 0.75 缩小，免得相邻的叠成一片
     const s = (b.large ? 1.4 : 1) * 0.75;
     const cls = `bullet d-${COLORS.bullet[b.damage] ? b.damage : "NML"}`;
@@ -737,8 +755,10 @@
     return `<circle class="${cls} ring" cx="${x}" cy="${y}" r="${f1(4.4 * s)}"/>`;
   }
 
-  function bellShape(x, y) {
-    return `<circle class="bell" cx="${x}" cy="${y}" r="3.6"/><circle class="bell-core" cx="${x}" cy="${y}" r="1.3"/>`;
+  // aimed：瞄准玩家的（落点取决于玩家当时的位置），画在出现位置上并调淡
+  function bellShape(x, y, aimed = false) {
+    const shape = `<circle class="bell" cx="${x}" cy="${y}" r="3.6"/><circle class="bell-core" cx="${x}" cy="${y}" r="1.3"/>`;
+    return aimed ? `<g class="aimed">${shape}</g>` : shape;
   }
 
   function trimNumber(value) {
@@ -767,7 +787,7 @@
         + `<polygon class="outside" points="${x + 12},${H} ${x + 9},${H} ${x},${H / 2} ${x + 12},${H / 2}"/>`
         + `<rect class="floorless" x="${x - 12}" y="0" width="24" height="${H / 2}"/>`
         + `<polyline class="wall k-WL" points="${x - 9},${H} ${x},${H / 2} ${x + 9},0"/><polyline class="wall k-WR" points="${x + 9},${H} ${x},${H / 2} ${x - 9},0"/>`; break;
-      case "soflan": inner = `<rect class="sv sv-slow" x="${x - 6}" y="2" width="4" height="${H - 4}"/><rect class="sv sv-fast" x="${x + 2}" y="2" width="4" height="${H - 4}"/>`; break;
+      case "soflan": inner = ["sv-slow", "sv-fast", "sv-stop", "sv-reverse"].map((cls, i) => `<rect class="sv ${cls}" x="${x - 13 + i * 7}" y="2" width="4" height="${H - 4}"/>`).join(""); break;
     }
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${inner}</svg>`;
   }

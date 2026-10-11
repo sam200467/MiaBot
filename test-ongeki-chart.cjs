@@ -209,7 +209,7 @@ test("FLICK 箭头朝向：L 画 ≪，R 画 ≫（尖端在拍点那一侧）",
   assert.equal(apex("flick-arrow crit"), 1);    // CFK … R
 });
 
-// Event Horizon 第 48–56 单位的墙（同一 tick 两个点 = 瞬移）和墙封锁，简化自实际谱面
+// Event Horizon 第 48–56 单位的墙（同一 tick 两个点 = 瞬移）和保护墙，简化自实际谱面
 const JUMP_WALLS = [
   "[HEADER]", "TRESOLUTION\t1920", "[LANE]",
   "WLS\t82\t48\t0\t-24", "WLN\t82\t49\t0\t0", "WLN\t82\t49\t0\t48", "WLN\t82\t50\t240\t48", "WLN\t82\t50\t240\t24",
@@ -250,7 +250,7 @@ test("装饰轨道（CL）按颜色号画成淡色细线", () => {
   assert.match(svg, /class="deco" stroke="#b9a6ff"/);
 });
 
-test("墙线瞬移：墙封锁停在瞬移之前的位置，不会被拉到跳过去的地方", () => {
+test("墙线瞬移：保护墙停在瞬移之前的位置，不会被拉到跳过去的地方", () => {
   const model = C.parseOgkr(JUMP_WALLS);
   const wl = model.laneById.get("82").points;
   const T = 49 * 1920;
@@ -261,7 +261,7 @@ test("墙线瞬移：墙封锁停在瞬移之前的位置，不会被拉到跳�
   const svg = C.renderSvg(model, C.layoutChart(model));
   for (const m of svg.matchAll(/<polyline class="block" points="([^"]+)"/g)) {
     const xs = m[1].split(" ").map((p) => Number(p.split(",")[0]));
-    assert.ok(Math.max(...xs) - Math.min(...xs) <= 24 * 2.5 + 0.5, "封锁线只在 ±24 到 0 之间走");
+    assert.ok(Math.max(...xs) - Math.min(...xs) <= 24 * 2.5 + 0.5, "保护墙虚线只在 ±24 到 0 之间走");
   }
 });
 
@@ -293,6 +293,34 @@ test("地板消失：两墙一起跳到场外、左右反转的区间整栏铺�
     "WLS\t90\t68\t0\t-24", "WLN\t90\t68\t145\t36", "WLN\t90\t68\t200\t36", "WLE\t90\t68\t480\t-24",
     "WRS\t214\t68\t0\t24", "WRN\t214\t68\t130\t36", "WRN\t214\t68\t260\t36", "WRE\t214\t68\t480\t24", "[NOTES]", "TAP\t0\t68\t0\t0\t0"].join("\n"));
   assert.deepEqual(C.floorlessRuns(sweep, 0, 70 * T), []);
+});
+
+test("子弹 / BELL 落点 = X + 调色板偏移；瞄准玩家的调淡；隐藏轨道不画；倒退变速单独上色", () => {
+  const lines = [
+    "[HEADER]", "TRESOLUTION\t1920",
+    "[B_PALETTE]",
+    "BPL\tK1\tUPS\t12\tFIX\t1.0\tN\tNDL\t0",
+    "BPL\tK2\tUPS\t-6\tFIX\t1.0\tN\tCIR\t0",
+    "BPL\tP1\tUPS\t4\tPLR\t1.0\tN\tCIR\t0",
+    "[COMPOSITION]", "SFL\t1\t0\t480\t-1.0", "SFL\t1\t960\t480\t0",
+    "[LANE]",
+    "LCS\t1\t0\t0\t0\t0\t0\t1", "LCE\t1\t2\t0\t0",
+    "LLS\t2\t0\t0\t-12", "LLE\t2\t2\t0\t-12",
+    "[BULLET]", "BLT\tK1\t0\t960\t-18\tNML", "BLT\tK2\t0\t960\t-18\tNML", "BLT\tP1\t0\t960\t10\tNML", "BLT\tZZ\t0\t960\t5\tNML",
+    "[BELL]", "BEL\t1\t0\t0\t--", "BEL\t1\t480\t0\tK2",
+    "[NOTES]", "TAP\t2\t0\t0\t-12\t0",
+  ];
+  const model = C.parseOgkr(lines.join("\n"));
+  assert.deepEqual(model.bullets.map((b) => [b.x, b.aimed]), [[-6, false], [-24, false], [10, true], [5, false]]);
+  assert.deepEqual(model.bells.map((b) => [b.x, b.aimed]), [[0, false], [-6, false]]);
+  assert.deepEqual(model.lanes.map((l) => [l.id, l.hidden]), [["1", true], ["2", false]]);
+  const svg = C.renderSvg(model, C.layoutChart(model));
+  assert.equal((svg.match(/class="rail k-C"/g) || []).length, 0, "隐藏的中轨不画");
+  assert.ok((svg.match(/class="rail k-L"/g) || []).length >= 1);
+  assert.equal((svg.match(/<g class="aimed">/g) || []).length, 1);
+  assert.match(svg, /class="sv sv-reverse"/);
+  assert.match(svg, /class="sv sv-stop"/);
+  assert.equal((C.legendSvg("soflan").match(/class="sv /g) || []).length, 4);
 });
 
 function tempTree(files) {

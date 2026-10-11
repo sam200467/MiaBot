@@ -251,6 +251,8 @@ h1 {
 .sv-slow { fill: #3cc8e6; }
 .sv-fast { fill: #ff9a3c; }
 .sv-stop { fill: #8a93a8; }
+.sv-reverse { fill: #ff4f6e; }
+.aimed { opacity: .45; }
 
 .measure-no { fill: #8b93a7; font: 700 11px "Noto CJK", sans-serif; }
 .rhythm { fill: #4d5568; font: 700 9.5px "Noto CJK", sans-serif; font-variant-numeric: tabular-nums; }
