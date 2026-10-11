@@ -295,7 +295,7 @@ function executeQuery(input, { preview = false, selectionKeys, excludeKeys = [],
   matched.sort((a, b) => {
     if (!known(a[field])) return known(b[field]) ? 1 : 0;
     if (!known(b[field])) return -1;
-    const diff = fields[field].type === "number" ? a[field] - b[field] : fields[field].type === "level" ? levelValue(a[field]) - levelValue(b[field]) : String(a[field]).localeCompare(String(b[field]));
+    const diff = fields[field].type === "number" ? a[field] - b[field] : fields[field].type === "level" ? levelValue(a[field]) - levelValue(b[field]) : String(a[field]).localeCompare(String(b[field]), "zh-CN");
     return (direction === "desc" ? -diff : diff) || a.songIndex - b.songIndex || DIFFICULTIES.indexOf(a.difficulty) - DIFFICULTIES.indexOf(b.difficulty);
   });
   let entries;
