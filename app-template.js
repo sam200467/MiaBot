@@ -1884,7 +1884,7 @@ async function renderSongDetailTheme(internalSong, recordData, playerName) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 单谱面分数线、容错与白金分分析（1800 × 1200）                       */
+/* 单谱面分数线、容错与白金分分析（1800 × 1600）                       */
 /* ------------------------------------------------------------------ */
 const CHART_INFO_DIFFICULTIES = Object.freeze({
   0: { position: 0, name: "BASIC", color: "#35c980" },
@@ -1938,6 +1938,7 @@ function buildChartInfoThemeData(song, difficultyId) {
   const catalogIndex = buildThemeCatalogIndex();
   const supplement = findSongSupplement(catalogIndex, song);
   const meta = supplement?.meta || {};
+  const extra = catalogIndex.sddtExtras?.[String(song.id)] || {};
   const artist = String(song?.artistName || meta.artist || "");
   const imageUrl = String(meta.image_url || "").trim();
   const jacketUrl = imageUrl
@@ -2007,6 +2008,17 @@ function buildChartInfoThemeData(song, difficultyId) {
       constant,
       noteCount,
       bellCount: Number.isFinite(bellCount) && bellCount >= 0 ? bellCount : 0,
+      // 以下是跟单曲成绩图同源的曲目信息，缺了就由主题显示“-”
+      chartDesigner: song.creator?.[position] ?? null,
+      genre: song.genre || null,
+      version: song.versionID || null,
+      bpm: song.bpm ?? null,
+      duration: extra.duration || null,
+      releaseDate: meta.song_release || null,
+      bossName: song.boss || null,
+      bossCardName: song.bossCardName || null,
+      bossLevel: song.bossLevel ?? null,
+      attribute: song.attributeType || null,
     },
     scoreRows,
     units: {
@@ -2034,7 +2046,7 @@ async function renderChartInfoTheme(data) {
   let browser = null;
   let cdp = null;
   try {
-    console.log("  正在渲染 1800×1200 单谱面分析图…");
+    console.log("  正在渲染 1800×1600 单谱面分析图…");
     browser = await launchEdge({ headless: true });
     cdp = new CDP(browser.wsUrl);
     await cdp.connect();
@@ -2042,7 +2054,7 @@ async function renderChartInfoTheme(data) {
     await cdp.send("Runtime.enable");
     await cdp.send("Emulation.setDeviceMetricsOverride", {
       width: 1800,
-      height: 1200,
+      height: 1600,
       deviceScaleFactor: 1,
       mobile: false,
     });
@@ -2052,7 +2064,7 @@ async function renderChartInfoTheme(data) {
       format: "png",
       fromSurface: true,
       captureBeyondViewport: false,
-      clip: { x: 0, y: 0, width: 1800, height: 1200, scale: 1 },
+      clip: { x: 0, y: 0, width: 1800, height: 1600, scale: 1 },
     });
     const buffer = Buffer.from(shot.data || "", "base64");
     if (buffer.length < 40000) throw new Error("单谱面分析图截图数据异常（文件过小）");

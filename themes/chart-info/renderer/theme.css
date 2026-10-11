@@ -60,7 +60,7 @@
 
 html, body {
   width: 1800px;
-  height: 1200px;
+  height: 1600px;
   margin: 0;
   overflow: hidden;
 }
@@ -77,11 +77,11 @@ body {
 
 #sheet {
   width: 1800px;
-  height: 1200px;
+  height: 1600px;
   padding: 32px;
   display: grid;
-  grid-template-rows: 100px 1000px 22px;
-  gap: 16px;
+  grid-template-rows: 92px 372px 438px minmax(0, 1fr) 40px;
+  gap: 18px;
 }
 
 .panel,
@@ -101,52 +101,39 @@ body {
   justify-content: space-between;
 }
 
-.page-header p,
-.section-title span {
-  margin: 0 0 3px;
-  color: #85a9df;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: .13em;
-}
-
 .page-header h1 {
   margin: 0;
   font-size: 46px;
   line-height: 1.12;
 }
 
-.dashboard {
-  display: grid;
-  grid-template-columns: 418px minmax(0, 1fr);
-  gap: 18px;
-}
-
 .panel { border-radius: 24px; }
 
-.identity-panel {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
+/* ---------- 曲目信息：曲绘 + 信息 + 难度卡 ---------- */
+.hero-panel {
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 322px minmax(0, 1fr) 236px;
+  gap: 30px;
   min-height: 0;
 }
 
 .jacket-frame {
   position: relative;
-  width: 376px;
-  height: 376px;
-  flex-shrink: 0;
+  width: 322px;
+  height: 322px;
   overflow: hidden;
   border: 1px solid rgba(209, 222, 247, .24);
   border-radius: 22px;
   background: #101d30;
+  box-shadow: 0 14px 34px rgba(30, 64, 48, .22);
 }
 
 .jacket-frame::after {
   content: "";
   position: absolute;
   inset: 0;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), inset 0 -70px 80px rgba(2, 8, 18, .2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
   pointer-events: none;
 }
 
@@ -157,175 +144,214 @@ body {
   object-fit: cover;
 }
 
-.difficulty-ribbon {
-  position: absolute;
-  z-index: 2;
-  right: 8px;
-  bottom: 8px;
+.song-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
 
-  padding: 8px 17px 10px;
+.song-info h2,
+.song-info p {
+  margin: 0;
+  overflow: hidden;
   white-space: nowrap;
-
-  border: 1px solid color-mix(in srgb, var(--difficulty) 65%, white 20%);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--difficulty) 72%, #111827 28%);
-
-  font-size: 20px;
-  line-height: 1;
-  font-weight: 700;
-  color: #fff;
+  text-overflow: ellipsis;
+  font-family: "Gakusan Maru", sans-serif;
 }
 
-.song-copy {
-  padding: 8px 4px 5px;
-
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 18px;
+.song-info h2 {
+  font-size: 46px;
+  line-height: 1.2;
 }
 
-.song-info {
+.song-info p {
+  margin-top: 2px;
+  color: #52667c;
+  font-size: 22px;
+}
+
+.song-tags {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  gap: 10px;
   min-width: 0;
 }
 
-.song-constant {
-  flex-shrink: 0;
-  min-width: 58px;
-  text-align: center;
-}
-
-.song-constant span {
-  display: block;
-  margin-bottom: 1px;
-
-  color: #52667c;
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: .06em;
-}
-
-.song-constant strong {
-  display: block;
-
-  color: #142437;
-  font-size: 30px;
-  line-height: 1;
-  font-weight: 700;
-}
-
-.song-copy h2 {
-  margin: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 30px;
-  font-family: Gakusan Maru, sans-serif;
-}
-
-.song-copy p {
-  margin: 1px 0 0;
-  transform: translateY(-5px);
-
-  overflow: hidden;
-  color: #52667c;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 20px;
-  font-family: Gakusan Maru, sans-serif;
-}
-
-.difficulty-card {
-  min-height: 90px;
-  padding: 13px 15px;
-  border: 1px solid rgba(255, 255, 255, .88);
-  border-radius: 18px;
-  display: grid;
-  grid-template-columns: 1fr 158px;
-  align-items: center;
-  gap: 10px;
-  background: transparent;
-  color: #142437;
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
-}
-
-.difficulty-card > div > span,
-.difficulty-card dt,
-.chart-facts span {
-  display: block;
-  color: #b9c4d9;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .06em;
-}
-
-.difficulty-card > div > span,
-.difficulty-card dt { color: #52667c; }
-
-.difficulty-card > div > strong {
-  display: block;
-  margin-top: 2px;
-  font-size: 24px;
-}
-
-.difficulty-card dl {
-  margin: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.song-tags li {
+  min-width: 0;
+  padding: 6px 14px;
+  display: flex;
+  align-items: baseline;
   gap: 8px;
+  border: 1px solid rgba(57, 84, 112, .16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .34);
+  white-space: nowrap;
 }
 
-.difficulty-card dl > div {
-  padding: 8px 9px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, .16);
-}
-
-.difficulty-card dd {
-  margin: 1px 0 0;
-  font-size: 19px;
+.song-tags span {
+  color: #52667c;
+  font-size: 14px;
   font-weight: 700;
+  letter-spacing: .04em;
 }
+
+.song-tags strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 17px;
+}
+
+#attribute::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #8a99ab;
+  vertical-align: 1px;
+}
+
+#attribute[data-tone="fire"]::before { background: #ec5a4f; }
+#attribute[data-tone="aqua"]::before { background: #3c9be8; }
+#attribute[data-tone="leaf"]::before { background: #3dbb5c; }
 
 .chart-facts {
-  margin-top: 10px;
+  margin-top: auto;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .chart-facts > div {
-  padding: 9px 11px;
+  min-width: 0;
+  padding: 9px 14px 10px;
   border: 1px solid rgba(57, 84, 112, .16);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, .14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .2);
 }
 
+.chart-facts > div.wide { grid-column: span 2; }
+
 .chart-facts span {
+  display: block;
   color: #52667c;
-  font-size: 18px;   /* 原来 11px */
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .04em;
 }
 
 .chart-facts strong {
   display: block;
   margin-top: 3px;
-  font-size: 21px;   /* 原来 17px */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 23px;
+  line-height: 1.25;
 }
 
-.unit-section {
-  margin-top: 24px;
-  padding-top: 26px;
-  border-top: 1px solid rgba(57, 84, 112, .16);
+/* 难度卡：沿用整张图的浅色玻璃底，只用难度色做描边、顶条和文字点缀 */
+.difficulty-card {
+  --difficulty: #9b63ea;
+  --difficulty-ink: color-mix(in srgb, var(--difficulty) 62%, #142437 38%);
+  position: relative;
+  overflow: hidden;
+  padding: 26px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid color-mix(in srgb, var(--difficulty) 45%, white 55%);
+  border-radius: 20px;
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--difficulty) 16%, rgba(255, 255, 255, .5)),
+    rgba(255, 255, 255, .16) 70%);
 }
 
-.unit-section .mini-table {
-  margin-top: -16px;
+.difficulty-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 6px;
+  background: var(--difficulty);
 }
 
-.mini-row span {
-  font-size: 14px;
+.card-label {
+  color: #52667c;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .14em;
 }
+
+#difficulty-name {
+  margin-top: 6px;
+  color: var(--difficulty-ink);
+  font-size: 38px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+
+.difficulty-card dl {
+  margin: auto 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.difficulty-card dl > div {
+  padding: 10px 14px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .34);
+}
+
+.difficulty-card dt {
+  color: #52667c;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.difficulty-card dd {
+  margin: 0;
+  color: #142437;
+  font-size: 40px;
+  line-height: 1.05;
+  font-weight: 700;
+}
+
+/* ---------- 分数线 + 单项分值 ---------- */
+.analysis-row {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 18px;
+}
+
+.unit-panel { padding: 22px 24px; }
+
+.mini-table {
+  overflow: hidden;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, .16);
+}
+
+.mini-row {
+  height: 47px;
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(57, 84, 112, .14);
+  display: grid;
+  grid-template-columns: 1fr 90px;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+
+.mini-row:last-child { border-bottom: 0; }
+.mini-row strong { text-align: right; font-size: 17px; }
 
 .section-title {
   min-height: 57px;
@@ -346,40 +372,6 @@ body {
   color: #52667c;
   font-size: 18px;
   white-space: nowrap;
-}
-
-.compact-title {
-  min-height: 50px;
-  transform: translateY(-9px);
-}
-.compact-title h3 { font-size: 19px; }
-.compact-title span { font-size: 10px; }
-
-.mini-table {
-  overflow: hidden;
-  border-radius: 15px;
-  background: rgba(255, 255, 255, .16);
-}
-
-.mini-row {
-  height: 39px;
-  padding: 0 12px;
-  border-bottom: 1px solid rgba(57, 84, 112, .14);
-  display: grid;
-  grid-template-columns: 1fr 74px;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.mini-row:last-child { border-bottom: 0; }
-.mini-row strong { text-align: right; font-size: 13px; }
-
-.content-column {
-  min-width: 0;
-  display: grid;
-  grid-template-rows: 438px 544px;
-  gap: 18px;
 }
 
 .score-panel,
@@ -431,7 +423,7 @@ tbody tr:last-child td { border-bottom: 0; }
 
 .platinum-panel th, .platinum-panel td { height: 53px; }
 .platinum-panel th { height: 42px; }
-.platinum-panel th:first-child { width: 150px; }
+.platinum-panel th:first-child { width: 190px; }
 
 .stars {
   display: flex;
@@ -494,33 +486,4 @@ footer strong {
   background: #4e1424;
   color: white;
   font-size: 25px;
-}
-
-/* MASTER / ADVANCED / EXPERT 等难度标签 */
-#difficulty-name {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  margin-top: 3px;
-  padding: 7px 14px 8px;
-
-  border: 1px solid color-mix(in srgb, var(--difficulty) 65%, white 20%);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--difficulty) 72%, #111827 28%);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, .18);
-
-  color: #fff;
-  font-size: 16px;
-  line-height: 1;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-/* 把外面的大框缩小一点 */
-.difficulty-card {
-  min-height: 50px;
-  padding: 8px 12px;
-  grid-template-columns: 1fr 140px;
-  gap: 8px;
 }

@@ -66,7 +66,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     });
     await send("Page.enable");
     await send("Runtime.enable");
-    await send("Emulation.setDeviceMetricsOverride", { width: 1800, height: 1200, deviceScaleFactor: 1, mobile: false });
+    await send("Emulation.setDeviceMetricsOverride", { width: 1800, height: 1600, deviceScaleFactor: 1, mobile: false });
     await send("Page.navigate", { url: pathToFileURL(path.join(renderer, "theme.html")).href });
     let state;
     for (let index = 0; index < 240; index += 1) {
@@ -77,7 +77,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
       await sleep(250);
     }
     if (!state?.ready) throw new Error("等待谱面分析主题渲染超时");
-    const shot = await send("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: false, clip: { x: 0, y: 0, width: 1800, height: 1200, scale: 1 } });
+    const shot = await send("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: false, clip: { x: 0, y: 0, width: 1800, height: 1600, scale: 1 } });
     fs.writeFileSync(output, Buffer.from(shot.data, "base64"));
     console.log(output);
   } finally {
