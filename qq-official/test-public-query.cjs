@@ -195,7 +195,7 @@ test("翻页不漏不重，零结果/页码越界/计数都保留条件与来源
   assert.match(formatResult(executeQuery({ ...query, page: 999 })), /超出范围/);
   const empty = formatResult(run([filter("bpm", "gt", 99999)]));
   assert.match(empty, /BPM＞99999/); assert.match(empty, /0 首/); assert.match(empty, /没匹配到/);
-  assert.match(formatResult(run([], { mode: "count" })), /本地音击曲库快照/);
+  assert.match(formatResult(run([], { mode: "count" })), /^符合条件：\d+ 首$/m, "不再每条都注「本地音击曲库快照」");
 });
 
 test("换了新条目重新上架的歌，已删除的旧条目不再算进来", () => {
@@ -373,4 +373,14 @@ test("排版：开头说明、结果列表、页码分段；每首带附加行�
   const withIds = formatResult(run([filter("title", "contains", "ai")], { select: ["title", "botId"] })).split("\n\n");
   assert.ok(withIds.slice(1, -1).every(block => /^《[^\n]+》[^\n]*\nID：/.test(block)), "每首一段");
   assert.doesNotMatch(formatResult(run([filter("title", "eq", "Titania")], { select: ["title"] })), /第 1\/1 页/, "只有一页时不写页码");
+});
+
+test("按歌名排序用读音（五十音），不按汉字的拼音；只在游戏数据里的已删歌也排得进去", () => {
+  const titles = all({ filters: [filter("deleted", "eq", true)], select: ["title"] }).map(e => e.title);
+  const at = title => { const i = titles.indexOf(title); assert.ok(i >= 0, title); return i; };
+  // 原来按拼音：腐れ外道(fu)→告白(gao)→紅蓮華(hong)→花ハ(hua)→回レ(hui)。
+  for (const [a, b] of [["腐れ外道とチョコレゐト", "紅蓮華"], ["紅蓮華", "告白バンジージャンプ"], ["花ハ踊レヤいろはにほ", "回レ！雪月花"]]) assert.ok(at(a) < at(b), `${a} 在 ${b} 前面`);
+  // 曲库没有读音的（游戏数据补上的已删歌）：君の知らない物語(キミ)排在紅蓮華(クレンケ)前面，不再全堆在最后。
+  assert.ok(at("君の知らない物語") < at("紅蓮華"));
+  assert.ok(at("ADAMAS") < at("あの世行きのバスに乗ってさらば。"), "英文在假名前面");
 });

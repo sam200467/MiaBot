@@ -177,11 +177,14 @@ const isHintLine = line => line.length > 0 && line.every(part => part?.hint);
 // QQ 的指令链接：<qqbot-cmd-input text="…" show="…" />，点了只填输入框、不直接发出；群里会自动带上 @美亚（2026-10-10 实测）。
 // 属性值里放不下半角双引号和尖括号（《Snow in "I love you"》），这种曲名不做链接、照原样显示。
 // 单个换行在 QQ 的 Markdown 里就是换行（同日实测），所以行与行之间不用改成空一行。
+// 曲名、谱师名里的 Markdown 符号（《ワタシConnect*》《セガサターン起動音[H.][Remix]》）反斜杠转义掉，免得被当成粗体、链接。
+// 只转会触发格式的那几个；括号、感叹号这些不转，万一 QQ 不认转义，满屏反斜杠的也只是极少数曲名。
+const escapeMarkdown = text => String(text).replace(/[\\`*_~#<>\[\]|]/g, ch => "\\" + ch);
 function markdownLine(line) {
   return line.map(part => {
-    if (typeof part === "string") return part;
+    if (typeof part === "string") return escapeMarkdown(part);
     if (part.hint) return part.hint;
-    if (/["<>&]/.test(part.text + part.command)) return part.text;
+    if (/["<>&]/.test(part.text + part.command)) return escapeMarkdown(part.text);
     return `<qqbot-cmd-input text="${part.command}" show="${part.text}" reference="false" />`;
   }).join("");
 }
@@ -239,4 +242,4 @@ function replyChunks(query, limit) {
   });
 }
 
-module.exports = { search, reply, replyChunks, SEARCH_SPEC };
+module.exports = { search, reply, replyChunks, escapeMarkdown, SEARCH_SPEC };

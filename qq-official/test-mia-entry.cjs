@@ -1225,7 +1225,7 @@ test("公共查询的翻页按钮：绑发起人；本人点了按存的查询�
     const first = mock.state.sent.at(-1).body;
     assert.equal(first.msg_type, 2);
     assert.match(first.markdown.content, /第 1\/\d+ 页，点下面的按钮翻页吧。$/, "挂着按钮就别叫人回复「下一页」");
-    assert.match(first.markdown.content, /本地音击曲库快照）\n\n《/, "开头说明和结果列表之间空一行，不被折叠");
+    assert.match(first.markdown.content, /符合条件：\d+ 首\n\n《/, "开头说明和结果列表之间空一行，不被折叠");
     const buttons = first.keyboard.content.rows.flatMap((r) => r.buttons);
     assert.deepEqual(buttons.map((b) => b.id), ["next", "last"], "公共查询没有页码按钮（没有可手填的指令）");
     assert.equal(buttons[0].action.data, "mia:U1:第2页", "按钮绑着发起人");

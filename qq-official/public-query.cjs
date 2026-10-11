@@ -218,10 +218,25 @@ for (const char of characters?.characters || []) {
     if (char.personal && titleKey(char.personal.title) === key) entry.personalFor.push(char.name);
   }
 }
-function songBase(songIndex, { title, artist, genre, version, release, bpm, deleted, officialId }) {
+// 按歌名排序用读音：曲库每首都带 reading（片假名、去掉浊点和长音、小写假名写大、英文大写，跟游戏里的排序键一样），
+// 汉字曲名按中文排序会变成拼音顺序（腐れ外道→告白→紅蓮華）。只在游戏数据里的歌没有 reading：
+// 汉字开头的那几首（全是已删歌，不会再变）在下面手写读音，其余的拿曲名照同样规则转。
+const SMALL_KANA = { ァ: "ア", ィ: "イ", ゥ: "ウ", ェ: "エ", ォ: "オ", ッ: "ツ", ャ: "ヤ", ュ: "ユ", ョ: "ヨ", ヮ: "ワ", ヵ: "カ", ヶ: "ケ" };
+const gameReading = text => String(text).normalize("NFKC").toUpperCase()
+  .replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60))
+  .normalize("NFD").replace(/[\u3099\u309a]/g, "").normalize("NFC")
+  .replace(/[ァィゥェォッャュョヮヵヶ]/g, ch => SMALL_KANA[ch]).replace(/[ー\s\p{P}\p{S}]/gu, "");
+const EXTRA_READINGS = {
+  "極上スマイル": "ゴクジョウスマイル", "君の知らない物語": "キミノシラナイモノガタリ", "終わりの先の音節": "オワリノサキノオンセツ",
+  "春擬き": "ハルモドキ", "深海のリトルクライ feat. 土岐麻子": "シンカイノリトルクライFEATトキアサコ", "星のダイアローグ": "ホシノダイアローグ",
+  "星屑☆シーカー": "ホシクズシーカー", "超電磁少女Days": "チョウデンジショウジョDAYS", "徒花ネクロマンシー": "アダバナネクロマンシー",
+  "怒槌～光吉猛修一部謎～": "イカヅチミツヨシタケノブイチブナゾ", "透明声彩": "トウメイセイサイ", "緋蜂": "ヒバチ", "流星": "リュウセイ",
+  "連れ去って・閉じ込めて・好きにして": "ツレサッテトジコメテスキニシテ",
+};
+function songBase(songIndex, { title, reading, artist, genre, version, release, bpm, deleted, officialId }) {
   const roles = rolesByTitle.get(titleKey(title)) || {};
   return {
-    songIndex, songKey: `${textKey(title)}\0${textKey(artist)}`, title, artist, genre, version, release, bpm: numeric(bpm), deleted, officialId,
+    songIndex, songKey: `${textKey(title)}\0${textKey(artist)}`, title, reading: reading || gameReading(EXTRA_READINGS[title] ?? title), artist, genre, version, release, bpm: numeric(bpm), deleted, officialId,
     singer: roles.singer || [], originalFor: roles.originalFor || [], personalFor: roles.personalFor || [],
   };
 }
@@ -245,7 +260,7 @@ function chartRow(base, difficulty, chart, v, botId, supplemental) {
 const rows = [
   ...catalogSongs.flatMap((song, songIndex) => {
     const meta = song.meta;
-    const base = songBase(songIndex, { title: meta.name, artist: meta.artist, genre: meta.genre, version: meta.song_release_version,
+    const base = songBase(songIndex, { title: meta.name, reading: meta.reading, artist: meta.artist, genre: meta.genre, version: meta.song_release_version,
       release: meta.song_release, bpm: meta.bpm, deleted: Boolean(meta.is_deleted), officialId: String(meta.official_id ?? "") });
     return DIFFICULTIES.flatMap((difficulty, i) => {
       const found = [];
@@ -314,7 +329,8 @@ function executeQuery(input, { preview = false, selectionKeys, excludeKeys = [],
   matched.sort((a, b) => {
     if (!known(a[field])) return known(b[field]) ? 1 : 0;
     if (!known(b[field])) return -1;
-    const diff = fields[field].type === "number" ? a[field] - b[field] : fields[field].type === "level" ? levelValue(a[field]) - levelValue(b[field]) : String(a[field]).localeCompare(String(b[field]), "zh-CN");
+    const diff = fields[field].type === "number" ? a[field] - b[field] : fields[field].type === "level" ? levelValue(a[field]) - levelValue(b[field])
+      : field === "title" ? a.reading.localeCompare(b.reading, "ja") || a.title.localeCompare(b.title, "ja") : String(a[field]).localeCompare(String(b[field]), "zh-CN");
     return (direction === "desc" ? -diff : diff) || a.songIndex - b.songIndex || DIFFICULTIES.indexOf(a.difficulty) - DIFFICULTIES.indexOf(b.difficulty);
   });
   let entries;
@@ -371,7 +387,7 @@ const CHART_FIELDS = ["difficulty", "level", "constant", "notes", "bells", "desi
 // 空行要发得出去，QQ 入口靠路由结果上的 preformatted 不折叠它（见 semantic-router.cjs 的 queryReply）。
 function formatResult(result) {
   const { query, total, pages } = result, unit = query.entity === "songs" ? "首" : "张谱面";
-  const lines = [!total ? "唔，按这些条件暂时没找到匹配的记录。" : result.fuzzy ? "没找到完全匹配的，美亚翻到了这些近似曲名，看看是不是你要找的？" : "查到啦，给你整理在这里♪", `筛选：${describeQuery(query)}`, `${result.fuzzy ? "近似候选" : "符合条件"}：${total} ${unit}（${result.source}）`];
+  const lines = [!total ? "唔，按这些条件暂时没找到匹配的记录。" : result.fuzzy ? "没找到完全匹配的，美亚翻到了这些近似曲名，看看是不是你要找的？" : "查到啦，给你整理在这里♪", `筛选：${describeQuery(query)}`, `${result.fuzzy ? "近似候选" : "符合条件"}：${total} ${unit}`];
   if (query.selection.excludePrevious && query.selection.kind === "all") lines.push(`排除上一批后：${result.eligibleTotal} ${unit}`);
   if (query.selection.kind !== "all") {
     lines[0] = result.selectedTotal ? query.selection.kind === "random" ? "喵哼哼，帮你抽好啦♪" : "按顺序帮你选出来啦♪" : "唔，按这些条件没有可选的新结果啦。";

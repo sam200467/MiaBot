@@ -543,9 +543,10 @@ function createMiaBot(config, deps = {}) {
         const pager = !file && message.__pager;
         const sent = pager
           // 挂着按钮时，结尾那句「回复「下一页」」换成指向按钮的说法；按钮被拒时发原文（markdownWithoutKeyboard）。
-          ? await transport.sendMarkdown(makeTarget(e), cleaned.replace(PAGE_REPLY_HINT, "，点下面的按钮翻页吧。"), cleaned, e.msgId, e.refId, {
+          // 曲名里的 Markdown 符号转义掉，见 song-search.cjs 的 escapeMarkdown；纯文本补发用原文。
+          ? await transport.sendMarkdown(makeTarget(e), songSearch.escapeMarkdown(cleaned.replace(PAGE_REPLY_HINT, "，点下面的按钮翻页吧。")), cleaned, e.msgId, e.refId, {
             keyboard: pagerKeyboard({ ...pager, owner: e.userId, jump: (page) => "第" + page + "页" }),
-            markdownWithoutKeyboard: cleaned,
+            markdownWithoutKeyboard: songSearch.escapeMarkdown(cleaned),
           })
           : await send(e, cleaned, file);
         if (e.type === "group") remember(e.openid, settings.characterName, cleaned + (file ? "（图片）" : ""));

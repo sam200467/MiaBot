@@ -298,3 +298,8 @@ test("打不出来的曲名：希腊字母按拼写、《∀》按叫法都搜�
   // 叫法只认符号那几首，不把单个字母「a」也当成《∀》
   assert.ok(!names("a").includes("∀"));
 });
+
+test("Markdown 里曲名的格式符号转义掉，纯文本照原样", () => {
+  const { escapeMarkdown } = require("./song-search.cjs");
+  assert.equal(escapeMarkdown("ワタシConnect* [H.][Remix] ALLNIGHT_DANCER #1 (ok)!"), "ワタシConnect\\* \\[H.\\]\\[Remix\\] ALLNIGHT\\_DANCER \\#1 (ok)!");
+});
