@@ -402,8 +402,9 @@
     return out;
   }
 
-  // 左墙跑到右墙右边的区间（左右反转），返回每段反转区域的多边形：[{ t, wr, wl }…]
-  function invertedRuns(model, from, to) {
+  // 地板消失的区间：左墙不在右墙左边（两墙重合、一起瞬移到场外，或左右反转）。
+  // 这时角色只能悬空，游戏画面整片压暗。返回 [{ start, end, inverted }]，inverted = 期间出现过左墙在右墙右边
+  function floorlessRuns(model, from, to) {
     const wall = (kind) => model.lanes.filter((lane) => lane.kind === kind).flatMap((lane) => lane.points).sort((a, b) => a.t - b.t);
     const wl = wall("WL"), wr = wall("WR");
     if (wl.length < 2 || wr.length < 2) return [];
@@ -412,24 +413,27 @@
     const ticks = [...new Set([lo, hi, ...[...wl, ...wr].map((pt) => pt.t).filter((t) => t > lo && t < hi)])].sort((a, b) => a - b);
     const runs = [];
     let run = null;
-    const close = () => { if (run) runs.push(run); run = null; };
-    const add = (t, l, r) => {
-      if (!run) run = [];
-      const last = run[run.length - 1];
-      if (!last || last.t !== t || last.wl !== l || last.wr !== r) run.push({ t, wl: l, wr: r });
-    };
+    const open = (t, inverted) => { if (!run) run = { start: t, end: t, inverted: false }; run.inverted = run.inverted || inverted; };
+    const close = (t) => { if (run) { run.end = t; if (run.end > run.start) runs.push(run); } run = null; };
     for (let i = 0; i + 1 < ticks.length; i++) {
       const a = ticks[i], b = ticks[i + 1];
-      const la = interpolate(wl, a), ra = interpolate(wr, a), lb = interpolate(wl, b, true), rb = interpolate(wr, b, true);
-      const da = la - ra, db = lb - rb;
-      if (da <= 0 && db <= 0) { close(); continue; }
-      if (da > 0 && db > 0) { add(a, la, ra); add(b, lb, rb); continue; }
-      const k = da / (da - db), tc = a + (b - a) * k, xc = la + (lb - la) * k;
-      if (da > 0) { add(a, la, ra); add(tc, xc, xc); close(); }
-      else { close(); add(tc, xc, xc); add(b, lb, rb); }
+      // 宽度 = 右墙 − 左墙；区间两端分别取瞬移之后 / 之前的位置
+      const wa = interpolate(wr, a) - interpolate(wl, a), wb = interpolate(wr, b, true) - interpolate(wl, b, true);
+      if (wa > 0 && wb > 0) { close(a); continue; }
+      if (wa <= 0 && wb <= 0) { open(a, wa < 0 || wb < 0); run.end = b; continue; }
+      const tc = a + (b - a) * wa / (wa - wb);   // 宽度过零的时刻
+      if (wa <= 0) { open(a, wa < 0); close(tc); }
+      else { close(a); open(tc, wb < 0); run.end = b; }
     }
-    close();
-    return runs.filter((r) => r.length >= 2 && r[r.length - 1].t > r[0].t);
+    close(run ? run.end : hi);
+    // 相邻（首尾相接）的合并
+    const merged = [];
+    for (const r of runs) {
+      const last = merged[merged.length - 1];
+      if (last && r.start <= last.end) { last.end = Math.max(last.end, r.end); last.inverted = last.inverted || r.inverted; }
+      else merged.push({ ...r });
+    }
+    return merged;
   }
 
   function inRange(list, from, to) {
@@ -477,12 +481,10 @@
       body.push(`<polygon class="outside" points="${edge},${Y(pts[0].t)} ${line.join(" ")} ${edge},${Y(pts[pts.length - 1].t)}"/>`);
     }
 
-    // 左右反转：左墙跑到右墙右边时，两墙之间仍然是场地（游戏里照样是黑底、能看到轨道）。
-    // 上面两侧的墙外阴影在这里会互相盖住，把两墙之间重新铺回场地底色
-    const inverted = invertedRuns(model, from, to);
-    for (const run of inverted) {
-      const right = run.map((pt) => `${X(pt.wl)},${Y(pt.t)}`).reverse();
-      body.push(`<polygon class="inverted" points="${run.map((pt) => `${X(pt.wr)},${Y(pt.t)}`).join(" ")} ${right.join(" ")}"/>`);
+    // 地板消失（两墙重合、一起跳到场外或左右反转）：角色悬空，整栏宽铺一层青色，和游戏里压暗的画面对应
+    const floorless = floorlessRuns(model, from, to);
+    for (const run of floorless) {
+      body.push(`<rect class="floorless" x="${X(o.xMin - 2)}" y="${Y(run.end)}" width="${f1(col.width + 10)}" height="${f1(Number(Y(run.start)) - Number(Y(run.end)))}"/>`);
     }
 
     // 拍线与小节线
@@ -597,11 +599,11 @@
       if (e.t < col.start || e.t >= col.end || !/BOSS/i.test(e.label)) continue;
       labels.push({ y: Y(e.t), text: "BOSS", cls: "event-mark" });
     }
-    for (const run of inverted) {
-      if (run[0].t < col.start || run[0].t >= col.end) continue;
-      labels.push({ y: Y(run[0].t), text: "反转", cls: "invert-mark" });
+    for (const run of floorless) {
+      if (run.start < col.start || run.start >= col.end) continue;
+      labels.push({ y: Number(Y(run.start)) - 11, text: run.inverted ? "反转" : "悬空", cls: "floorless-mark" });
     }
-    // 挨得太近的标签只留优先级高的（小节号 > BPM > 拍号 > 事件 > 反转），连续变速时不会叠成一摞
+    // 挨得太近的标签只留优先级高的（小节号 > BPM > 拍号 > 事件 > 悬空），连续变速时不会叠成一摞
     const kept = [];
     for (const label of labels) {
       const y = Number(label.y);
@@ -751,10 +753,11 @@
       case "damage": inner = bulletShape({ shape: "CIR", damage: "NML" }, x - 10, y) + bulletShape({ shape: "CIR", damage: "STR" }, x, y) + bulletShape({ shape: "CIR", damage: "DNG" }, x + 10, y); break;
       case "beam": inner = `<rect class="beam" x="${x - 6}" y="1" width="12" height="${H - 2}"/><line class="beam-core" x1="${x}" x2="${x}" y1="1" y2="${H - 1}"/>`; break;
       case "block": inner = `<line class="wall k-WL" x1="${x}" x2="${x}" y1="1" y2="${H - 1}"/><line class="block" x1="${x}" x2="${x}" y1="4" y2="${H - 4}"/>`; break;
-      // 两墙交叉：下半截正常，上半截左墙在右，两墙之间（菱形里外）都还是场地，墙外压暗
-      case "inverted": inner = `<rect class="col-bg" x="${x - 12}" y="0" width="24" height="${H}"/>`
-        + `<polygon class="outside" points="${x - 12},${H} ${x - 9},${H} ${x},${H / 2} ${x - 9},0 ${x - 12},0"/>`
-        + `<polygon class="outside" points="${x + 12},${H} ${x + 9},${H} ${x},${H / 2} ${x + 9},0 ${x + 12},0"/>`
+      // 两墙收拢后交叉：交叉那段地板消失，整片铺青色
+      case "floorless": inner = `<rect class="col-bg" x="${x - 12}" y="0" width="24" height="${H}"/>`
+        + `<polygon class="outside" points="${x - 12},${H} ${x - 9},${H} ${x},${H / 2} ${x - 12},${H / 2}"/>`
+        + `<polygon class="outside" points="${x + 12},${H} ${x + 9},${H} ${x},${H / 2} ${x + 12},${H / 2}"/>`
+        + `<rect class="floorless" x="${x - 12}" y="0" width="24" height="${H / 2}"/>`
         + `<polyline class="wall k-WL" points="${x - 9},${H} ${x},${H / 2} ${x + 9},0"/><polyline class="wall k-WR" points="${x + 9},${H} ${x},${H / 2} ${x - 9},0"/>`; break;
       case "soflan": inner = `<rect class="sv sv-slow" x="${x - 6}" y="2" width="4" height="${H - 4}"/><rect class="sv sv-fast" x="${x + 2}" y="2" width="4" height="${H - 4}"/>`; break;
     }
@@ -774,5 +777,5 @@
     return lo === hi ? trimNumber(lo) : `${trimNumber(lo)}–${trimNumber(hi)}`;
   }
 
-  return { parseOgkr, layoutChart, renderSvg, legendSvg, measuresOf, interpolate, invertedRuns, clipPath, flickRuns, rhythmMarks, rhythmLabel, formatDuration, bpmText, DEFAULTS, COLORS };
+  return { parseOgkr, layoutChart, renderSvg, legendSvg, measuresOf, interpolate, floorlessRuns, clipPath, flickRuns, rhythmMarks, rhythmLabel, formatDuration, bpmText, DEFAULTS, COLORS };
 });

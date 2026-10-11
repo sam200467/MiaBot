@@ -265,22 +265,24 @@ test("墙线瞬移：墙封锁停在瞬移之前的位置，不会被拉到跳�
   }
 });
 
-test("左右反转：左墙越过右墙的区间两墙之间铺回场地底色，并标出", () => {
+test("地板消失：两墙重合、一起跳到场外、左右反转的区间整栏铺青色并标出", () => {
   const model = C.parseOgkr(JUMP_WALLS);
   const T = 1920;
-  const runs = C.invertedRuns(model, 0, 60 * T);
-  assert.equal(runs.length, 1);
-  const run = runs[0];
-  // 55:240 两墙都在 0，之后左墙往右、右墙往左，55:1200 又回到 0
-  assert.equal(run[0].t, 55 * T + 240);
-  assert.equal(run.at(-1).t, 55 * T + 1200);
-  assert.ok(run.some((pt) => pt.wl === 36 && pt.wr === -36));
-  // 49:0 瞬移到同一位置（两墙都在 48）不算反转
+  const runs = C.floorlessRuns(model, 0, 60 * T);
+  // 49:0 两墙收成一点并一起跳到 x=48，50:240 回到 24 后才重新张开
+  // 55:240 收成一点后左右反转，55:1200 收回同一点后再张开
+  assert.deepEqual(runs.map((r) => [r.start, r.end, r.inverted]), [
+    [49 * T, 50 * T + 240, false],
+    [55 * T + 240, 55 * T + 1200, true],
+  ]);
   const svg = C.renderSvg(model, C.layoutChart(model));
-  assert.equal((svg.match(/class="inverted"/g) || []).length, 1);
-  assert.match(svg, /class="invert-mark"[^>]*>反转</);
-  assert.match(C.legendSvg("inverted"), /class="col-bg"/);
+  assert.ok((svg.match(/class="floorless"/g) || []).length >= 2);
+  assert.match(svg, /class="floorless-mark"[^>]*>悬空</);
+  assert.match(svg, /class="floorless-mark"[^>]*>反转</);
+  assert.match(C.legendSvg("floorless"), /class="floorless"/);
   assert.match(C.legendSvg("block"), /class="block"/);
+  // 正常张开的墙没有悬空区间
+  assert.deepEqual(C.floorlessRuns(C.parseOgkr(SAMPLE), 0, 20 * T), []);
 });
 
 function tempTree(files) {
