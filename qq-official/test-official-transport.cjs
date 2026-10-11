@@ -487,7 +487,8 @@ test("按钮：挂在 Markdown 上发；被拒就去掉按钮、换上不带按�
   const options = { keyboard, markdownWithoutKeyboard: "**无按钮**" };
   await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**有按钮**", "纯文本", "m1", null, options);
   assert.deepEqual(mock.state.sent[0].body.keyboard, { content: keyboard });
-  assert.equal(mock.state.sent[0].body.markdown.content, "**有按钮**");
+  // 带按钮时普通的第一行写成 ### 小标题，QQ 才不会在消息顶上多空一行；补发不带按钮的照原样。
+  assert.equal(mock.state.sent[0].body.markdown.content, "### **有按钮**");
 
   mock.state.nextError = { status: 400, err_code: 40034999, message: "不允许发送按钮" };
   await transport.sendMarkdown({ kind: "group", openid: "G1" }, "**有按钮2**", "纯文本2", "m2", null, options);
@@ -550,4 +551,20 @@ test("requireMarkdown：Markdown 被拒或没开时抛出，不退成纯文本�
   await assert.rejects(() => off.transport.sendMarkdown({ kind: "group", openid: "G1" }, "![图](http://x/a.png)", "纯文本", "m1", null, { requireMarkdown: true }), /Markdown 不可用/);
   assert.equal(off.mock.state.sent.length, 0);
   await off.transport.stop(); await off.mock.stop();
+});
+
+test("带按钮的 Markdown：第一行已经是标题、引用、图片、指令链接的不再加 ###", async () => {
+  const keyboard = { rows: [{ buttons: [{ id: "next", render_data: { label: "下一页", visited_label: "下一页", style: 1 }, action: { type: 1, data: "x", permission: { type: 2 } } }] }] };
+  for (const [markdown, expected] of [
+    ["查到啦\n筛选：a", "### 查到啦\n筛选：a"],
+    ["# 标题\n正文", "# 标题\n正文"],
+    ["> 引用\n正文", "> 引用\n正文"],
+    ["![图 #10px #10px](https://example.com/a.png)\n\n第 1/2 页", "![图 #10px #10px](https://example.com/a.png)\n\n第 1/2 页"],
+    ['<qqbot-cmd-input text="/a" show="a" reference="false" />', '<qqbot-cmd-input text="/a" show="a" reference="false" />'],
+  ]) {
+    const { transport, mock } = await connected();
+    await transport.sendMarkdown({ kind: "group", openid: "G" }, markdown, "纯文本", "m1", null, { keyboard });
+    assert.equal(mock.state.sent.at(-1).body.markdown.content, expected, markdown);
+    await transport.stop(); await mock.stop();
+  }
 });
