@@ -3856,7 +3856,8 @@ async function main() {
         abfbTheme.charts.some((chart) => !chart.isAllBreak || !chart.isFullBell) ||
         !abfbTheme.charts.some((chart) => chart.difficultyId === 10) ||
         abfbTheme.charts[0]?.difficultyId !== 10 || !abfbSortValid ||
-        level0Charts.length < 20 || !level0Charts.some((chart) => chart.difficultyId === 10) ||
+        // 愚人节限定白谱标为下线（286ffbf）之后在线的 LEVEL 0 只剩 19 张；这里只防「筛选整个坏掉」，不卡具体张数
+        level0Charts.length < 15 || !level0Charts.some((chart) => chart.difficultyId === 10) ||
         level0Charts.some((chart) => ["unavailable", "deleted", "removed"].includes(String(chart.song?.status || "").toLowerCase())) ||
         level14Charts.length < 150 || !level14Charts.some((chart) => completionIsBonusTrack(chart.song)) ||
         !level14Charts.some((chart) => chart.difficultyId === 2) ||
