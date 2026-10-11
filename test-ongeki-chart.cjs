@@ -219,8 +219,36 @@ const JUMP_WALLS = [
   "WRN\t205\t51\t240\t4", "WRE\t205\t55\t0\t24",
   "WRS\t207\t55\t0\t24", "WRN\t207\t55\t240\t0", "WRN\t207\t55\t720\t-36", "WRN\t207\t55\t1200\t0", "WRE\t207\t55\t1440\t24",
   "[COMPOSITION]", "LBK\t82\t48\t0\t-24\t0\t49\t0\t0\t0", "LBK\t205\t48\t0\t24\t0\t49\t0\t0\t0",
-  "[NOTES]", "TAP\t0\t56\t0\t0\t0",
+  "[NOTES]", "TAP\t0\t47\t0\t0\t0", "TAP\t0\t56\t0\t0\t0",
 ].join("\n");
+
+test("开头的空白小节不画，第一个有物件的小节记为第 1 小节，开头的 BPM 照样标出", () => {
+  const lines = ["[HEADER]", "TRESOLUTION\t1920", "BPM_DEF\t135\t135\t135\t135", "[COMPOSITION]", "BPM\t0\t0\t135", "BPM\t3\t0\t270",
+    "[LANE]", "LCS\t0\t0\t0\t0", "LCE\t0\t6\t0\t0", "[NOTES]", "TAP\t0\t2\t960\t0\t0", "TAP\t0\t5\t0\t0\t0"];
+  const model = C.parseOgkr(lines.join("\n"));
+  const layout = C.layoutChart(model);
+  assert.equal(layout.chartStart, 2 * 1920);
+  assert.equal(layout.columns[0].start, 2 * 1920);
+  assert.deepEqual(layout.measures.slice(0, 2).map((m) => [m.t, m.no]), [[2 * 1920, 1], [3 * 1920, 2]]);
+  assert.deepEqual(layout.bpmMarks.map((b) => [b.t, b.bpm]), [[2 * 1920, 135], [3 * 1920, 270]]);
+  const svg = C.renderSvg(model, layout);
+  assert.match(svg, /class="bpm-mark"[^>]*>135</);
+  // 第一个物件就在第 0 小节：不跳
+  const plain = C.layoutChart(C.parseOgkr(SAMPLE));
+  assert.equal(plain.chartStart, 0);
+  assert.equal(plain.measures[0].no, 1);
+});
+
+test("装饰轨道（CL）按颜色号画成淡色细线", () => {
+  const lines = ["[HEADER]", "TRESOLUTION\t1920", "[LANE]", "CLS\t7\t0\t0\t-10\t19\t0", "CLE\t7\t1\t0\t10\t19\t0",
+    "CLS\t8\t0\t0\t5\t42\t0", "CLE\t8\t1\t0\t5\t42\t0", "[NOTES]", "TAP\t0\t0\t0\t0\t0"];
+  const model = C.parseOgkr(lines.join("\n"));
+  assert.deepEqual(model.lanes.map((l) => [l.kind, l.color]), [["CL", 19], ["CL", 42]]);
+  const svg = C.renderSvg(model, C.layoutChart(model));
+  assert.equal((svg.match(/class="deco"/g) || []).length, 2);
+  assert.match(svg, /class="deco" stroke="#5aa8ff"/);
+  assert.match(svg, /class="deco" stroke="#b9a6ff"/);
+});
 
 test("墙线瞬移：墙封锁停在瞬移之前的位置，不会被拉到跳过去的地方", () => {
   const model = C.parseOgkr(JUMP_WALLS);

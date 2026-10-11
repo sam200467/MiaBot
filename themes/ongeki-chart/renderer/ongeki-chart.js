@@ -48,7 +48,8 @@
       let m = LANE_COMMAND.exec(cmd);
       if (m) {
         const id = p[1];
-        if (!lanes.has(id)) lanes.set(id, { id, kind: LANE_KINDS[m[1]], points: [] });
+        // 装饰轨道（CL）多两列：颜色号、亮度
+        if (!lanes.has(id)) lanes.set(id, { id, kind: LANE_KINDS[m[1]], color: m[1] === "CL" ? num(p[5], -1) : undefined, points: [] });
         lanes.get(id).points.push({ u: num(p[2]), g: num(p[3]), x: num(p[4]) });
         continue;
       }
@@ -90,7 +91,7 @@
     const byTick = (a, b) => a.t - b.t;
 
     const laneList = [...lanes.values()].map((lane) => ({
-      id: lane.id, kind: lane.kind,
+      id: lane.id, kind: lane.kind, color: lane.color,
       points: lane.points.map((pt) => ({ t: tick(pt.u, pt.g), x: pt.x })).sort(byTick),
     })).filter((lane) => lane.points.length);
     const laneById = new Map(laneList.map((lane) => [lane.id, lane]));
@@ -139,6 +140,13 @@
       else if (!prev || !same(prev, item)) out.push(item);
     }
     return out;
+  }
+
+  // 第一个物件（音符、BELL、子弹）所在的 tick；谱面开头常有一两小节空白
+  function firstTick(model) {
+    let first = Infinity;
+    for (const list of [model.taps, model.holds, model.flicks, model.bells, model.bullets]) if (list.length && list[0].t < first) first = list[0].t;
+    return Number.isFinite(first) ? first : 0;
   }
 
   function lastTick(model) {
@@ -274,7 +282,23 @@
   function layoutOnce(model, o) {
     const TR = model.header.tResolution;
     const end = Math.max(model.lastTick + 1, TR);
-    const measures = measuresOf(model, end);
+    // 开头没有物件的空白小节不画，第一个有物件的小节记为第 1 小节（和常见的谱面站一致）
+    let measures = measuresOf(model, end);
+    const firstAt = firstTick(model);
+    let startIndex = 0;
+    measures.forEach((m, i) => { if (!m.minor && m.t <= firstAt) startIndex = i; });
+    if (startIndex > 0) {
+      const skipped = measures[startIndex].no - 1;
+      measures = measures.slice(startIndex);
+      for (const m of measures) if (!m.minor) m.no -= skipped;
+    }
+    const chartStart = measures[0].t;
+    // BPM 标注：开头之前最后一次的 BPM 挪到开头标出
+    const bpmMarks = [];
+    for (const b of model.bpms) {
+      if (b.t <= chartStart) bpmMarks[0] = { ...b, t: chartStart };
+      else bpmMarks.push(b);
+    }
     const capacity = o.columnMeasures * TR;
     const beatTicks = TR / 4;
 
@@ -323,6 +347,7 @@
       options: o, measures, meterMarks: meterMarks(model, measures), columns: placed, pxPerTick, fieldWidth,
       width: Math.max(0, usedColumns * pitch - o.gap),
       rhythm: rhythmMarks(model),
+      chartStart, bpmMarks,
       height: Math.max(0, y - o.rowGap),
       rowHeight: maxRowHeight,
     };
@@ -337,6 +362,9 @@
     critical: "#ffd447", bell: "#ffc93d", flick: "#eef2ff",
     bullet: { NML: "#ff3fae", STR: "#8f46e6", DNG: "#ff8a2a" },
   };
+
+  // 装饰轨道的颜色号：常见的 0 / 1 / 19 对着游戏画面取红、绿、蓝，其余一律淡紫
+  const CL_COLORS = { 0: "#ff4f6e", 1: "#35d68f", 19: "#5aa8ff", other: "#b9a6ff" };
 
   const f1 = (v) => Math.round(v * 10) / 10;
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
@@ -477,6 +505,14 @@
       body.push(`<polyline class="beam-core" points="${pts.map((pt) => `${X(pt.x)},${Y(pt.t)}`).join(" ")}"/>`);
     }
 
+    // 装饰轨道（CL）：演出用的彩色细线，不能打，画得比轨道还淡
+    for (const lane of model.lanes) {
+      if (lane.kind !== "CL") continue;
+      const pts = clipPath(lane.points, from, to);
+      if (pts.length < 2) continue;
+      body.push(`<polyline class="deco" stroke="${CL_COLORS[lane.color] || CL_COLORS.other}" points="${pts.map((pt) => `${X(pt.x)},${Y(pt.t)}`).join(" ")}"/>`);
+    }
+
     // 轨道和墙线
     for (const lane of model.lanes) {
       if (!COLORS[lane.kind]) continue;
@@ -549,7 +585,7 @@
       if (m.minor || m.t < col.start || m.t >= col.end) continue;
       labels.push({ y: Y(m.t), text: String(m.no), cls: "measure-no" });
     }
-    for (const b of model.bpms) {
+    for (const b of layout.bpmMarks) {
       if (b.t < col.start || b.t >= col.end) continue;
       labels.push({ y: Y(b.t) - 11, text: trimNumber(b.bpm), cls: "bpm-mark" });
     }
