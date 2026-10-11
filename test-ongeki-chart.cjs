@@ -168,7 +168,8 @@ test("分音：按全音符约分，HOLD 尾也算击打时刻，超过一小节
   assert.equal(C.rhythmLabel(360, 1920), "3/16");
   assert.equal(C.rhythmLabel(80, 1920), "1/24");
   assert.equal(C.rhythmLabel(1920, 1920), "");
-  assert.equal(C.rhythmLabel(7, 1920), "", "分母超过 64 的不标");
+  assert.equal(C.rhythmLabel(95, 1920), "19/384", "不规则时值照实约分");
+  assert.equal(C.rhythmLabel(7, 1920), "7/1920");
 
   const model = C.parseOgkr(SAMPLE);
   const marks = C.rhythmMarks(model);

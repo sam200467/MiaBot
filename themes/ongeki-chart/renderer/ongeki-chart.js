@@ -215,14 +215,14 @@
   }
 
   // 分音：每个击打时刻（TAP、侧键、HOLD 头尾、FLICK）与上一个击打时刻的间隔，
-  // 按全音符（TRESOLUTION）约分写成 1/16、3/16 这样。超过一整小节、或分母大于 64 的不写（只留刻度）。
+  // 按全音符（TRESOLUTION）约分写成 1/16、3/16 这样；不规则的时值也照实写（19/384、5/96）。
+  // 超过一整小节的不写（只留刻度）。
   function gcd(a, b) { while (b) [a, b] = [b, a % b]; return a; }
 
   function rhythmLabel(gap, TR) {
     if (!(gap > 0) || gap >= TR) return "";
     const g = gcd(gap, TR);
-    const n = gap / g, d = TR / g;
-    return d > 64 ? "" : `${n}/${d}`;
+    return `${gap / g}/${TR / g}`;
   }
 
   function rhythmMarks(model) {
@@ -247,7 +247,7 @@
     xMin: -30, xMax: 30,    // 显示的横向范围
     unitPx: 2.5,            // 每个 X 单位的像素
     gutter: 30,             // 栏左侧小节号宽度
-    rightGutter: 28,        // 栏右侧分音标注宽度
+    rightGutter: 34,        // 栏右侧分音标注宽度（放得下 19/384 这种）
     gap: 8,                 // 栏与栏之间的空白
     rowGap: 34,
     maxWidth: 1840,
@@ -527,7 +527,9 @@
         const y = Number(Y(m.t));
         if (!fits(y)) continue;
         placed.push(y);
-        out.push(`<text class="rhythm" x="${f1(right + 6)}" y="${f1(y + 3.3)}">${m.label}</text>`);
+        // 533/1920 这种特别长的横向压到窄边以内，不压到隔壁栏
+        const squeeze = m.label.length > 6 ? ` textLength="${layout.options.rightGutter - 7}" lengthAdjust="spacingAndGlyphs"` : "";
+        out.push(`<text class="rhythm" x="${f1(right + 6)}" y="${f1(y + 3.3)}"${squeeze}>${m.label}</text>`);
       }
     }
     return out.join("");
