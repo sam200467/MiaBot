@@ -222,11 +222,11 @@ h1 {
 .side.crit { stroke: #ffd447; stroke-width: 2; }
 .side-mark { stroke: #fff; stroke-width: 1.4; stroke-linecap: round; }
 
-/* FLICK：半透明银色宽条 + 三道箭头 */
-.flick { fill: rgba(200, 210, 235, .28); stroke: #dfe5f7; stroke-width: 1.2; }
-.flick.crit { fill: rgba(255, 212, 71, .22); stroke: #ffd447; stroke-width: 1.8; }
-.flick-arrow { fill: none; stroke: #f4f6ff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.flick-arrow.crit { stroke: #ffe27a; }
+/* FLICK：判定拍上一根细条，箭头在条的上方 */
+.flick { fill: #dfe5f7; stroke: rgba(10, 14, 24, .7); stroke-width: .8; }
+.flick.crit { fill: #ffd447; }
+.flick-arrow { fill: none; stroke: #eef2ff; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.flick-arrow.crit { stroke: #ffd447; }
 
 .bell { fill: #ffc93d; stroke: #6b4700; stroke-width: 1; }
 .bell-core { fill: #fff6cf; stroke: none; }

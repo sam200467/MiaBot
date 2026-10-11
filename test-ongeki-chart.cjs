@@ -148,6 +148,21 @@ test("SVG：各类物件都画出来，场外子弹裁掉，文字转义", () =>
   }
 });
 
+test("FLICK：同一拍、同方向、相邻的合并成一根长条", () => {
+  const runs = C.flickRuns([
+    { t: 0, x: -18, dir: -1, critical: false }, { t: 0, x: -6, dir: -1, critical: false },
+    { t: 0, x: 6, dir: -1, critical: false }, { t: 0, x: 18, dir: -1, critical: false },
+    { t: 0, x: 0, dir: 1, critical: false },        // 方向不同
+    { t: 0, x: 30, dir: -1, critical: true },       // CRITICAL 单独一条
+    { t: 480, x: -24, dir: 1, critical: false }, { t: 480, x: 24, dir: 1, critical: false }, // 隔太远
+  ]);
+  const key = (r) => `${r.t}|${r.dir}|${r.critical}|${r.x1}..${r.x2}|${r.count}`;
+  assert.deepEqual(runs.map(key).sort(), [
+    "0|-1|false|-18..18|4", "0|-1|true|30..30|1", "0|1|false|0..0|1",
+    "480|1|false|-24..-24|1", "480|1|false|24..24|1",
+  ]);
+});
+
 test("空谱面和坏行不会抛错", () => {
   const model = C.parseOgkr("[HEADER]\nTRESOLUTION\tabc\nTAP\t9\nHLD\nBLT\n[NOTES]\n");
   assert.equal(model.header.tResolution, 1920);

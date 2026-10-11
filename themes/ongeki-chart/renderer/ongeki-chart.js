@@ -425,7 +425,9 @@
     for (const n of [...inRange(model.taps, from, to), ...heads].sort((a, b) => a.t - b.t)) {
       body.push(tapShape(n, X(n.x), Y(n.t)));
     }
-    for (const n of inRange(model.flicks, from, to)) body.push(flickShape(n, X(n.x), Y(n.t)));
+    for (const run of flickRuns(inRange(model.flicks, from, to))) {
+      body.push(flickShape(run, X(run.x1 - FLICK_HALF_UNITS), X(run.x2 + FLICK_HALF_UNITS), Y(run.t)));
+    }
     for (const n of inRange(model.bells, from, to)) {
       if (n.x < o.xMin - 2 || n.x > o.xMax + 2) continue;
       body.push(bellShape(X(n.x), Y(n.t)));
@@ -492,7 +494,7 @@
     return pts;
   }
 
-  // 尺寸比例参照游戏/编辑器贴图：TAP 40×16、侧键 40×40、FLICK 104×69、子弹 40×40（针形 30×80）。
+  // 尺寸比例参照游戏/编辑器贴图：TAP 40×16、侧键 40×40、子弹 40×40（针形 30×80）。
   // 这里 TAP 宽 12px，其余按同一比例缩放，子弹略缩小以免满屏遮挡音符。
   function tapShape(n, x, y) {
     const crit = n.critical ? " crit" : "";
@@ -509,13 +511,41 @@
       + `<rect class="tap-shine" x="${f1(x - w / 2 + 2.5)}" y="${f1(y - h / 2 + 1)}" width="${w - 5}" height="1.2" rx=".6"/>`;
   }
 
-  function flickShape(n, x, y) {
-    // 宽条 + 三道朝滑动方向的箭头（≪≪≪ / ≫≫≫），CRITICAL 加金框
-    const d = n.dir, w = 30, h = 11;
-    const out = [`<rect class="flick${n.critical ? " crit" : ""}" x="${f1(x - w / 2)}" y="${f1(y - h / 2)}" width="${w}" height="${h}" rx="2"/>`];
-    for (let i = -1; i <= 1; i++) {
-      const cx = x + i * 7.5 + d * 2;
-      out.push(`<polyline class="flick-arrow${n.critical ? " crit" : ""}" points="${f1(cx - d * 3)},${f1(y - 3.6)} ${f1(cx + d * 1)},${f1(y)} ${f1(cx - d * 3)},${f1(y + 3.6)}"/>`);
+  // FLICK 文件里没有长度：同一拍横向挨着的几个 FLICK 在游戏里连成一根长条，这里也合并画。
+  // 细条压在判定那一拍上（和 TAP 差不多粗），箭头画在条的上方，不挡时间位置。
+  const FLICK_HALF_UNITS = 4;       // 单个 FLICK 半宽（X 单位）
+  const FLICK_JOIN_UNITS = 12.5;    // 中心相距不超过这个就算挨着
+
+  function flickRuns(flicks) {
+    const groups = new Map();
+    for (const n of flicks) {
+      const key = `${n.t}|${n.dir}|${n.critical ? 1 : 0}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(n);
+    }
+    const runs = [];
+    for (const list of groups.values()) {
+      list.sort((a, b) => a.x - b.x);
+      let run = null;
+      for (const n of list) {
+        if (run && n.x - run.x2 <= FLICK_JOIN_UNITS) { run.x2 = n.x; run.count++; continue; }
+        run = { t: n.t, dir: n.dir, critical: n.critical, x1: n.x, x2: n.x, count: 1 };
+        runs.push(run);
+      }
+    }
+    return runs;
+  }
+
+  // left / right 是像素坐标
+  function flickShape(run, left, right, y) {
+    const crit = run.critical ? " crit" : "";
+    const d = run.dir, h = 4;
+    const out = [`<rect class="flick${crit}" x="${f1(left)}" y="${f1(y - h / 2)}" width="${f1(right - left)}" height="${h}" rx="1.5"/>`];
+    const step = 5, count = Math.max(2, Math.floor((right - left - 3) / step));
+    const start = (left + right) / 2 - (count - 1) * step / 2;
+    for (let i = 0; i < count; i++) {
+      const cx = start + i * step;
+      out.push(`<polyline class="flick-arrow${crit}" points="${f1(cx + d * 1.5)},${f1(y - 11)} ${f1(cx - d * 1.5)},${f1(y - 7.5)} ${f1(cx + d * 1.5)},${f1(y - 4)}"/>`);
     }
     return out.join("");
   }
@@ -557,7 +587,7 @@
       case "critical": inner = tapShape({ kind: "C", critical: true }, x, y); break;
       case "hold": inner = `<polyline class="hold-body k-C" points="${x},${H - 2} ${x},2"/>` + tapShape({ kind: "C" }, x, H - 4); break;
       case "side": inner = tapShape({ kind: "WL" }, x - 8, y) + tapShape({ kind: "WR" }, x + 8, y); break;
-      case "flick": inner = flickShape({ dir: -1 }, x, y); break;
+      case "flick": inner = flickShape({ dir: -1 }, x - 12, x + 12, y + 5); break;
       case "bell": inner = bellShape(x, y); break;
       case "bullet": inner = bulletShape({ shape: "NDL", damage: "NML" }, x - 10, y + 7) + bulletShape({ shape: "CIR", damage: "NML" }, x, y + 1) + bulletShape({ shape: "SQR", damage: "NML" }, x + 10, y + 6); break;
       case "damage": inner = bulletShape({ shape: "CIR", damage: "NML" }, x - 10, y) + bulletShape({ shape: "CIR", damage: "STR" }, x, y) + bulletShape({ shape: "CIR", damage: "DNG" }, x + 10, y); break;
@@ -580,5 +610,5 @@
     return lo === hi ? trimNumber(lo) : `${trimNumber(lo)}–${trimNumber(hi)}`;
   }
 
-  return { parseOgkr, layoutChart, renderSvg, legendSvg, measuresOf, interpolate, formatDuration, bpmText, DEFAULTS, COLORS };
+  return { parseOgkr, layoutChart, renderSvg, legendSvg, measuresOf, interpolate, flickRuns, formatDuration, bpmText, DEFAULTS, COLORS };
 });
