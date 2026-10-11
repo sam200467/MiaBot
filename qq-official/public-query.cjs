@@ -232,7 +232,8 @@ const internalChart = (v, i) => ({ level: v.level[i], const: v.const?.[i], const
 // 《Singularity》）会把另一首的对手配上来，一首歌的几张白谱（《Perfect Shining!!》）也会互相串。
 function chartRow(base, difficulty, chart, v, botId, supplemental) {
   return {
-    ...base, supplemental, botId, difficulty, level: chart.level,
+    // offline：补录谱面在游戏数据里已标为下线（期间限定的愚人节谱面等）。曲库自己收的谱面以曲库为准，不看这个。
+    ...base, supplemental, offline: Boolean(supplemental && v && v.status !== "online"), botId, difficulty, level: chart.level,
     // 白谱一张一条、ID 各不相同（见 song-id.cjs），同一首歌的几张白谱要算几张谱面，不能并成一张。
     chartKey: `${base.songKey}\0${difficulty}${difficulty === "LUN" ? `\0${botId}` : ""}`,
     // 0 级白谱的定数就是 0（游戏数据里 23 张全是）；《Perfect Shining!!》那张在曲库里记成未知，也按 0 算。
@@ -394,9 +395,13 @@ function formatResult(result) {
       out.push(`${fields[field].label}：${labelled.join(" / ")}`);
     }
     if (query.select.includes("difficulty")) out.push(`难度：${[...new Set(entry.rows.map(r => r.difficulty))].join(" / ")}`);
-    // 补录 = 公开曲库没收、从游戏数据里补上的谱面。已删除的歌本来就玩不到，不再多说一遍。
-    const supplemental = [...new Set(entry.rows.filter(r => r.supplemental && !r.deleted).map(r => r.difficulty))];
-    if (showsCharts && supplemental.length) out.push(`※ ${supplemental.join(" / ")} 谱面是从游戏数据补录的，不一定能在机台上玩到`);
+    // 补录 = 公开曲库没收、从游戏数据里补上的谱面。已删除的歌本来就玩不到，不再多说一遍；
+    // 歌还在、补录的谱面已下线（《Titania》《脳天直撃》的愚人节白谱）的，要说清楚现在玩不到。
+    // 白谱带上 ID：《Perfect Shining!!》有两张白谱，只说「LUN」分不清是哪张。
+    const supplemental = offline => [...new Set(entry.rows.filter(r => r.supplemental && !r.deleted && r.offline === offline)
+      .map(r => r.difficulty === "LUN" ? `LUN（ID ${r.botId}）` : r.difficulty))].join(" / ").replace(/[^）]$/, "$& ");
+    if (showsCharts && supplemental(false)) out.push(`※ ${supplemental(false)}谱面主曲库未收录，资料取自游戏数据`);
+    if (showsCharts && supplemental(true)) out.push(`※ ${supplemental(true)}谱面是期间限定谱面，已经下线了`);
     return out;
   });
   const footer = [];

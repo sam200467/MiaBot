@@ -165,7 +165,10 @@ test("BPM/谱师/物量等数据库字段可组合，按谱面排序和计数不
   assert.deepEqual(umapi.entries[0].rows.map(r => r.difficulty), ["LUN"]);
   // 补录提示只给仍在线的歌、而且只在列出谱面资料时给：已删除的歌本来就玩不到，只问歌名时也用不着。
   assert.doesNotMatch(formatResult(umapi), /补录/);
-  assert.match(formatResult(run([filter("title", "eq", "Titania")], { select: ["title", "constant"] })), /^※ LUN 谱面是从游戏数据补录的/m);
+  assert.match(formatResult(run([filter("title", "eq", "Perfect Shining!!")], { select: ["title", "constant"] })), /^※ LUN（ID 8091）谱面主曲库未收录，资料取自游戏数据$/m);
+  const titania = formatResult(run([filter("title", "eq", "Titania")], { select: ["title", "constant"] }));
+  assert.match(titania, /^※ LUN（ID 8158）谱面是期间限定谱面，已经下线了$/m, "愚人节白谱在游戏数据里标了下线");
+  assert.doesNotMatch(titania, /已删除|主曲库未收录/, "歌本身还在，只是那张白谱下线了");
   assert.doesNotMatch(formatResult(run([filter("title", "eq", "Titania")], { select: ["title"] })), /补录/);
 });
 
