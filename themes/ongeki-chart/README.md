@@ -67,3 +67,17 @@
 | 激光 | 粉色半透明带 + 中线 |
 | 墙封锁 | 墙线上的红色粗虚线 |
 | 变速 | 栏左缘细带：青＝减速、橙＝加速、灰＝停止 |
+
+## 打服务器更新包
+
+核心 `ongeki-core.exe` 会把字体和分表素材一起封进去，这些素材只在部署者本机，所以更新包要在平时构建核心的那台 Windows 机器上打：
+
+```powershell
+npm ci
+npm run build:core
+node tools/build-core-update.cjs MiaBot-chart-view-update-20261011 --notes tools/core-update/notes/chart-view-20261011.txt --with-panel
+Compress-Archive -Path server-updates/MiaBot-chart-view-update-20261011 -DestinationPath server-updates/MiaBot-chart-view-update-20261011.zip
+```
+
+`--notes` 是这次更新的说明（写进包里的「使用说明.txt」，安装与回退步骤自动附上）；`--with-panel` 附带 `Update-Panel.cmd`，把 /谱面图 加进 QQ 指令面板。
+更新程序不改配置文件，`ongekiChartRoots` 要在服务器的 `qq-official/config.local.json` 里手动加。

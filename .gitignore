@@ -26,6 +26,8 @@ song-alias-candidates-*.json
 
 data/
 deploy/
+# 服务器更新包（tools/build-core-update.cjs 生成，里面是二进制核心）
+server-updates/
 dist/
 output/
 previews/
