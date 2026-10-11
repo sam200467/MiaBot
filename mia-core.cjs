@@ -16,6 +16,8 @@ const { spawn } = require("node:child_process");
 const { Converter } = require("opencc-js");
 const { SongAliasStore, SongAliasCandidateStore } = require("./song-alias-store.cjs");
 const INTERNAL_SONGS = require("./ongeki-music-internal.json");
+const { songs: CATALOG_SONGS } = require("./ongeki-song-catalog.json");
+const songKana = require("./song-kana.cjs");
 const rinnet = require("./rinnet-client.cjs");
 
 const GENERATE_COOLDOWN_MS = 60 * 1000;
@@ -59,13 +61,23 @@ function safeError(error) {
 }
 
 const simplifySongQuery = Converter({ from: "tw", to: "cn" });
+// 曲名里的「戦 / 気 / 楽」是日本新字体，不是繁体，简繁表不管：打「战争」找不到《ぼくらの16bit戦争》。
+// 先把新字体换成繁体，再统一转简体。查询词和曲名走同一条路，所以简体、繁体、新字体打哪种都行。
+const traditionalizeShinjitai = Converter({ from: "jp", to: "t" });
+// 拉丁字母上的重音和几个合字：打「fatalite」「loschen」「astronotes」也要找到
+// 《GranFatalité》《Löschen》《AstrøNotes.》。只去拉丁字母后面的附加符号，假名的浊点不能动。
+const LATIN_LETTERS = { ø: "o", æ: "ae", œ: "oe", ß: "ss", đ: "d", ł: "l", ı: "i" };
+function plainLatin(value) {
+  return value.normalize("NFD").replace(/(\p{Script=Latin})\p{M}+/gu, "$1").normalize("NFC")
+    .replace(/[øæœßđłı]/g, (ch) => LATIN_LETTERS[ch]);
+}
 
 function normalizeSongQuery(value) {
-  return simplifySongQuery(String(value || "")
+  return simplifySongQuery(traditionalizeShinjitai(plainLatin(String(value || "")
     .normalize("NFKC")
     .replace(/[\s　]+/g, " ")
     .trim()
-    .toLowerCase())
+    .toLowerCase())))
     // OpenCC 的简繁表未涵盖「焔 / 燄 / 焰」这组异体字。
     .replace(/[焔燄]/g, "焰");
 }
@@ -172,7 +184,25 @@ function readingKeys(title, normalize) {
 }
 const matchesReading = ({ spellings, names }, needle) => spellings.some(key => key.includes(needle)) || names.some(key => needle.includes(key));
 
-const SONG_SEARCH_INDEX = INTERNAL_SONGS.map(song => ({ song, title: normalizeSongQuery(song?.name), readings: readingKeys(song?.name, normalizeSongQuery) }));
+// 官方读音（公开曲库的 reading，片假名）。游戏数据本身没有读音，按曲名 + 曲师对上；
+// 曲名相同、曲师对不上的，曲名唯一时也认。对不上的歌只拿曲名里的假名比。
+const CATALOG_READINGS = (() => {
+  const key = (value) => String(value || "").normalize("NFKC").trim().toLowerCase();
+  const byNameArtist = new Map(), byName = new Map();
+  for (const { meta } of CATALOG_SONGS) {
+    if (!meta?.reading) continue;
+    byNameArtist.set(key(meta.name) + "\u0000" + key(meta.artist), meta.reading);
+    byName.set(key(meta.name), byName.has(key(meta.name)) && byName.get(key(meta.name)) !== meta.reading ? null : meta.reading);
+  }
+  return (song) => byNameArtist.get(key(song?.name) + "\u0000" + key(song?.artistName)) ?? byName.get(key(song?.name)) ?? "";
+})();
+function kanaKeys(song) {
+  return [songKana.foldKana(String(song?.name || "").toLowerCase()), songKana.foldKana(CATALOG_READINGS(song))].filter(Boolean);
+}
+const matchesKana = (keys, kana) => Boolean(kana) && keys.some((key) => key.includes(kana));
+
+const SONG_SEARCH_INDEX = INTERNAL_SONGS.map(song => ({ song, title: normalizeSongQuery(song?.name), readings: readingKeys(song?.name, normalizeSongQuery), kana: kanaKeys(song) }));
+const SONG_KANA_KEYS = new Map(SONG_SEARCH_INDEX.map(({ song, kana }) => [song, kana]));
 
 function searchSongs(query) {
   const raw = String(query || "").normalize("NFKC").trim();
@@ -189,8 +219,12 @@ function searchSongs(query) {
     const sameTitle = SONG_SEARCH_INDEX.filter(({ song, title }) => title === needle && !byId.includes(song)).map(({ song }) => song);
     if (byId.length || sameTitle.length) return [...byId, ...sameTitle];
   }
-  return SONG_SEARCH_INDEX
-    .filter(({ song, title, readings }) => title.includes(needle) || matchesReading(readings, needle) || songAliases.matches(song.name, needle, "ongeki"))
+  const byText = SONG_SEARCH_INDEX
+    .filter(({ song, title, readings }) => title.includes(needle) || matchesReading(readings, needle) || songAliases.matches(song.name, needle, "ongeki"));
+  // 曲名、别名都没对上，再按假名找：平假名打片假名曲名、罗马音、对着官方读音打汉字曲名。
+  // 只在前面一首都没有时才用，免得「sage」这种英文词顺带按「サケ」拖出一串歌，/单曲 本来唯一的结果变成多首。
+  const kana = byText.length ? "" : songKana.queryKana(raw);
+  return (kana ? SONG_SEARCH_INDEX.filter((item) => matchesKana(item.kana, kana)) : byText)
     .map(({ song }) => song)
     .sort((a, b) => Number(a.id) - Number(b.id));
 }
@@ -231,9 +265,15 @@ function searchSongClues(query) {
   if (/^(?:id\s*)?\d+$/i.test(raw)) return searchSongs(raw);
   const needle = normalizeSongQuery(raw);
   const aliasTitles = new Set(songAliases.names(raw, "ongeki").map((hit) => normalizeSongQuery(hit.title)));
+  // 曲名读法（希腊字母转写、《∀》叫「倒A」）也要留下：原来这里只认曲名和别名，
+  // 「omega4」「ataraxia」在 /单曲 查得到、到 /是什么歌 却被筛成空。
+  // 按假名命中的（见 searchSongs）同样留下。
+  const readingsBySong = new Map(SONG_SEARCH_INDEX.map(({ song, readings }) => [song, readings]));
+  const kana = songKana.queryKana(raw);
   return searchSongs(raw).filter((song) => {
     const title = normalizeSongQuery(song.name);
-    return title.includes(needle) || aliasTitles.has(title);
+    return title.includes(needle) || aliasTitles.has(title) || matchesReading(readingsBySong.get(song), needle) ||
+      matchesKana(SONG_KANA_KEYS.get(song), kana);
   });
 }
 

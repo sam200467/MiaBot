@@ -86,6 +86,7 @@ for (const file of [
   path.join(HERE, "test-chat-log.cjs"),
   path.join(HERE, "test-mia-commands.cjs"),
   path.join(HERE, "test-song-search.cjs"),
+  path.join(ROOT, "test-song-kana.cjs"),
   path.join(HERE, "test-song-jacket.cjs"),
   path.join(HERE, "test-semantic-router.cjs"),
   path.join(HERE, "test-public-query.cjs"),
@@ -201,6 +202,13 @@ execFileSync(process.execPath, [
   "--outfile=" + path.join(outEntryDir, "probe-layout.cjs"),
 ], { stdio: "inherit" });
 console.log("带上 probe-layout.cjs");
+// 查歌检查也打成单文件带上：在服务器上确认各条指令认得哪些写法（别名库只读，不写任何文件）。
+execFileSync(process.execPath, [
+  ESBUILD, path.join(HERE, "check-song-query.cjs"),
+  "--bundle", "--platform=node", "--format=cjs", "--target=node22",
+  "--outfile=" + path.join(outEntryDir, "check-song-query.cjs"),
+], { stdio: "inherit" });
+console.log("带上 check-song-query.cjs");
 
 // ── 5. 启动器（用同一套生成器，只是输出到部署目录）──────────────────
 {

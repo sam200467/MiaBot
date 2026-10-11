@@ -20,7 +20,7 @@ const GROUP = "GROUP_OPENID_A";
 test("搜索歌曲无需绑定，斜杠与模型工具共用真实曲库", async () => {
   await run({}, { getBinding: async () => { throw new Error("查歌不应读账号"); } }, async ({ commands, sent }) => {
     await commands.handleCommand(groupEvent(""), parseCommand("/搜索歌曲 サド"));
-    await commands.runCapability(groupEvent(""), "songsearch", "サドマミホリツク", "模型虚构曲名");
+    await commands.runCapability(groupEvent(""), "songsearch", "サドマミホリッコ", "模型虚构曲名");
     assert.match(sent[0].text, /サドマミホリック/);
     assert.match(sent[0].text, /13\.5/);
     assert.match(sent[1].text, /比较接近/);

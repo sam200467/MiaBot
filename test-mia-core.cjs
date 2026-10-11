@@ -46,6 +46,30 @@ assert.deepEqual(core.searchSongs("愛"), core.searchSongs("爱"));
 assert.equal(core.searchSongs("id870")[0].id, 870);
 assert.deepEqual(core.searchSongs("omega4").map(s => s.name), ["ω4"]);
 assert.ok(core.searchSongs("倒A").some(s => s.name === "∀"));
+// 日本新字体（戦/気/楽）跟简体、繁体互通；拉丁字母的重音可以不打；假名的浊点照旧区分。
+for (const query of ["战争", "戦争", "戰爭"]) {
+  assert.ok(core.searchSongs(query).some((song) => song.name === "ぼくらの16bit戦争"), query);
+  assert.ok(core.searchSongClues(query).some((song) => song.name === "ぼくらの16bit戦争"), "/是什么歌 " + query);
+}
+assert.ok(core.searchSongs("气").some((song) => song.name === "心象蜃気楼"));
+for (const [query, name] of [["fatalite", "GranFatalité"], ["loschen", "Löschen"], ["astronotes", "AstrøNotes."], ["jorqer", "Jörqer"]]) {
+  assert.ok(core.searchSongs(query).some((song) => song.name === name), query);
+  assert.ok(core.searchSongClues(query).some((song) => song.name === name), "/是什么歌 " + query);
+}
+assert.notEqual(core.normalizeSongQuery("が"), core.normalizeSongQuery("か"), "浊点不能当重音去掉");
+// 假名、罗马音：平假名打片假名曲名，罗马音对曲名里的假名或官方读音（《千本桜》读音是「センホンサクラ」）。
+const ids = (query) => core.searchSongs(query).map((song) => song.id);
+for (const query of ["さど", "sado", "SADO"]) assert.deepEqual(ids(query), [252], query + " → サドマミホリック");
+assert.deepEqual(ids("senbonzakura"), ids("千本桜"), "罗马音按官方读音找汉字曲名");
+for (const query of ["shugasongu", "shuga-songu", "shugaasongu"]) assert.ok(ids(query).includes(24), query + " 长音怎么打都行");
+for (const query of ["yuureitoukyou", "yureitokyo"]) assert.deepEqual(ids(query), [720], query);
+assert.deepEqual(ids("sage"), [833], "英文曲名命中了就不再按罗马音多拖出别的歌");
+assert.deepEqual(core.searchSongClues("sado").map((song) => song.id), [252], "/是什么歌 也认罗马音");
+assert.deepEqual(core.searchChartInfo("sado 紫").matches.map((match) => match.song.id), [252], "谱面分析也认");
+// /是什么歌 在 searchSongs 之后还有一道筛选，曾把按读法命中的歌筛掉。
+assert.deepEqual(core.searchSongClues("omega4").map(s => s.name), ["ω4"]);
+assert.deepEqual(core.searchSongClues("ataraxia").map(s => s.name), ["Ἀταραξία"]);
+assert.ok(core.searchSongClues("倒A").some(s => s.name === "∀"));
 assert.deepEqual(core.searchSongs("冬花").map((song) => song.id), [1076], "部分曲名应能定位歌曲");
 for (const query of ["光焔", "光焰", "光燄"]) {
   assert.deepEqual(core.searchSongs(query).map((song) => song.id), [728], query + " 应命中同一首歌");

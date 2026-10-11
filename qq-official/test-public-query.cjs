@@ -20,7 +20,7 @@ test("开头/包含/完整名互不退化；严格搜索不引入别名与纠错
   assert.ok(!prefix.entries.some(e => e.title === "Brain Power" || e.title === "雷切-RAIKIRI-"));
   assert.equal(run([filter("title", "eq", "ai")]).total, 0);
   assert.equal(run([filter("title", "prefix", "サドマミホリツク")]).total, 0);
-  assert.ok(run([filter("title", "search", "サドマミホリツク")]).fuzzy);
+  assert.ok(run([filter("title", "search", "サドマミホリッコ")]).fuzzy);
   assert.equal(run([filter("title", "search", "id999999999")]).total, 0);
 });
 

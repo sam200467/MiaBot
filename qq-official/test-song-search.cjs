@@ -13,8 +13,10 @@ test("查询、假名归一化和拼写纠错", () => {
     assert.equal(r.matches[0].MAS.const, 13.5);
     assert.equal(r.fuzzy, false);
   }
-  assert.equal(search("サドマミホリツク").fuzzy, true);
-  assert.match(reply("サドマミホリツク"), /比较接近/);
+  // 小字打成大字（ッ→ツ）跟官方读音的写法一样，算精确命中；真打错一个假名才走纠错。
+  assert.equal(search("サドマミホリツク").fuzzy, false);
+  assert.equal(search("サドマミホリッコ").fuzzy, true);
+  assert.match(reply("サドマミホリッコ"), /比较接近/);
 });
 test("曲名里的符号不被抹掉：整条就是符号的曲名也搜得到自己", () => {
   // 曲名《∀》整条就是一个符号，归一化时若把 \p{S} 一起删掉就只剩空串 ——
@@ -36,12 +38,13 @@ test("去掉符号仍能搜到：用户通常不会照着打「!」「☆」", (
   for (const [query, title] of [
     ["ウキウキCandy", "ウキウキ☆Candy!"],
     ["ポジティブダンスタイム", "ポジティブ☆ダンスタイム"],
-    ["ネコ", "ネ！コ！"],
   ]) {
     const r = search(query);
     assert.equal(r.total, 1, `${query} 应该搜到 1 首`);
     assert.equal(r.matches[0].meta.name, title);
   }
+  // 「ネコ」还会按读音带出《猫祭り》（ネコマツリ）
+  assert.deepEqual(search("ネコ").matches.map(m => m.meta.name).sort(), ["ネ！コ！", "猫祭り"].sort());
   // 这首还有三个 -某某ソロver.-，所以只断言正式版在其中
   const histories = search("ヒストリーブレイカー");
   assert.ok(histories.matches.some(m => m.meta.name === "ヒストリー×ブレイカー"), "× 少打了也要搜到");
