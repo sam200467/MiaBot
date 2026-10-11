@@ -27,6 +27,10 @@ themes/
 │  ├─ previews/              浏览器实渲染验收图
 │  ├─ tools/                 本地预览生成器
 │  └─ README.md              查询格式、公式与显示规则
+├─ ongeki-chart/             整张谱面的预览长图（读本地 .ogkr）
+│  ├─ renderer/              解析 + 排版 + SVG 绘制，均为本仓库代码，无外部素材
+│  ├─ tools/                 本地预览：任意 .ogkr 渲染成 PNG
+│  └─ README.md              数据契约、排版规则与配色
 └─ completion-search/        版本牌子全曲完成度图
 └─ level-score/              按显示等级查询的全谱面成绩长图
    ├─ assets/                完整牌子、背景、等级框和徽章

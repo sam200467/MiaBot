@@ -60,6 +60,7 @@ const COMMANDS = Object.freeze({
   songsearch: "搜索歌曲",
   songjacket: "查曲绘",
   chartinfo: "谱面分析",
+  chartview: "谱面图",
   constant: "定数表",
   level: "等级",
   calculate: "计算",
@@ -85,6 +86,7 @@ const ALIASES = Object.freeze({
   songsearch: ["搜索歌曲", "搜歌", "查歌", "songsearch"],
   songjacket: ["查曲绘", "曲绘", "jacket"],
   chartinfo: ["谱面分析", "譜面分析", "chartinfo", "谱面"],
+  chartview: ["谱面图", "譜面圖", "谱面预览", "看谱", "chartview"],
   constant: ["定数表", "定數表", "constant", "定数"],
   level: ["等级", "等級", "level", "lv"],
   calculate: ["计算", "計算", "calculate", "rating"],
@@ -780,6 +782,7 @@ function createMiaCommands(options = {}) {
       case "songsearch": return runCapability(event, "songsearch", command.rest);
       case "songjacket": return handleSongJacket(event, command.rest);
       case "chartinfo": return runCapability(event, "chartinfo", command.rest);
+      case "chartview": return runCapability(event, "chartview", command.rest);
       case "constant": return runCapability(event, "constant", command.rest);
       case "level": return runCapability(event, "level", command.rest, "", event.__target);
       case "calculate": return runCapability(event, "calculate", command.rest);

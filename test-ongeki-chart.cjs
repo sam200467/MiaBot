@@ -1,0 +1,224 @@
+"use strict";
+
+// 谱面图：ogkr 解析、分栏排版、SVG 输出、本地谱面文件索引和 /谱面图 能力。
+// 用的是手写的小谱面，不依赖任何游戏数据。
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const C = require("./themes/ongeki-chart/renderer/ongeki-chart.js");
+const { createChartFileIndex } = require("./ongeki-chart-files.cjs");
+const core = require("./mia-core.cjs");
+
+const SAMPLE = [
+  "[HEADER]",
+  "VERSION\t1\t7\t0",
+  "CREATOR\tTester",
+  "BPM_DEF\t150\t150\t150\t150",
+  "MET_DEF\t4\t4",
+  "TRESOLUTION\t1920",
+  "XRESOLUTION\t4096",
+  "",
+  "[B_PALETTE]",
+  "BPL\tA0\tUPS\t0\tFIX\t1\tN\tNDL\t0",
+  "",
+  "[COMPOSITION]",
+  "BPM\t0\t0\t150",
+  "BPM\t4\t0\t300",
+  "MET\t2\t0\t1\t32",
+  "MET\t2\t60\t4\t4",
+  "SFL\t3\t0\t960\t0.5\t0",
+  "",
+  "[LANE]",
+  "LLS\t0\t0\t0\t-12\t0\t0\t0",
+  "LLE\t0\t8\t0\t-12\t0\t0\t0",
+  "LCS\t1\t0\t0\t0\t0\t0\t0",
+  "LCN\t1\t4\t0\t8\t0\t0\t0",
+  "LCE\t1\t8\t0\t0\t0\t0\t0",
+  "WLS\t2\t0\t0\t-24\t0\t0\t0",
+  "WLE\t2\t8\t0\t-24\t0\t0\t0",
+  "WRS\t3\t0\t0\t24\t0\t0\t0",
+  "WRE\t3\t8\t0\t24\t0\t0\t0",
+  "",
+  "[BULLET]",
+  "BLT\tA0\t1\t0\t4\tNML",
+  "BLT\tA0\t1\t480\t90\tDNG",
+  "",
+  "[BELL]",
+  "BEL\t1\t960\t0\t--",
+  "",
+  "[FLICK]",
+  "FLK\t2\t480\t0\tL",
+  "CFK\t2\t960\t0\tR",
+  "",
+  "[NOTES]",
+  "TAP\t0\t0\t960\t-12\t0",
+  "CTP\t1\t1\t0\t0\t2048",
+  "TAP\t2\t1\t0\t-24\t0",
+  "HLD\t1\t3\t0\t6\t0\t5\t0\t6\t0",
+  "CHD\t3\t5\t0\t24\t0\t6\t0\t24\t0",
+].join("\r\n");
+
+test("解析：时间、坐标、轨道归属与统计", () => {
+  const model = C.parseOgkr(SAMPLE);
+  assert.equal(model.header.tResolution, 1920);
+  assert.equal(model.header.creator, "Tester");
+  assert.equal(model.lanes.length, 4);
+
+  const [tap, critical, side] = model.taps;
+  assert.deepEqual([tap.t, tap.x, tap.kind, tap.critical], [960, -12, "L", false]);
+  assert.equal(critical.t, 1920);
+  assert.equal(critical.x, 0.5, "XGrid 的细分要按 XRESOLUTION 折算");
+  assert.equal(critical.critical, true);
+  assert.equal(side.kind, "WL", "挂在墙上的 TAP 是侧键");
+
+  assert.equal(model.holds.length, 2);
+  assert.deepEqual([model.holds[0].t, model.holds[0].end], [3 * 1920, 5 * 1920]);
+  assert.equal(model.holds[1].kind, "WR");
+  assert.equal(model.holds[1].critical, true);
+
+  assert.deepEqual(model.flicks.map((f) => [f.dir, f.critical]), [[-1, false], [1, true]]);
+  assert.equal(model.bells.length, 1);
+  assert.equal(model.bullets[0].shape, "NDL", "子弹形状来自调色板");
+  assert.equal(model.bullets[1].damage, "DNG");
+  assert.deepEqual(model.stats, { tap: 2, hold: 1, side: 1, sideHold: 1, flick: 2, bell: 1, bullet: 2, critical: 3 });
+  assert.equal(model.lastTick, 6 * 1920);
+  assert.equal(C.bpmText(model), "150–300");
+  // 前 4 小节 150 BPM（每小节 1.6 秒），后 2 小节 300 BPM（每小节 0.8 秒）
+  assert.ok(Math.abs(model.durationSeconds - (4 * 1.6 + 2 * 0.8)) < 1e-9);
+  assert.equal(C.formatDuration(model.durationSeconds), "0:08");
+});
+
+test("轨道插值：中间点之间线性过渡，两端外取端点", () => {
+  const model = C.parseOgkr(SAMPLE);
+  const center = model.laneById.get("1");
+  assert.equal(C.interpolate(center.points, 2 * 1920), 4);
+  assert.equal(C.interpolate(center.points, -100), 0);
+  assert.equal(C.interpolate(center.points, 99999), 0);
+});
+
+test("小节：拍号变化切小节，演出用的极短小节不占小节号", () => {
+  const model = C.parseOgkr(SAMPLE);
+  const measures = C.measuresOf(model, model.lastTick + 1);
+  const gimmick = measures.find((m) => m.t === 2 * 1920);
+  assert.equal(gimmick.len, 60);
+  assert.equal(gimmick.minor, true);
+  assert.equal(gimmick.no, undefined);
+  const after = measures.find((m) => m.t === 2 * 1920 + 60);
+  assert.equal(after.no, 3, "极短小节之后的编号接着数，不跳号");
+  assert.equal(after.len, 1920);
+});
+
+test("分栏：每栏不超过容量，首尾相接、不漏不重", () => {
+  const model = C.parseOgkr(SAMPLE);
+  const layout = C.layoutChart(model, { columnMeasures: 2 });
+  assert.ok(layout.columns.length >= 3);
+  for (let i = 1; i < layout.columns.length; i++) {
+    assert.equal(layout.columns[i].start, layout.columns[i - 1].end);
+  }
+  assert.equal(layout.columns[0].start, 0);
+  assert.ok(layout.columns.at(-1).end > model.lastTick);
+  for (const column of layout.columns) assert.ok(column.end - column.start <= 2 * 1920 * 1.02);
+  // 拍号 4/4 → 1/32 → 4/4 绕一圈回到原样，不该标出任何拍号
+  assert.deepEqual(layout.meterMarks, []);
+});
+
+test("长谱面放宽每行栏数，行数不超过目标", () => {
+  const lines = ["[HEADER]", "TRESOLUTION\t1920", "[LANE]", "LCS\t0\t0\t0\t0\t0\t0\t0", "LCE\t0\t400\t0\t0\t0\t0\t0", "[NOTES]"];
+  for (let m = 0; m < 400; m++) lines.push(`TAP\t0\t${m}\t0\t0\t0`);
+  const model = C.parseOgkr(lines.join("\n"));
+  const layout = C.layoutChart(model);
+  const rows = new Set(layout.columns.map((c) => c.y + c.height)).size;
+  assert.ok(layout.width <= layout.options.maxWidthLimit);
+  assert.ok(layout.width > layout.options.maxWidth, "超长谱面要放宽");
+  assert.ok(rows >= layout.options.targetRows);
+});
+
+test("SVG：各类物件都画出来，场外子弹裁掉，文字转义", () => {
+  const model = C.parseOgkr(SAMPLE.replace("CREATOR\tTester", "CREATOR\t<x>"));
+  const svg = C.renderSvg(model, C.layoutChart(model));
+  for (const cls of ["tap k-L", "tap crit k-C", "side k-WL", "hold-body k-C", "hold-body side k-WR", "flick", "flick crit", "bell", "bullet d-NML", "wall k-WL", "rail k-C", "sv sv-slow", "measure-no", "bpm-mark"]) {
+    assert.ok(svg.includes(`class="${cls}"`), "缺少 " + cls);
+  }
+  assert.ok(!svg.includes("d-DNG"), "x=90 的子弹在显示范围外");
+  assert.ok(!svg.includes("<x>"));
+  for (const kind of ["tap", "critical", "hold", "side", "flick", "bell", "bullet", "beam", "soflan"]) {
+    assert.match(C.legendSvg(kind), /^<svg[^>]*>.+<\/svg>$/);
+  }
+});
+
+test("空谱面和坏行不会抛错", () => {
+  const model = C.parseOgkr("[HEADER]\nTRESOLUTION\tabc\nTAP\t9\nHLD\nBLT\n[NOTES]\n");
+  assert.equal(model.header.tResolution, 1920);
+  const layout = C.layoutChart(model);
+  assert.equal(layout.columns.length, 1);
+  assert.match(C.renderSvg(model, layout), /^<svg/);
+});
+
+function tempTree(files) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ogkr-index-"));
+  for (const [name, content] of Object.entries(files)) {
+    const file = path.join(root, ...name.split("/"));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, content);
+  }
+  return root;
+}
+
+test("谱面文件索引：递归找，ID 去前导零，后面的包覆盖前面的", () => {
+  const root = tempTree({
+    "A000/music/music0036/0036_03.ogkr": "old",
+    "option/A001/music/music0036/0036_03.ogkr": "new",
+    "A000/music/music8003/8003_04.ogkr": "lun",
+    "A000/music/music0036/readme.txt": "",
+  });
+  try {
+    let clock = 0;
+    const index = createChartFileIndex([root], { now: () => clock });
+    assert.equal(fs.readFileSync(index.find(36, 3), "utf8"), "new");
+    assert.equal(fs.readFileSync(index.find("8003", 4), "utf8"), "lun");
+    assert.equal(index.find(36, 2), null);
+    // 新放进去的谱面：一分钟内不重扫，之后重扫能找到
+    fs.writeFileSync(path.join(root, "A000/music/music0036/0036_02.ogkr"), "exp");
+    clock = 1000;
+    assert.equal(index.find(36, 2), null);
+    clock = 61000;
+    assert.ok(index.find(36, 2));
+    assert.equal(createChartFileIndex([]).find(36, 3), null);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("/谱面图：没配目录、缺文件、找到文件三种结果", async () => {
+  const plain = await core.resolveCapability({}, "u1", "chartview", "id36");
+  assert.equal(plain.kind, "text");
+  assert.match(plain.text, /ongekiChartRoots/);
+
+  const root = tempTree({ "music/0036_03.ogkr": SAMPLE });
+  const original = core.generateChartPreview;
+  try {
+    const config = { ongekiChartRoots: [root] };
+    const usage = await core.resolveCapability(config, "u1", "chartview", "");
+    assert.equal(usage.kind, "text");
+
+    const missing = await core.resolveCapability(config, "u1", "chartview", "id36 expert");
+    assert.equal(missing.kind, "text");
+    assert.match(missing.text, /0036_02\.ogkr/);
+
+    let call = null;
+    core.generateChartPreview = async (...args) => { call = args; return { buffer: Buffer.from("x"), meta: null }; };
+    const plan = await core.resolveCapability(config, "u1", "chartview", "id36");
+    assert.equal(plan.kind, "image");
+    assert.equal(plan.key, "chartview");
+    assert.match(plan.caption, /id36 .* · MASTER/);
+    await plan.run();
+    assert.equal(call[1].song.id, 36);
+    assert.equal(call[1].difficultyId, 3);
+    assert.equal(call[2], path.join(root, "music", "0036_03.ogkr"));
+  } finally {
+    core.generateChartPreview = original;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

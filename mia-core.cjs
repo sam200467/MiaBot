@@ -19,6 +19,7 @@ const INTERNAL_SONGS = require("./ongeki-music-internal.json");
 const { songs: CATALOG_SONGS } = require("./ongeki-song-catalog.json");
 const songKana = require("./song-kana.cjs");
 const rinnet = require("./rinnet-client.cjs");
+const chartFiles = require("./ongeki-chart-files.cjs");
 
 const GENERATE_COOLDOWN_MS = 60 * 1000;
 const MAX_QUEUE = 3;
@@ -326,6 +327,18 @@ function searchChartInfo(value) {
   return { parsed, matches, suggestions: matches.length ? [] : chartInfoSuggestions(songs, parsed.difficultyId) };
 }
 
+// 谱面图：难度可以不写。不写时有紫谱就看紫谱，只有白谱的曲目（白谱单独编号）就看白谱。
+function searchChartView(value) {
+  const raw = String(value || "").normalize("NFKC").replace(/[\s　]+/g, " ").trim();
+  if (!raw) return { parsed: null, matches: [], suggestions: [] };
+  if (parseChartInfoQuery(raw)) return searchChartInfo(raw);
+  const matches = searchSongs(raw).map((song) => {
+    const difficultyId = [3, 10].find((id) => songHasChartDifficulty(song, id));
+    return difficultyId === undefined ? null : { song, difficultyId, difficultyName: CHART_INFO_DIFFICULTY_NAMES[difficultyId] };
+  }).filter(Boolean);
+  return { parsed: { songQuery: raw, difficultyId: null, difficultyName: "", difficultyWord: "" }, matches, suggestions: [] };
+}
+
 // Candidate values use IDs so duplicate titles and shortened labels stay unambiguous.
 function songAutocomplete(commandName, value) {
   if (!["song", "chartinfo"].includes(commandName)) return [];
@@ -404,13 +417,13 @@ function chartInfoMatchLines(matches) {
 }
 
 // 「是不是其实想查 id8015 的谱面」：说清白谱单独编号，再给照抄就能用的整条命令。
-function chartInfoSuggestionLines({ parsed, suggestions }) {
+function chartInfoSuggestionLines({ parsed, suggestions }, command = capabilityHints.chartInfoCommand) {
   if (!suggestions?.length) return [];
   const titles = [...new Set(suggestions.map((song) => "《" + escapeText(song.name) + "》"))].join("、");
   return [
     "是不是其实想查 " + suggestions.map((song) => "id" + song.id).join(" 或 ") + " 的谱面？" +
       titles + "的白谱单独编号，跟绿黄红紫谱不是同一个 ID。",
-    ...suggestions.map((song) => pickHint(capabilityHints.chartInfoCommand) + " id" + song.id + " " + parsed.difficultyWord),
+    ...suggestions.map((song) => pickHint(command) + " id" + song.id + " " + parsed.difficultyWord),
   ];
 }
 
@@ -806,6 +819,26 @@ async function generateChartInfo(config, match, onLine) {
   return { name: path.basename(outputPath), buffer, meta };
 }
 
+const CHART_PREVIEW_MAX_BYTES = 4 * 1024 * 1024;
+
+async function generateChartPreview(config, match, file, onLine) {
+  const size = fs.statSync(file).size;
+  if (size > CHART_PREVIEW_MAX_BYTES) throw new Error("谱面文件过大（" + Math.round(size / 1024) + " KB）");
+  const result = await runCore(config, "--chart-preview-job-stdin", {
+    songId: Number(match.song.id),
+    difficultyId: Number(match.difficultyId),
+    ogkr: fs.readFileSync(file, "utf8"),
+    streamOutput: true,
+  }, 180000, onLine);
+  const streamed = result.stdout.match(/^CHART_PREVIEW_OUTPUT_BASE64:([^:]+):(.+)$/m);
+  if (streamed) return { name: streamed[1], buffer: Buffer.from(streamed[2], "base64"), meta: null };
+  const outputPath = result.stdout.match(/^CHART_PREVIEW_OUTPUT_FILE:(.+)$/m)?.[1]?.trim();
+  if (!outputPath || !fs.existsSync(outputPath)) throw new Error("分表核心未返回有效的谱面图数据");
+  const buffer = fs.readFileSync(outputPath);
+  try { fs.unlinkSync(outputPath); } catch {}
+  return { name: path.basename(outputPath), buffer, meta: null };
+}
+
 async function generateCompletionChart(config, binding, plate, onLine) {
   const result = await runCore(config, "--completion-job-stdin", {
     ...await personalJob(config, binding, "plate"),
@@ -929,6 +962,7 @@ const CAPABILITY_SPECS = Object.freeze([
   { name: "plate", label: "版本牌子完成度图", argHint: "版本牌子名，如 闪击、赤击、想击；用户问有哪些版本牌子、或想查却说不出版本名时留空，程序会列出全部可选的版本", needsBinding: true },
   { name: "song", label: "单曲全难度成绩图", argHint: "曲名或 Song ID", needsBinding: true },
   { name: "chartinfo", label: "单张谱面分数线分析图", argHint: "曲名或 Song ID 加难度，如 id870 master", needsBinding: false },
+  { name: "chartview", label: "谱面图（整张谱面的预览长图，看配置和走位）", argHint: "曲名或 Song ID，可加难度，如 id870 master；不写难度默认紫谱", needsBinding: false },
   { name: "constant", label: "定数表", argHint: "0–20 的整数或一位小数，如 14 或 14.2", needsBinding: false },
   { name: "level", label: "等级成绩长图", argHint: "14、14+、14.1 或 ABFB，可再加页码", needsBinding: true },
   { name: "calculate", label: "单曲 Rating 计算", argHint: "定数、技术分、铃铛 none/fb、连击 none/fc/ab/ab-plus", needsBinding: false },
@@ -966,6 +1000,8 @@ let capabilityHints = Object.freeze({
   chartInfoUsage: "请在曲名或 Song ID 后写明难度，例如 `id870 master`、`初音ミクの激唱 lunatic`。支持 BASIC / ADVANCED / EXPERT / MASTER / LUNATIC 及常用缩写。",
   // 查不到谱面、提示「是不是其实想查 id8015」时，后面那条照抄就能用的命令以它开头。
   chartInfoCommand: "/chartinfo",
+  chartViewUsage: "请写曲名或 Song ID，可以再加难度，例如 `id870`、`id870 expert`。不写难度时默认看 MASTER。",
+  chartViewCommand: "/chartview",
   levelUsage: "请输入显示等级（如 14、14+）、一位小数定数（如 14.1）或 ABFB。",
   constantUsage: "请输入 0–20 的整数或一位小数，例如 14、14.2。",
   calculateUsage: "请给出定数、技术分、铃铛（none 或 fb）和连击（none / fc / ab / ab-plus），例如 14.2 1000737 fb none。",
@@ -1106,6 +1142,28 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
     };
   }
 
+  if (spec.name === "chartview") {
+    const index = chartFiles.chartFileIndexFor(config);
+    if (!index.roots.length) return text("谱面图还没有开：部署者需要在配置里填 ongekiChartRoots，指向本地游戏数据中放谱面（.ogkr）的目录。");
+    const result = searchChartView(q);
+    if (!result.parsed) return text(pickHint(capabilityHints.chartViewUsage));
+    if (result.matches.length !== 1) {
+      return { kind: "lines", header: result.matches.length ? "找到多张谱面，请用完整 Song ID 明确选择：" : "没有找到符合要求的谱面。", lines: [...chartInfoMatchLines(result.matches), ...chartInfoSuggestionLines(result, capabilityHints.chartViewCommand)], footer: "" };
+    }
+    const match = result.matches[0];
+    const position = CHART_INFO_DIFFICULTY_POSITIONS[match.difficultyId];
+    const file = index.find(match.song.id, position);
+    if (!file) {
+      return text("本地游戏数据里没有找到 id" + match.song.id + " " + escapeText(match.song.name) + " 的 " + match.difficultyName +
+        " 谱面文件（" + String(match.song.id).padStart(4, "0") + "_0" + position + ".ogkr）。");
+    }
+    return {
+      kind: "image", key: "chartview", label: "正在生成谱面图", failText: "谱面图生成失败：",
+      caption: "谱面图：id" + match.song.id + " " + escapeText(match.song.name) + " · " + match.difficultyName,
+      run: () => coreCall("generateChartPreview", config, match, file, onLine),
+    };
+  }
+
   if (spec.name === "constant") {
     const token = q.replace(/[^\d.]/g, " ").trim().split(/\s+/).filter(Boolean)[0] || "";
     if (!/^(?:[0-9]|1[0-9]|20)(?:\.[0-9])?$/.test(token) || Number(token) > 20) return text(capabilityHints.constantUsage);
@@ -1229,6 +1287,7 @@ module.exports = {
   parseChartInfoQuery,
   songHasChartDifficulty,
   searchChartInfo,
+  searchChartView,
   songAutocomplete,
   aliasAutocomplete,
   // 别名库
@@ -1276,6 +1335,7 @@ module.exports = {
   generateChart,
   generateSongChart,
   generateChartInfo,
+  generateChartPreview,
   generateCompletionChart,
   generateLevelChart,
   // 图片元数据
