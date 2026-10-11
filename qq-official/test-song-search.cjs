@@ -222,11 +222,14 @@ test("Markdown 版：「id36 曲名」整段填到「/谱面分析 id36 」，�
   assert.match(many, /text="\/谱面分析 id8025 白" show="id8025   怒槌～光吉猛修一部謎～"/, "只有白谱的歌没得挑，直接填白");
 });
 
-test("Markdown 版：曲名里有半角引号放不进属性值，照原样显示不做链接；按钮被拒时翻页的下一页也可点", () => {
-  const { replyChunks } = require("./song-search.cjs");
+test("Markdown 版：曲名里的半角引号、& 写成 &quot; &amp;，照样可点，指令里的半角引号不做链接；按钮被拒时翻页的下一页也可点", () => {
+  const { replyChunks, markdownLine } = require("./song-search.cjs");
   const snow = replyChunks("Snow in", 900).map(c => c.markdown).join("\n");
-  assert.match(snow, /Snow in "I love you"/);
-  assert.doesNotMatch(snow, /show="id\d+   Snow in/);
+  assert.match(snow, /<qqbot-cmd-input text="\/谱面分析 id\d+ " show="id\d+   Snow in &quot;I love you&quot;" reference="false" \/>/);
+  assert.match(reply("Snow in"), /Snow in "I love you"/, "纯文本照原样");
+  assert.equal(markdownLine([{ text: "下一页", command: '/搜索歌曲 "a" --page 2' }]), "下一页", "填进输入框的那段不改，有半角引号就不做链接");
+  assert.equal(markdownLine([{ text: "C & B", command: "/谱面分析 id1 " }]), '<qqbot-cmd-input text="/谱面分析 id1 " show="C &amp; B" reference="false" />', "& 写成 &amp; 照样可点");
+  assert.equal(markdownLine([{ text: "a<b", command: "/谱面分析 id1 " }]), "a<b", "尖括号不做链接");
   const paged = replyChunks("a", 900).at(-1);
   assert.match(paged.markdownWithoutKeyboard, /<qqbot-cmd-input text="\/搜索歌曲 a --page 2" show="\/搜索歌曲 a --page 2" reference="false" \/>/);
   assert.doesNotMatch(paged.markdown, /--page 2/, "带按钮时正文不再写下一页指令");

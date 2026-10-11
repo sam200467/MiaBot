@@ -24,8 +24,8 @@ test("截图查歌请求经语义路由查本地，未绑定不查账号或状�
       await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content }));
       assert.ok(await mock.waitFor(() => mock.state.sent.length > before));
       const body = mock.state.sent.at(-1).body;
-      // /搜索歌曲 走 Markdown（曲名可点）；自然语言那两句走结构化查询，照旧是纯文本。
-      if (content.startsWith("/")) assert.equal(body.msg_type, 2, "搜索歌曲走 Markdown（曲名可点）");
+      // 两种都走 Markdown、曲名可点：/搜索歌曲 是指令，自然语言那两句走结构化查询。
+      assert.equal(body.msg_type, 2, "曲名可点，走 Markdown");
       const text = body.msg_type === 2 ? body.markdown.content : body.content;
       assert.match(text, /サドマミホリック/);
       assert.match(text, /13\.5/);
@@ -202,11 +202,14 @@ test("随机抽样经QQ入口保存，同批翻页不重抽，用户间不能共
   };
   const { mock, bot } = await setup({}, { botDeps: { fetchImpl } });
   bot.settings.c.limits.userCooldownSeconds = 0;
-  const titles = text => [...text.matchAll(/^《(.+)》/gm)].map(m => m[1]);
+  const titles = text => [...text.matchAll(/《(.+?)》/g)].map(m => m[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
   try {
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "随机选10张14.5的谱" }));
     const first = titles(lastText(mock));
     assert.equal(first.length, 8);
+    // 按谱面抽的，每条只有一张谱面：曲名链接把难度也填好，回车即可。
+    assert.equal([...lastText(mock).matchAll(/<qqbot-cmd-input text="\/谱面分析 id\d+ [绿黄红紫白]"/g)].length, 8);
+    assert.match(lastText(mock), /（点曲名会填好这张谱面的 \/谱面分析，回车即可）$/);
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "下一页" }));
     const second = titles(lastText(mock));
     assert.equal(second.length, 2); assert.ok(second.every(t => !first.includes(t)));
@@ -1224,8 +1227,8 @@ test("公共查询的翻页按钮：绑发起人；本人点了按存的查询�
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "歌名包含ai的有哪些" }));
     const first = mock.state.sent.at(-1).body;
     assert.equal(first.msg_type, 2);
-    assert.match(first.markdown.content, /第 1\/\d+ 页，点下面的按钮翻页吧。\n想直接跳页的话，回复这条消息 @我 说「第\d+页」就行。$/, "挂着按钮就别叫人回复「下一页」；公共查询没有页码按钮，跳页靠这句提示");
-    assert.match(first.markdown.content, /符合条件：\d+ 首\n\n《/, "开头说明和结果列表之间空一行，不被折叠");
+    assert.match(first.markdown.content, /第 1\/\d+ 页，点下面的按钮翻页吧。\n想直接跳页的话，回复这条消息 @我 说「第\d+页」就行。\n\n（点曲名会填入 \/谱面分析 和曲目 ID，再补一个难度字：绿\/黄\/红\/紫）$/, "挂着按钮就别叫人回复「下一页」；公共查询没有页码按钮，跳页靠这句提示");
+    assert.match(first.markdown.content, /符合条件：\d+ 首\n\n<qqbot-cmd-input text="\/谱面分析 id\d+ " show="《/, "开头说明和结果列表之间空一行，不被折叠；曲名可点");
     const buttons = first.keyboard.content.rows.flatMap((r) => r.buttons);
     assert.deepEqual(buttons.map((b) => b.id), ["next", "last"], "公共查询没有页码按钮（没有可手填的指令）");
     assert.equal(buttons[0].action.data, "mia:U1:第2页", "按钮绑着发起人");

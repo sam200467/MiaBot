@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { executeQuery, validateQuery, formatResult, queryMismatch, characterMentions } = require("./public-query.cjs");
+const { executeQuery, validateQuery, formatResult, formatResultMarkdown, queryMismatch, characterMentions } = require("./public-query.cjs");
 const catalog = require("../ongeki-song-catalog.json");
 const characters = require("../chat-core/knowledge/ongeki-characters.json");
 const filter = (field, op, value) => ({ field, op, value });
@@ -373,6 +373,31 @@ test("排版：开头说明、结果列表、页码分段；每首带附加行�
   const withIds = formatResult(run([filter("title", "contains", "ai")], { select: ["title", "botId"] })).split("\n\n");
   assert.ok(withIds.slice(1, -1).every(block => /^《[^\n]+》[^\n]*\nID：/.test(block)), "每首一段");
   assert.doesNotMatch(formatResult(run([filter("title", "eq", "Titania")], { select: ["title"] })), /第 1\/1 页/, "只有一页时不写页码");
+});
+
+test("Markdown 版：曲名是 /谱面分析 指令链接，其余跟纯文本逐字一样，提示只在最后一段", () => {
+  const link = (command, title) => `<qqbot-cmd-input text="${command}" show="《${title}》" reference="false" />`;
+  const plain = markdown => markdown.replace(/<qqbot-cmd-input text="[^"]*" show="([^"]*)" reference="false" \/>/g, "$1").replace(/\\([*_])/g, "$1");
+  // 按歌查、一首有好几张谱面：填到本曲 ID 为止，难度让用户补
+  const songs = run([filter("title", "contains", "ai")], { select: ["title"] });
+  const markdown = formatResultMarkdown(songs);
+  assert.equal(plain(markdown), formatResult(songs) + "\n\n（点曲名会填入 /谱面分析 和曲目 ID，再补一个难度字：绿/黄/红/紫）");
+  const gate = formatResultMarkdown(run([filter("title", "eq", "Gate of Doom")], { select: ["title", "constant"] }));
+  assert.match(gate, new RegExp("^" + link("/谱面分析 id39 ", "Gate of Doom") + "\n定数：", "m"), "白谱 ID 另算，链接用本曲的");
+  // 只剩一张谱面：整条命令填好，白谱用它自己的 ID
+  const charts = formatResultMarkdown(run([filter("title", "eq", "Gate of Doom")], { entity: "charts", select: ["title", "difficulty"] }));
+  assert.ok(charts.includes(link("/谱面分析 id39 紫", "Gate of Doom")));
+  assert.ok(charts.includes(link("/谱面分析 id8015 白", "Gate of Doom")));
+  assert.match(charts, /（点曲名会填好这张谱面的 \/谱面分析，回车即可）$/);
+  assert.ok(formatResultMarkdown(run([filter("title", "eq", "Gate of Doom"), filter("difficulty", "eq", "MAS")])).includes(link("/谱面分析 id39 紫", "Gate of Doom")));
+  // 半角引号、& 写成 &quot; &amp;，照样可点；纯文本版照原样
+  assert.match(formatResultMarkdown(run([filter("title", "search", "Snow in")])), /show="《Snow in &quot;I love you&quot;》"/);
+  assert.ok(formatResultMarkdown(run([filter("title", "eq", "C & B")])).includes(link("/谱面分析 id837 ", "C &amp; B")));
+  // 没有能点的就不给 Markdown 版：只有几张白谱（ID 各不相同）、只问条数
+  assert.equal(formatResultMarkdown(run([filter("title", "eq", "Perfect Shining!!"), filter("difficulty", "eq", "LUN")])), null);
+  assert.equal(formatResultMarkdown(run([], { mode: "count" })), null);
+  // 筛选条件里的 * 照样转义，免得「DECO*27 … TANO*C」变成斜体
+  assert.match(formatResultMarkdown(run([filter("artist", "contains", "DECO*27")])), /^筛选：艺术家署名包含DECO\\\*27$/m);
 });
 
 test("按歌名排序用读音（五十音），不按汉字的拼音；只在游戏数据里的已删歌也排得进去", () => {

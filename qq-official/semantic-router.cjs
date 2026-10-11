@@ -114,9 +114,11 @@ function queryReply(query, options = {}) {
   const result = publicQuery.executeQuery(query, options);
   // 不止一页时带上 pager，QQ 入口据此在消息下面挂翻页按钮（chat-core 不认这个字段，原样忽略）。
   // preformatted：结果是程序排好的，段与段之间的空行是故意留的，QQ 入口不要像模型回复那样把它折叠掉。
+  // markdown：曲名可点的 Markdown 版（见 public-query.cjs 的 formatResultMarkdown），没有可点的就不带，QQ 入口照旧发纯文本。
   const paged = result.query.mode !== "count" && result.selectedTotal && result.pages > 1 && result.query.page <= result.pages;
+  const markdown = publicQuery.formatResultMarkdown(result);
   return { ...clarification(publicQuery.formatResult(result)), preformatted: true, queryState: result.query, querySelection: result.selectionKeys,
-    ...(paged ? { pager: { page: result.query.page, pages: result.pages } } : {}) };
+    ...(markdown ? { markdown } : {}), ...(paged ? { pager: { page: result.query.page, pages: result.pages } } : {}) };
 }
 async function routeIntent({ settings, messages, specs, targets = [], queryState, querySelection = [], media = {}, fetchImpl = fetch, signal, dispatcher, validateAction, log = () => {}, pickIndex }) {
   const current = messages.filter(m => m.role === "user").at(-1)?.content || "";
