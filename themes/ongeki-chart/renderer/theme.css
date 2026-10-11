@@ -70,24 +70,45 @@ html, body { margin: 0; background: var(--page); }
 }
 
 .song { min-width: 0; display: flex; flex-direction: column; }
-.song-top { display: flex; align-items: center; gap: 12px; }
+.song-top { display: flex; align-items: center; gap: 14px; height: 38px; }
 
+/* 难度、等级、定数同一字号、同一行高，靠基线对齐；等级和定数之间只用竖线和透明度区分。
+   固定行高是为了不让回退字体（假名、汉字）把某一段撑高，导致上下错位。 */
 .difficulty {
   display: inline-flex;
   align-items: baseline;
-  gap: 10px;
-  padding: 5px 14px 6px;
+  height: 38px;
+  padding: 0 16px;
   border-radius: 999px;
   background: var(--diff);
   color: #fff;
-  font: 700 17px/1 "Gakusan Maru", "Noto CJK", sans-serif;
-  letter-spacing: .06em;
+  font: 700 19px/38px "Gakusan Maru", "Noto CJK", sans-serif;
+  font-variant-numeric: tabular-nums;
 }
-.difficulty b { font-size: 22px; letter-spacing: 0; }
-.difficulty small { font-size: 14px; opacity: .85; letter-spacing: 0; }
+.difficulty span, .difficulty b, .difficulty small { font: inherit; line-height: 38px; }
+.difficulty span { letter-spacing: .06em; }
+.difficulty b {
+  position: relative;
+  margin-left: 13px;
+  padding-left: 13px;
+}
+.difficulty b::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  border-left: 1.5px solid currentColor;
+  opacity: .45;
+}
+.difficulty small { margin-left: 9px; opacity: .78; }
 .difficulty.light { color: #2a2f3d; box-shadow: inset 0 0 0 1.5px #aab0c2; }
 
-.song-id { color: var(--muted); font-size: 15px; font-weight: 700; }
+.song-id {
+  color: var(--muted);
+  font: 700 19px/38px "Gakusan Maru", "Noto CJK", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
 
 h1 {
   margin: 12px 0 2px;
@@ -106,19 +127,27 @@ h1 {
   white-space: nowrap;
 }
 
+/* 四项的标签与数值各自同一字号、固定行高，横向一排顶端和基线都对齐 */
 .facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 26px;
+  align-items: flex-start;
+  gap: 8px 34px;
   margin: auto 0 0;
   padding-top: 14px;
 }
-.facts div { display: flex; flex-direction: column; min-width: 0; max-width: 520px; }
-.facts dt { color: var(--muted); font-size: 12px; letter-spacing: .08em; }
+.facts div { display: flex; flex-direction: column; min-width: 0; max-width: 560px; }
+.facts dt {
+  height: 18px;
+  color: var(--muted);
+  font: 400 13px/18px "Noto CJK", "Microsoft YaHei", "PingFang SC", sans-serif;
+  letter-spacing: .04em;
+}
 .facts dd {
-  margin: 1px 0 0;
-  font-size: 19px;
-  font-weight: 700;
+  height: 30px;
+  margin: 3px 0 0;
+  font: 700 22px/30px "Noto CJK", "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-variant-numeric: tabular-nums;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -140,7 +169,7 @@ h1 {
   background: #f3f5fa;
   text-align: center;
 }
-.counts strong { display: block; font-size: 22px; line-height: 1.1; }
+.counts strong { display: block; font-size: 22px; line-height: 26px; height: 26px; font-variant-numeric: tabular-nums; }
 .counts span { color: var(--muted); font-size: 11px; letter-spacing: .1em; }
 
 .legend {
