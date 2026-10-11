@@ -415,7 +415,11 @@ function formatResult(result) {
     return out;
   });
   const footer = [];
-  if (query.mode !== "count" && result.selectedTotal && query.page <= pages && pages > 1) footer.push(`第 ${query.page}/${pages} 页${query.page < pages ? "，回复「下一页」继续看吧。" : "。"}`);
+  if (query.mode !== "count" && result.selectedTotal && query.page <= pages && pages > 1) {
+    footer.push(`第 ${query.page}/${pages} 页${query.page < pages ? "，回复「下一页」继续看吧。" : "。"}`);
+    // 三页以上才提跳页：两页的话上一页、下一页就够了。例子挑一个不是当前页的页码。
+    if (pages > 2) footer.push(`想直接跳页的话，回复这条消息 @我 说「第${query.page === pages ? 1 : pages}页」就行。`);
+  }
   const list = blocks.map(block => block.join("\n")).join(blocks.some(block => block.length > 1) ? "\n\n" : "\n");
   return [lines.join("\n"), list, footer.join("\n")].filter(Boolean).join("\n\n");
 }

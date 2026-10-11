@@ -101,6 +101,14 @@ function applyIdIntent(result, text) {
 function imageRequest(text, media) {
   return ((!text.trim() || text === "[图片]" || text === "[图片（内容看不到）]") && media?.hasImage) || /(?:点评|评价|辨认|识别|读|看看|看一下|看懂|描述|分析|写了|是什么|什么意思).{0,18}(?:这张图|这幅图|图片|照片|截图)|(?:这张图|这幅图|图片|照片|截图).{0,18}(?:点评|评价|内容|写了|什么意思|是什么|看得|看懂)/.test(text);
 }
+// 「3」「三」「十二」「二十」「二十三」→ 数字；认不出来的返回 NaN（后面按超出页数处理）。
+const CN_DIGITS = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+function pageNumber(text) {
+  if (/^\d+$/.test(text)) return Number(text);
+  const m = text.match(/^([一二两三四五六七八九])?(十)?([一二三四五六七八九])?$/);
+  if (!m || (!m[2] && (!m[1] || m[3]))) return NaN;
+  return m[2] ? (m[1] ? CN_DIGITS[m[1]] : 1) * 10 + (m[3] ? CN_DIGITS[m[3]] : 0) : CN_DIGITS[m[1]];
+}
 function queryReply(query, options = {}) {
   if (query.selection?.excludePrevious && !options.selectionKeys && !options.excludeKeys?.length) return { ...clarification("还没有记下可以排除的上一批呢。先告诉我想选哪些条件的歌吧。"), queryState: null };
   const result = publicQuery.executeQuery(query, options);
@@ -117,14 +125,16 @@ async function routeIntent({ settings, messages, specs, targets = [], queryState
   if (imageRequest(current, media)) return validateDecision({ route: "media" }, specs);
   if (needsPersonalRecords(messages)) return null;
   // 翻页沿用程序保存的查询，不经模型。「上一页」「第3页」是翻页按钮发来的（也可以手打）。
-  const turn = current.match(/^(?:(下一页|下页|翻页)|(上一页|上页)|第\s*(\d{1,4})\s*页)[吧呀。！!\s]*$/);
+  // 页码也认中文数字（「第三页」「第十二页」），前面可以带「帮我看/翻到/跳到」：原来只认「第3页」，
+  // 别的说法要交给模型去猜，偶尔会翻不过去。
+  const turn = current.match(/^(?:(下一页|下页|翻页)|(上一页|上页)|(?:(?:帮我|给我)?(?:看|翻到|跳到|查|搜)(?:一下)?)?第\s*(\d{1,4}|[一二两三四五六七八九十]{1,3})\s*页)[吧呀。！!\s]*$/);
   if (turn) {
     if (!queryState) return clarification("还没有可以接着翻的查询呢，先告诉我想找什么吧。");
     const previous = publicQuery.executeQuery(queryState, { selectionKeys: querySelection, pickIndex });
     const page = previous.query.page, pages = previous.pages;
     if (previous.query.mode === "count" || !previous.total) return clarification("已经没有下一页啦，要不要换个条件再看看？");
-    const target = turn[1] ? page + 1 : turn[2] ? page - 1 : Number(turn[3]);
-    if (target > pages) return clarification(turn[1] ? "已经没有下一页啦，要不要换个条件再看看？" : `一共只有 ${pages} 页哦。`);
+    const target = turn[1] ? page + 1 : turn[2] ? page - 1 : pageNumber(turn[3]);
+    if (!(target <= pages)) return clarification(turn[1] ? "已经没有下一页啦，要不要换个条件再看看？" : `一共只有 ${pages} 页哦。`);
     if (target < 1) return clarification("已经是第一页啦。");
     return queryReply({ ...previous.query, page: target }, { selectionKeys: querySelection, pickIndex });
   }

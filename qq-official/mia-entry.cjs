@@ -207,7 +207,7 @@ function makeFileLog(logFile) {
 // 所以正文里的空行折叠成单个换行（保留分段感，但不留空行）。
 // 只有来源脚注（chat-core 的 attachSources 拼在最后的「参考资料：」那段）前面留一个空行：
 // 跟着一起折叠的话，它会跟正文黏在一起（2026-10-09 群里实测）。脚注标题有三种，跟那边保持一致。
-const PAGE_REPLY_HINT = /，回复「下一页」继续看吧。$/;
+const PAGE_REPLY_HINT = /，回复「下一页」继续看吧。$/m;
 const SOURCE_FOOTER = /\n[ \t]*\n((?:参考资料|搜索结果（供核对）|资料出处[^\n]*?)：\n[\s\S]*)$/;
 // preformatted：程序排好版的回复（公共查询结果），空行是分段用的，只把连着好几行的空行压成一行。
 function formatReply(text, { preformatted = false } = {}) {

@@ -368,7 +368,7 @@ test("排版：开头说明、结果列表、页码分段；每首带附加行�
   const [head, list, foot] = titles.split("\n\n");
   assert.match(head, /^查到啦/); assert.doesNotMatch(head, /《/);
   assert.ok(list.split("\n").every(line => line.startsWith("《")), "只问歌名时列表紧挨着排");
-  assert.match(foot, /^第 1\/\d+ 页/);
+  assert.match(foot, /^第 1\/\d+ 页，回复「下一页」继续看吧。\n想直接跳页的话，回复这条消息 @我 说「第\d+页」就行。$/, "三页以上提示怎么跳页");
   assert.doesNotMatch(titles, /补录|补充谱面|内部曲库/, "只问歌名不提谱面补录");
   const withIds = formatResult(run([filter("title", "contains", "ai")], { select: ["title", "botId"] })).split("\n\n");
   assert.ok(withIds.slice(1, -1).every(block => /^《[^\n]+》[^\n]*\nID：/.test(block)), "每首一段");
