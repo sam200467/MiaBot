@@ -76,6 +76,16 @@
     return row;
   }
 
+  // 长曲名、长卡名先缩字号，缩到下限还放不下再交给 CSS 的省略号
+  function fitSingleLine(element, minimum = 0.72) {
+    const base = parseFloat(getComputedStyle(element).fontSize);
+    let size = base;
+    while (element.scrollWidth > element.clientWidth + 1 && size > base * minimum) {
+      size -= 1;
+      element.style.fontSize = `${size}px`;
+    }
+  }
+
   async function waitForImages() {
     await Promise.all([...document.images].map((image) => new Promise((resolve, reject) => {
       const validate = () => image.naturalWidth > 0 ? resolve() : reject(new Error(`图片内容无效：${image.src}`));
@@ -93,21 +103,33 @@
     const chart = data.chart || {};
     const difficultyColor = chart.color || "#9b63ea";
 
+    const dash = (value) => value == null || String(value).trim() === "" ? "-" : String(value);
     $("jacket").src = chart.jacketUrl;
     $("song-title").textContent = chart.title || "-";
     $("artist").textContent = chart.artist || "-";
-    const difficultyName = document.getElementById("difficulty-name");
-    if (difficultyName) difficultyName.textContent = chart.difficulty || "-";
-    $("difficulty-ribbon").textContent = chart.difficulty || "-";
-    $("difficulty-ribbon").style.setProperty("--difficulty", difficultyColor);
-    const difficultyCard = document.getElementById("difficulty-card");
-    if (difficultyCard) difficultyCard.style.setProperty("--difficulty", difficultyColor);
-    const chartLevel = document.getElementById("chart-level");
-    if (chartLevel) chartLevel.textContent = chart.level ?? "-";
+    $("genre").textContent = dash(chart.genre);
+    $("version").textContent = dash(chart.version);
+    $("release-date").textContent = dash(chart.releaseDate);
+    $("attribute").textContent = dash(chart.attribute);
+    const attributeTone = { fire: "fire", aqua: "aqua", leaf: "leaf" }[String(chart.attribute || "").toLowerCase()];
+    if (attributeTone) $("attribute").dataset.tone = attributeTone;
+
+    $("difficulty-card").style.setProperty("--difficulty", difficultyColor);
+    $("difficulty-name").textContent = chart.difficulty || "-";
+    $("chart-level").textContent = dash(chart.level);
     $("chart-constant").textContent = chart.constant == null ? "-" : Number(chart.constant).toFixed(1);
+
     $("song-id").textContent = chart.songId ?? "-";
+    $("bpm").textContent = chart.bpm == null ? "-" : String(Number(chart.bpm));
+    $("duration").textContent = dash(chart.duration);
     $("note-count").textContent = comma(chart.noteCount);
     $("bell-count").textContent = comma(chart.bellCount);
+    $("chart-designer").textContent = dash(chart.chartDesigner);
+    $("boss-card").textContent = dash(chart.bossCardName || chart.bossName);
+    $("boss-level").textContent = dash(chart.bossLevel);
+    for (const id of ["chart-designer", "boss-card"]) {
+      $(id).classList.toggle("lead-bracket", /^[【（「『［〔〈《]/.test($(id).textContent));
+    }
 
     for (const item of data.scoreRows || []) $("score-rows").append(buildScoreRow(item));
     for (const item of data.platinumRows || []) $("platinum-rows").append(buildPlatinumRow(item));
@@ -125,6 +147,7 @@
     );
 
     await Promise.all([document.fonts.ready, waitForImages()]);
+    for (const id of ["song-title", "artist", "chart-designer", "boss-card", "genre", "version"]) fitSingleLine($(id));
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     window.__THEME_READY__ = true;
   }

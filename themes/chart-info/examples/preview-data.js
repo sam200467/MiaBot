@@ -11,6 +11,16 @@ window.__THEME_DATA__ = {
     "constant": 14.6,
     "noteCount": 1658,
     "bellCount": 143,
+    "chartDesigner": "kawaiilemon",
+    "genre": "チュウマイ",
+    "version": "bright MEMORY Act.2",
+    "bpm": 188,
+    "duration": "2:13",
+    "releaseDate": "2023-09-14",
+    "bossName": "高瀬 梨緒",
+    "bossCardName": "【R】高瀬 梨緒[体操着]",
+    "bossLevel": 61,
+    "attribute": "Aqua",
     "jacketUrl": "https://norca0721.github.io/otoge-db/ongeki/jacket/d9a711a807c5ab8c.png"
   },
   "scoreRows": [
