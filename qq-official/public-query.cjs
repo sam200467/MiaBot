@@ -435,16 +435,16 @@ function formatResult(result) {
 // 条目里只有一张谱面（按谱面查的，或按歌查但条件只留下一个难度）时整条命令填好，回车即可；
 // 一首歌有好几张谱面时填到本曲 ID 为止，难度让用户补。白谱各有各的 ID，跟本曲那个 ID 配不上，
 // 所以只剩几张白谱的歌、ID 待核实的谱面不做链接，照原样显示。
-// 曲名里有半角双引号、尖括号的（《Snow in "I love you"》）放不进链接的属性值，也不做链接（同 song-search.cjs 的 markdownLine）。
+// 曲名带尖括号、& 的放不进链接，也不做链接；半角双引号显示成弯引号，照样能点（见 song-search.cjs 的 markdownLine）。
 const DIFFICULTY_WORDS = { BAS: "绿", ADV: "黄", EXP: "红", MAS: "紫", LUN: "白" };
 function titleCommand({ title, rows }) {
-  if (/["<>&]/.test(title)) return null;
+  const make = (command, complete) => songSearch.linkable(`《${title}》`, command) ? { command, complete } : null;
   if (new Set(rows.map(r => `${r.botId}\0${r.difficulty}`)).size === 1) {
-    return rows[0].botId == null ? null : { command: `/谱面分析 id${rows[0].botId} ${DIFFICULTY_WORDS[rows[0].difficulty]}`, complete: true };
+    return rows[0].botId == null ? null : make(`/谱面分析 id${rows[0].botId} ${DIFFICULTY_WORDS[rows[0].difficulty]}`, true);
   }
   const main = new Set(rows.filter(r => r.difficulty !== "LUN").map(r => r.botId));
   const [id] = main;
-  return main.size === 1 && id != null ? { command: `/谱面分析 id${id} `, complete: false } : null;
+  return main.size === 1 && id != null ? make(`/谱面分析 id${id} `, false) : null;
 }
 // Markdown 版：曲名是指令链接，其余照纯文本版逐字排，Markdown 符号转义掉（见 song-search.cjs 的 escapeMarkdown）。
 // 最后一段是怎么用链接的提示，只在 Markdown 里出现。一条链接都没有时返回 null，照旧发纯文本。

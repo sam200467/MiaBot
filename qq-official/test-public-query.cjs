@@ -390,9 +390,11 @@ test("Markdown 版：曲名是 /谱面分析 指令链接，其余跟纯文本�
   assert.ok(charts.includes(link("/谱面分析 id8015 白", "Gate of Doom")));
   assert.match(charts, /（点曲名会填好这张谱面的 \/谱面分析，回车即可）$/);
   assert.ok(formatResultMarkdown(run([filter("title", "eq", "Gate of Doom"), filter("difficulty", "eq", "MAS")])).includes(link("/谱面分析 id39 紫", "Gate of Doom")));
+  // 半角引号显示成弯引号，照样可点；纯文本版照原样
+  assert.match(formatResultMarkdown(run([filter("title", "search", "Snow in")])), /show="《Snow in “I love you”》"/);
   // 没有能点的就不给 Markdown 版：只有几张白谱（ID 各不相同）、曲名放不进链接、只问条数
   assert.equal(formatResultMarkdown(run([filter("title", "eq", "Perfect Shining!!"), filter("difficulty", "eq", "LUN")])), null);
-  assert.equal(formatResultMarkdown(run([filter("title", "search", "Snow in")])), null);
+  assert.equal(formatResultMarkdown(run([filter("title", "eq", "C & B")])), null);
   assert.equal(formatResultMarkdown(run([], { mode: "count" })), null);
   // 筛选条件里的 * 照样转义，免得「DECO*27 … TANO*C」变成斜体
   assert.match(formatResultMarkdown(run([filter("artist", "contains", "DECO*27")])), /^筛选：艺术家署名包含DECO\\\*27$/m);
