@@ -90,7 +90,7 @@ function textNamesCharacter(text, name) {
 const DIFFICULTIES = ["BAS", "ADV", "EXP", "MAS", "LUN"];
 const PAGE_SIZE = 8;
 const fields = {
-  title: { label: "歌名", type: "text", note: "prefix=开头，contains=包含，eq=完整歌名；search 才允许别名/ID/拼写候选；charset=曲名的字全是某类字符（digits 数字/latin 英文字母/kana 假名/han 汉字，空格和标点不算），比如「全是数字的歌」用 charset digits" },
+  title: { label: "歌名", type: "text", note: "prefix=开头，contains=包含，eq=完整歌名；search 才允许别名/ID/拼写候选；charset=曲名的字全是某类字符（digits 数字/latin 英文字母/greek 希腊字母/kana 假名/han 汉字/symbol 没有字母数字、整条是符号，空格和标点不算），比如「全是数字的歌」用 charset digits；用户描述一个符号或希腊字母的读法（倒A、omega）用 search" },
   artist: { label: "艺术家署名", type: "text" },
   genre: { label: "分类", type: "text" },
   version: { label: "收录版本", type: "text" },
@@ -122,16 +122,18 @@ const operations = {
 };
 // 「全是数字的歌」这种按曲名字形问的，prefix/contains 都表达不了。模型只能编出不支持的写法，复核两轮都过不了校验，
 // 群里实测回「这次查询条件没能核对好」（曲库里明明有《39》《2112410403927243233368》）。
-// 只看字母和数字：空格、标点、符号不算，至少得有一个字，《∀》这种纯符号的不归任何一类。
+// 只看字母和数字：空格、标点、符号不算，至少得有一个字。《∀》这种一个字母数字都没有的归 symbol。
 const CHARSETS = {
   digits: /^\p{Nd}$/u,
   latin: /^[\p{Script=Latin}\p{Nd}]$/u,
   kana: /^[\p{Script=Hiragana}\p{Script=Katakana}ー\p{Nd}]$/u,
   han: /^[\p{Script=Han}\p{Nd}]$/u,
+  greek: /^[\p{Script=Greek}\p{Nd}]$/u,
 };
-const CHARSET_LABELS = { digits: "数字", latin: "英文字母", kana: "假名", han: "汉字" };
+const CHARSET_LABELS = { digits: "数字", latin: "英文字母", greek: "希腊字母", kana: "假名", han: "汉字", symbol: "符号" };
 function titleCharset(title, charset) {
   const chars = [...String(title ?? "").normalize("NFKC")].filter(c => /[\p{L}\p{N}]/u.test(c));
+  if (charset === "symbol") return chars.length === 0 && /\S/.test(String(title ?? ""));
   return chars.length > 0 && chars.every(c => CHARSETS[charset].test(c)) && (charset === "digits" || chars.some(c => !/\p{Nd}/u.test(c)));
 }
 const SCHEMA = {
@@ -174,7 +176,7 @@ function validateQuery(input) {
   const filters = input.filters.map(f => {
     if (!f || Object.keys(f).some(k => !["field", "op", "value"].includes(k)) || !Object.hasOwn(fields, f.field)) reject("包含未支持的数据库字段");
     if (!(operations[fields[f.field].type].includes(f.op) || (f.field === "title" && ["search", "charset"].includes(f.op)))) reject(`${fields[f.field].label}不支持这个比较方式`);
-    if (f.op === "charset") return Object.hasOwn(CHARSETS, f.value) ? { field: f.field, op: f.op, value: f.value } : reject(`charset 只能是 ${Object.keys(CHARSETS).join("/")}`);
+    if (f.op === "charset") return Object.hasOwn(CHARSET_LABELS, f.value) ? { field: f.field, op: f.op, value: f.value } : reject(`charset 只能是 ${Object.keys(CHARSET_LABELS).join("/")}`);
     if (f.op === "search" && /\s+--page\s+\d+$/i.test(String(f.value))) reject("翻页参数只能放在 query.page，不能混入曲名线索");
     const value = f.op === "in"
       ? (Array.isArray(f.value) && f.value.length && f.value.length <= 12 ? f.value.map(v => scalar(f.field, v)) : reject("in 需要非空数组，最多 12 项"))
@@ -467,7 +469,9 @@ function queryMismatch(query, text, { self } = {}) {
   }
   if (expected && title.length && !title.some(f => f.op === expected)) return `用户要求歌名 ${expected} 匹配，不能改成其他比较方式或模糊搜索`;
   // 问曲名字形（全是数字/纯英文……）就得真按字形筛，不能拿「1」开头、包含「0」之类凑一部分交差。
-  const charset = /(?:全是|全都是|都是|纯|純|只有|只含|全部是|全由)\s*(?:阿拉伯)?(?:数字|數字)|(?:数字|數字)组成|(?:歌名|曲名|名字)(?:是|为|叫)?(?:数字|數字)/.test(text) ? "digits" : /(?:全是|全都是|纯|純|只有)\s*(?:英文|英语|字母)/.test(text) ? "latin" : null;
+  const charset = /(?:全是|全都是|都是|纯|純|只有|只含|全部是|全由)\s*(?:阿拉伯)?(?:数字|數字)|(?:数字|數字)组成|(?:歌名|曲名|名字)(?:是|为|叫)?(?:数字|數字)/.test(text) ? "digits" : /(?:全是|全都是|纯|純|只有)\s*(?:英文|英语|字母)/.test(text) ? "latin"
+    : /希腊字母|希臘字母/.test(text) && !/倒|读作|念作|叫/.test(text) ? "greek"
+    : /(?:全是|全都是|纯|純|只有)\s*符号|没有(?:字母|文字)/.test(text) ? "symbol" : null;
   if (charset && !title.some(f => f.op === "charset" && f.value === charset)) return `用户问曲名全由某类字符组成，歌名用 charset 筛选，value=${charset}`;
   if (/对战相手|對戰相手/.test(text) && !query.filters.some(f => f.field === "opponent") && !query.select.includes("opponent")) return "用户问对战相手，查询必须筛选或返回 opponent，不能只查演唱者";
   return characterMismatch(query, text, self);

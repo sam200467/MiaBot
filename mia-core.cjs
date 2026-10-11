@@ -151,7 +151,28 @@ function resolveAliasTitle(value, game = "") {
   return getAliasStore().lookup(value, game);
 }
 
-const SONG_SEARCH_INDEX = INTERNAL_SONGS.map(song => ({ song, title: normalizeSongQuery(song?.name) }));
+// 打不出来的曲名的读法。曲名里的希腊字母、整条就是一个符号的《∀》，原来只有照原样贴字符才搜得到：
+// 「ataraxia」找不到《Ἀταραξία》，「omega4」找不到《ω4》，「倒A」找不到《∀》。
+// spellings：希腊字母转写，查询词是它的一段就算命中（《Λzure Vixen》的 Λ 是当 A 用的，另给一种「看字形」的转写）。
+// names：符号的叫法，查询词里含着它就算命中 ——「倒A符号的歌」也要认得出《∀》。
+const GREEK_SOUND = { α: "a", β: "b", γ: "g", δ: "d", ε: "e", ζ: "z", η: "i", θ: "th", ι: "i", κ: "k", λ: "l", μ: "m", ν: "n", ξ: "x", ο: "o", π: "p", ρ: "r", σ: "s", ς: "s", τ: "t", υ: "y", φ: "f", χ: "ch", ψ: "ps", ω: "o" };
+const GREEK_NAME = { α: "alpha", β: "beta", γ: "gamma", δ: "delta", ε: "epsilon", ζ: "zeta", η: "eta", θ: "theta", ι: "iota", κ: "kappa", λ: "lambda", μ: "mu", ν: "nu", ξ: "xi", ο: "omicron", π: "pi", ρ: "rho", σ: "sigma", ς: "sigma", τ: "tau", υ: "upsilon", φ: "phi", χ: "chi", ψ: "psi", ω: "omega" };
+const GREEK_LOOK = { λ: "a" };
+const SYMBOL_NAMES = { "∀": ["倒a", "倒着的a", "倒过来的a", "反a", "反过来的a", "倒立的a", "for all", "forall", "全称量词", "全称符号"] };
+function titleReadings(title) {
+  const plain = String(title || "").normalize("NFD").replace(/\p{M}/gu, "").normalize("NFC").toLowerCase();
+  const spellings = /\p{Script=Greek}/u.test(plain)
+    ? [...new Set([GREEK_SOUND, GREEK_NAME, { ...GREEK_SOUND, ...GREEK_LOOK }].map(map => plain.replace(/\p{Script=Greek}/gu, ch => map[ch] ?? ch)))]
+    : [];
+  return { spellings, names: SYMBOL_NAMES[String(title || "").normalize("NFKC").trim()] || [] };
+}
+function readingKeys(title, normalize) {
+  const { spellings, names } = titleReadings(title);
+  return { spellings: spellings.map(normalize).filter(Boolean), names: names.map(normalize).filter(key => key.length >= 2) };
+}
+const matchesReading = ({ spellings, names }, needle) => spellings.some(key => key.includes(needle)) || names.some(key => needle.includes(key));
+
+const SONG_SEARCH_INDEX = INTERNAL_SONGS.map(song => ({ song, title: normalizeSongQuery(song?.name), readings: readingKeys(song?.name, normalizeSongQuery) }));
 
 function searchSongs(query) {
   const raw = String(query || "").normalize("NFKC").trim();
@@ -169,7 +190,7 @@ function searchSongs(query) {
     if (byId.length || sameTitle.length) return [...byId, ...sameTitle];
   }
   return SONG_SEARCH_INDEX
-    .filter(({ song, title }) => title.includes(needle) || songAliases.matches(song.name, needle, "ongeki"))
+    .filter(({ song, title, readings }) => title.includes(needle) || matchesReading(readings, needle) || songAliases.matches(song.name, needle, "ongeki"))
     .map(({ song }) => song)
     .sort((a, b) => Number(a.id) - Number(b.id));
 }
@@ -1158,6 +1179,8 @@ module.exports = {
   safeError,
   // 曲库检索
   normalizeSongQuery,
+  readingKeys,
+  matchesReading,
   normalizeLevelCommandQuery,
   levelCommandTarget,
   searchSongs,

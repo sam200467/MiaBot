@@ -44,6 +44,8 @@ assert.equal(core.calculateMarkConflict(null, "fb", "ab-plus"), "", "分数没�
 assert.ok(core.searchSongs("愛").length > 0);
 assert.deepEqual(core.searchSongs("愛"), core.searchSongs("爱"));
 assert.equal(core.searchSongs("id870")[0].id, 870);
+assert.deepEqual(core.searchSongs("omega4").map(s => s.name), ["ω4"]);
+assert.ok(core.searchSongs("倒A").some(s => s.name === "∀"));
 assert.deepEqual(core.searchSongs("冬花").map((song) => song.id), [1076], "部分曲名应能定位歌曲");
 for (const query of ["光焔", "光焰", "光燄"]) {
   assert.deepEqual(core.searchSongs(query).map((song) => song.id), [728], query + " 应命中同一首歌");
