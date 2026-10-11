@@ -85,18 +85,31 @@ console.log(`已拷到 ${outDir}，共 ${(bytes / 1024 / 1024).toFixed(1)} MB。
 try {
   const songs = require("../ongeki-music-internal.json");
   const missing = [];
+  const byVersion = new Map();   // 版本 -> { charts, songs: Map(id -> 曲名) }
   let expected = 0;
   for (const song of songs) {
     if (["unavailable", "deleted", "removed"].includes(String(song.status || "").toLowerCase())) continue;
     (song.level || []).forEach((level, position) => {
       if (level == null || String(level).trim() === "" || String(level) === "-") return;
       expected++;
-      if (!found.has(song.id + "_" + FILE_DIFFICULTY[position])) missing.push(`id${song.id} ${song.name} ${DIFFICULTIES[position]}`);
+      if (found.has(song.id + "_" + FILE_DIFFICULTY[position])) return;
+      missing.push(`id${song.id} ${song.name} ${DIFFICULTIES[position]}`);
+      const version = song.versionID || "未知版本";
+      if (!byVersion.has(version)) byVersion.set(version, { charts: 0, songs: new Map() });
+      const entry = byVersion.get(version);
+      entry.charts++;
+      entry.songs.set(song.id, song.name);
     });
   }
   console.log(`本地曲库在线谱面 ${expected} 张，其中 ${expected - missing.length} 张找到了文件。`);
   if (missing.length) {
-    console.log(`缺 ${missing.length} 张，例如：`);
-    for (const line of missing.slice(0, 8)) console.log("  " + line);
+    console.log(`缺 ${missing.length} 张，按收录版本：`);
+    for (const [version, entry] of [...byVersion].sort((a, b) => b[1].charts - a[1].charts)) {
+      const sample = [...entry.songs].slice(0, 4).map(([id, name]) => `id${id} ${name}`).join("、");
+      console.log(`  ${version}：${entry.charts} 张 / ${entry.songs.size} 首，如 ${sample}${entry.songs.size > 4 ? " …" : ""}`);
+    }
+    // 完整清单写到输出目录旁边，方便对照
+    const listFile = path.join(path.dirname(outDir), path.basename(outDir) + "-missing.txt");
+    try { fs.writeFileSync(listFile, missing.join("\n") + "\n"); console.log(`完整清单：${listFile}`); } catch {}
   }
 } catch {}
