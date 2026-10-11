@@ -105,8 +105,9 @@ function queryReply(query, options = {}) {
   if (query.selection?.excludePrevious && !options.selectionKeys && !options.excludeKeys?.length) return { ...clarification("还没有记下可以排除的上一批呢。先告诉我想选哪些条件的歌吧。"), queryState: null };
   const result = publicQuery.executeQuery(query, options);
   // 不止一页时带上 pager，QQ 入口据此在消息下面挂翻页按钮（chat-core 不认这个字段，原样忽略）。
+  // preformatted：结果是程序排好的，段与段之间的空行是故意留的，QQ 入口不要像模型回复那样把它折叠掉。
   const paged = result.query.mode !== "count" && result.selectedTotal && result.pages > 1 && result.query.page <= result.pages;
-  return { ...clarification(publicQuery.formatResult(result)), queryState: result.query, querySelection: result.selectionKeys,
+  return { ...clarification(publicQuery.formatResult(result)), preformatted: true, queryState: result.query, querySelection: result.selectionKeys,
     ...(paged ? { pager: { page: result.query.page, pages: result.pages } } : {}) };
 }
 async function routeIntent({ settings, messages, specs, targets = [], queryState, querySelection = [], media = {}, fetchImpl = fetch, signal, dispatcher, validateAction, log = () => {}, pickIndex }) {

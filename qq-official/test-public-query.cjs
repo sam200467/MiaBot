@@ -163,7 +163,10 @@ test("BPM/谱师/物量等数据库字段可组合，按谱面排序和计数不
   assert.equal(total.total, all({ filters: [], entity: "charts" }).length);
   const umapi = run([filter("title", "eq", "うまぴょい伝説"), filter("opponent", "eq", "美亚")], { select: ["title", "difficulty", "opponent"] });
   assert.deepEqual(umapi.entries[0].rows.map(r => r.difficulty), ["LUN"]);
-  assert.match(formatResult(umapi), /补充谱面/);
+  // 补录提示只给仍在线的歌、而且只在列出谱面资料时给：已删除的歌本来就玩不到，只问歌名时也用不着。
+  assert.doesNotMatch(formatResult(umapi), /补录/);
+  assert.match(formatResult(run([filter("title", "eq", "Titania")], { select: ["title", "constant"] })), /^※ LUN 谱面是从游戏数据补录的/m);
+  assert.doesNotMatch(formatResult(run([filter("title", "eq", "Titania")], { select: ["title"] })), /补录/);
 });
 
 test("严格拒绝未支持的字段/操作/类型，不能静默丢失条件", () => {
@@ -355,4 +358,16 @@ test("曲名字形：希腊字母和纯符号", () => {
   // 描述一个符号的样子是找那一首，用 search 就对，不逼成 charset
   assert.ok(!queryMismatch(validateQuery({ filters: [filter("title", "search", "倒A")], select: ["title"] }), "倒A符号的歌是什么"));
   assert.deepEqual(run([filter("title", "search", "倒A")]).entries.map(e => e.title), ["∀"]);
+});
+
+test("排版：开头说明、结果列表、页码分段；每首带附加行时首与首之间也空一行", () => {
+  const titles = formatResult(run([filter("title", "contains", "ai")], { select: ["title"] }));
+  const [head, list, foot] = titles.split("\n\n");
+  assert.match(head, /^查到啦/); assert.doesNotMatch(head, /《/);
+  assert.ok(list.split("\n").every(line => line.startsWith("《")), "只问歌名时列表紧挨着排");
+  assert.match(foot, /^第 1\/\d+ 页/);
+  assert.doesNotMatch(titles, /补录|补充谱面|内部曲库/, "只问歌名不提谱面补录");
+  const withIds = formatResult(run([filter("title", "contains", "ai")], { select: ["title", "botId"] })).split("\n\n");
+  assert.ok(withIds.slice(1, -1).every(block => /^《[^\n]+》[^\n]*\nID：/.test(block)), "每首一段");
+  assert.doesNotMatch(formatResult(run([filter("title", "eq", "Titania")], { select: ["title"] })), /第 1\/1 页/, "只有一页时不写页码");
 });

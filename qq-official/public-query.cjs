@@ -357,7 +357,6 @@ function executeQuery(input, { preview = false, selectionKeys, excludeKeys = [],
   const selectedTotal = chosen.length, pages = Math.max(1, Math.ceil(selectedTotal / PAGE_SIZE));
   return { query, total, eligibleTotal, selectedTotal, pages, fuzzy,
     selectionKeys: !preview ? (query.selection.kind === "all" ? chosen.slice((query.page - 1) * PAGE_SIZE, query.page * PAGE_SIZE) : chosen).map(keyOf) : [],
-    supplemental: chosen.some(e => e.rows.some(r => r.supplemental)),
     entries: query.mode === "count" ? [] : chosen.slice((query.page - 1) * PAGE_SIZE, query.page * PAGE_SIZE), source: "本地音击曲库快照", updatedAt: catalog.meta?.last_updated_at };
 }
 const opLabels = { eq: "＝", ne: "≠", gt: "＞", gte: "≥", lt: "＜", lte: "≤", contains: "包含", prefix: "开头是", suffix: "结尾是", search: "线索", in: "属于", charset: "全是" };
@@ -365,35 +364,45 @@ const show = value => Array.isArray(value) ? value.join("、") || "未知" : !kn
 function describeQuery(query) {
   return query.filters.length ? query.filters.map(f => `${fields[f.field].label}${opLabels[f.op]}${f.op === "charset" ? CHARSET_LABELS[f.value] : show(f.value)}`).join("；") : "全部曲目";
 }
+const CHART_FIELDS = ["difficulty", "level", "constant", "notes", "bells", "designer", "opponent", "bossLevel", "attribute"];
+// 排版分三段，段与段之间空一行：开头的说明（筛选、条数、排序……）、结果列表、结尾的说明和页码。
+// 每首只有一行（只问歌名）时列表紧挨着排；带 ID、定数这些附加行时，每首之间也空一行，免得看串。
+// 空行要发得出去，QQ 入口靠路由结果上的 preformatted 不折叠它（见 semantic-router.cjs 的 queryReply）。
 function formatResult(result) {
   const { query, total, pages } = result, unit = query.entity === "songs" ? "首" : "张谱面";
   const lines = [!total ? "唔，按这些条件暂时没找到匹配的记录。" : result.fuzzy ? "没找到完全匹配的，美亚翻到了这些近似曲名，看看是不是你要找的？" : "查到啦，给你整理在这里♪", `筛选：${describeQuery(query)}`, `${result.fuzzy ? "近似候选" : "符合条件"}：${total} ${unit}（${result.source}）`];
-  if (query.selection.excludePrevious && query.selection.kind === "all") lines.push(`排除上一批后：${result.eligibleTotal} ${unit}。`);
+  if (query.selection.excludePrevious && query.selection.kind === "all") lines.push(`排除上一批后：${result.eligibleTotal} ${unit}`);
   if (query.selection.kind !== "all") {
     lines[0] = result.selectedTotal ? query.selection.kind === "random" ? "喵哼哼，帮你抽好啦♪" : "按顺序帮你选出来啦♪" : "唔，按这些条件没有可选的新结果啦。";
     lines.push(`${query.selection.kind === "random" ? "随机抽取" : "按顺序取前"}：${result.selectedTotal} ${unit}${query.selection.excludePrevious ? "（排除上一批）" : ""}`);
-    if (query.selection.kind === "first") lines.push(`排序：${fields[query.sort.field].label}，${query.sort.direction === "desc" ? "降序" : "升序"}。`);
+    if (query.selection.kind === "first") lines.push(`排序：${fields[query.sort.field].label}，${query.sort.direction === "desc" ? "降序" : "升序"}`);
     if (result.selectedTotal < query.selection.count) lines.push(`你要 ${query.selection.count} ${unit}，${query.selection.excludePrevious ? "排除上一批后" : "符合条件的"}只剩 ${result.selectedTotal} ${unit}，我都列在这里，不拿重复的凑数哦。`);
   }
   if (!total) lines.push("可以再确认一下名称或条件；这次没匹配到，不代表游戏里一定没有哦。");
   if (query.page > pages && total) lines.push(`这一页已经超出范围啦，一共 ${pages} 页。`);
-  for (const entry of result.entries) {
-    lines.push(`《${entry.title}》${entry.rows.every(r => r.deleted) ? "（已删除记录）" : entry.rows.some(r => r.deleted) ? "（含历史记录）" : ""}`);
+  // 谱面资料只在用得上时才提补录：列了难度/定数这类谱面字段，或者是按谱面字段筛出来的。只问歌名时不提。
+  const showsCharts = query.entity === "charts" || query.select.some(f => CHART_FIELDS.includes(f)) || query.filters.some(f => CHART_FIELDS.includes(f.field));
+  const blocks = result.entries.map(entry => {
+    const out = [`《${entry.title}》${entry.rows.every(r => r.deleted) ? "（已删除记录）" : entry.rows.some(r => r.deleted) ? "（含历史记录）" : ""}`];
     for (const field of query.select.filter(f => f !== "title" && f !== "difficulty")) {
-      const chartField = ["constant", "level", "notes", "bells", "designer", "opponent", "bossLevel", "attribute"].includes(field);
+      const chartField = CHART_FIELDS.includes(field);
       const values = [...new Set(entry.rows.map(r => `${chartField ? r.difficulty + " " : ""}${show(r[field])}`))];
       // 带白谱的歌有两个 ID（本曲 39、白谱 8015），光列「39 / 8015」分不清哪个是哪个，就注上各管哪几张谱面。
       const labelled = field === "botId" && values.length > 1
         ? values.map(id => `${id}（${[...new Set(entry.rows.filter(r => show(r.botId) === id).map(r => r.difficulty))].join("/")}）`)
         : values;
-      lines.push(`${fields[field].label}：${labelled.join(" / ")}`);
+      out.push(`${fields[field].label}：${labelled.join(" / ")}`);
     }
-    if (query.select.includes("difficulty")) lines.push(`难度：${[...new Set(entry.rows.map(r => r.difficulty))].join(" / ")}`);
-    if (entry.rows.some(r => r.supplemental)) lines.push(`补充谱面记录：${[...new Set(entry.rows.filter(r => r.supplemental).map(r => r.difficulty))].join(" / ")}（来自内部曲库快照）`);
-  }
-  if (result.supplemental) lines.push("结果含主曲库缺录的本地补充谱面，不代表当前机台仍可游玩。");
-  if (query.mode !== "count" && result.selectedTotal && query.page <= pages && (query.selection.kind === "all" || pages > 1)) lines.push(`第 ${query.page}/${pages} 页${query.page < pages ? "，回复「下一页」继续看吧。" : "。"}`);
-  return lines.join("\n");
+    if (query.select.includes("difficulty")) out.push(`难度：${[...new Set(entry.rows.map(r => r.difficulty))].join(" / ")}`);
+    // 补录 = 公开曲库没收、从游戏数据里补上的谱面。已删除的歌本来就玩不到，不再多说一遍。
+    const supplemental = [...new Set(entry.rows.filter(r => r.supplemental && !r.deleted).map(r => r.difficulty))];
+    if (showsCharts && supplemental.length) out.push(`※ ${supplemental.join(" / ")} 谱面是从游戏数据补录的，不一定能在机台上玩到`);
+    return out;
+  });
+  const footer = [];
+  if (query.mode !== "count" && result.selectedTotal && query.page <= pages && pages > 1) footer.push(`第 ${query.page}/${pages} 页${query.page < pages ? "，回复「下一页」继续看吧。" : "。"}`);
+  const list = blocks.map(block => block.join("\n")).join(blocks.some(block => block.length > 1) ? "\n\n" : "\n");
+  return [lines.join("\n"), list, footer.join("\n")].filter(Boolean).join("\n\n");
 }
 
 // Words that name a relation. 「梨绪有哪些歌」 names none, and then the answer is
