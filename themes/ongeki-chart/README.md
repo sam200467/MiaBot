@@ -15,6 +15,15 @@
 `ongeki-music-internal.json` 的 `id` 相同，前导零不计），后半是难度 `00`–`03`（BASIC–MASTER）、`04`（LUNATIC）。
 同一张谱面有多份时，取路径排序靠后的那份。没找到的谱面一分钟后会重扫，所以更新游戏数据不用重启机器人。
 
+**服务器上没有装游戏**时，在装了游戏的电脑上把谱面单独收集出来，再拷到服务器：
+
+```powershell
+node tools/collect-ongeki-charts.cjs "D:\SDDT\package" --out D:\ongeki-charts
+```
+
+脚本只拷 `.ogkr` 谱面文件，平铺成 `0036_03.ogkr` 这样，并对照本地曲库报告缺了哪些。把输出目录压缩后传到服务器、解压，
+`ongekiChartRoots` 指向解压后的目录即可。这些谱面属于游戏数据，只放在自己的服务器上，不要提交进仓库或公开分发。
+
 难度可以不写：有 MASTER 就看 MASTER，只有 LUNATIC 的曲目（白谱单独编号）就看 LUNATIC。
 
 ## 文件
