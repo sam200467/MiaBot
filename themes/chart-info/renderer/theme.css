@@ -306,7 +306,7 @@ body {
 .difficulty-card dl > div {
   padding: 10px 14px;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   border-radius: 14px;
   background: rgba(255, 255, 255, .34);
@@ -314,7 +314,8 @@ body {
 
 .difficulty-card dt {
   color: #52667c;
-  font-size: 30px;
+  /* 汉字的字面比数字高，标签比数字小一号，墨迹的上下沿才对得齐 */
+  font-size: 27px;
   line-height: 1.05;
   font-weight: 700;
 }
