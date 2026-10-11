@@ -236,6 +236,9 @@ body {
 
 .chart-facts > div.wide { grid-column: span 2; }
 
+/* 全角括号“【”的字形左侧自带半个字宽的空白，开头是它时往左收半格，才能跟上面的标签对齐 */
+.chart-facts strong.lead-bracket { margin-left: -.5em; }
+
 .chart-facts span {
   display: block;
   color: #52667c;
@@ -311,14 +314,15 @@ body {
 
 .difficulty-card dt {
   color: #52667c;
-  font-size: 16px;
+  font-size: 30px;
+  line-height: 1.05;
   font-weight: 700;
 }
 
 .difficulty-card dd {
   margin: 0;
   color: #142437;
-  font-size: 40px;
+  font-size: 36px;
   line-height: 1.05;
   font-weight: 700;
 }

@@ -127,6 +127,9 @@
     $("chart-designer").textContent = dash(chart.chartDesigner);
     $("boss-card").textContent = dash(chart.bossCardName || chart.bossName);
     $("boss-level").textContent = dash(chart.bossLevel);
+    for (const id of ["chart-designer", "boss-card"]) {
+      $(id).classList.toggle("lead-bracket", /^[【（「『［〔〈《]/.test($(id).textContent));
+    }
 
     for (const item of data.scoreRows || []) $("score-rows").append(buildScoreRow(item));
     for (const item of data.platinumRows || []) $("platinum-rows").append(buildPlatinumRow(item));
