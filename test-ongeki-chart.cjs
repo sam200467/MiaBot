@@ -133,6 +133,12 @@ test("长谱面放宽每行栏数，行数不超过目标", () => {
   assert.ok(layout.width <= layout.options.maxWidthLimit);
   assert.ok(layout.width > layout.options.maxWidth, "超长谱面要放宽");
   assert.ok(rows >= layout.options.targetRows);
+  // 400 小节放宽到最宽还是太长：小节整体压矮，谱面区不超过截图上限
+  assert.ok(layout.height <= layout.options.maxHeight, `高度 ${layout.height}`);
+  assert.ok(layout.options.measurePx < C.DEFAULTS.measurePx && layout.options.measurePx >= C.DEFAULTS.minMeasurePx);
+  // 普通长度的谱面不压
+  const short = C.layoutChart(C.parseOgkr(lines.join("\n").replace(/^TAP\t0\t(\d{3})\t.*$/gm, "")));
+  assert.equal(short.options.measurePx, C.DEFAULTS.measurePx);
 });
 
 test("SVG：各类物件都画出来，场外子弹裁掉，文字转义", () => {

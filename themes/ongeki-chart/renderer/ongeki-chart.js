@@ -242,7 +242,7 @@
   }
 
   const DEFAULTS = {
-    measurePx: 240,         // 一个 4/4 小节的高度
+    measurePx: 288,         // 一个 4/4 小节的高度
     columnMeasures: 4,      // 一栏约放几个 4/4 小节
     xMin: -30, xMax: 30,    // 显示的横向范围
     unitPx: 2.5,            // 每个 X 单位的像素
@@ -253,11 +253,25 @@
     maxWidth: 1840,
     maxWidthLimit: 2800,    // 长谱面放宽每行栏数，避免图片过长
     targetRows: 4,
+    maxHeight: 8400,        // 谱面区最高多少像素（核心截图上限 9000，留给头部和页脚）；超长谱面整体压矮小节
+    minMeasurePx: 150,
     overlapTicks: 240,      // 栏首尾多画一点前后栏内容，便于衔接（1/8 小节）
   };
 
   function layoutChart(model, options = {}) {
-    const o = { ...DEFAULTS, ...options };
+    let layout = layoutOnce(model, { ...DEFAULTS, ...options });
+    // 放宽到最宽还是太长的谱面：按比例压矮小节，免得截图被截断（行间距不随之缩放，所以最多再试两次）
+    for (let i = 0; i < 2 && layout.height > layout.options.maxHeight; i++) {
+      const o = layout.options;
+      if (o.measurePx <= o.minMeasurePx) break;
+      const rows = Math.round((layout.height + o.rowGap) / (layout.rowHeight + o.rowGap)) || 1;
+      const scale = (o.maxHeight - (rows - 1) * o.rowGap) / (layout.height - (rows - 1) * o.rowGap);
+      layout = layoutOnce(model, { ...o, measurePx: Math.max(o.minMeasurePx, Math.floor(o.measurePx * scale)) });
+    }
+    return layout;
+  }
+
+  function layoutOnce(model, o) {
     const TR = model.header.tResolution;
     const end = Math.max(model.lastTick + 1, TR);
     const measures = measuresOf(model, end);
@@ -293,10 +307,11 @@
     for (let i = 0; i < columns.length; i += perRow) rows.push(columns.slice(i, i + perRow));
     const columnHeight = (c) => (c.end - c.start + 2 * o.overlapTicks) * pxPerTick;
 
-    let y = 0;
+    let y = 0, maxRowHeight = 0;
     const placed = [];
     for (const row of rows) {
       const rowHeight = Math.max(...row.map(columnHeight));
+      maxRowHeight = Math.max(maxRowHeight, rowHeight);
       row.forEach((c, i) => {
         const h = columnHeight(c);
         placed.push({ ...c, x: i * pitch, y: y + rowHeight - h, width: fieldWidth, height: h, index: placed.length });
@@ -309,6 +324,7 @@
       width: Math.max(0, usedColumns * pitch - o.gap),
       rhythm: rhythmMarks(model),
       height: Math.max(0, y - o.rowGap),
+      rowHeight: maxRowHeight,
     };
   }
 
