@@ -46,6 +46,17 @@ assert.deepEqual(core.searchSongs("愛"), core.searchSongs("爱"));
 assert.equal(core.searchSongs("id870")[0].id, 870);
 assert.deepEqual(core.searchSongs("omega4").map(s => s.name), ["ω4"]);
 assert.ok(core.searchSongs("倒A").some(s => s.name === "∀"));
+// 日本新字体（戦/気/楽）跟简体、繁体互通；拉丁字母的重音可以不打；假名的浊点照旧区分。
+for (const query of ["战争", "戦争", "戰爭"]) {
+  assert.ok(core.searchSongs(query).some((song) => song.name === "ぼくらの16bit戦争"), query);
+  assert.ok(core.searchSongClues(query).some((song) => song.name === "ぼくらの16bit戦争"), "/是什么歌 " + query);
+}
+assert.ok(core.searchSongs("气").some((song) => song.name === "心象蜃気楼"));
+for (const [query, name] of [["fatalite", "GranFatalité"], ["loschen", "Löschen"], ["astronotes", "AstrøNotes."], ["jorqer", "Jörqer"]]) {
+  assert.ok(core.searchSongs(query).some((song) => song.name === name), query);
+  assert.ok(core.searchSongClues(query).some((song) => song.name === name), "/是什么歌 " + query);
+}
+assert.notEqual(core.normalizeSongQuery("が"), core.normalizeSongQuery("か"), "浊点不能当重音去掉");
 // /是什么歌 在 searchSongs 之后还有一道筛选，曾把按读法命中的歌筛掉。
 assert.deepEqual(core.searchSongClues("omega4").map(s => s.name), ["ω4"]);
 assert.deepEqual(core.searchSongClues("ataraxia").map(s => s.name), ["Ἀταραξία"]);

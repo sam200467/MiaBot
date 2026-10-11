@@ -59,13 +59,23 @@ function safeError(error) {
 }
 
 const simplifySongQuery = Converter({ from: "tw", to: "cn" });
+// 曲名里的「戦 / 気 / 楽」是日本新字体，不是繁体，简繁表不管：打「战争」找不到《ぼくらの16bit戦争》。
+// 先把新字体换成繁体，再统一转简体。查询词和曲名走同一条路，所以简体、繁体、新字体打哪种都行。
+const traditionalizeShinjitai = Converter({ from: "jp", to: "t" });
+// 拉丁字母上的重音和几个合字：打「fatalite」「loschen」「astronotes」也要找到
+// 《GranFatalité》《Löschen》《AstrøNotes.》。只去拉丁字母后面的附加符号，假名的浊点不能动。
+const LATIN_LETTERS = { ø: "o", æ: "ae", œ: "oe", ß: "ss", đ: "d", ł: "l", ı: "i" };
+function plainLatin(value) {
+  return value.normalize("NFD").replace(/(\p{Script=Latin})\p{M}+/gu, "$1").normalize("NFC")
+    .replace(/[øæœßđłı]/g, (ch) => LATIN_LETTERS[ch]);
+}
 
 function normalizeSongQuery(value) {
-  return simplifySongQuery(String(value || "")
+  return simplifySongQuery(traditionalizeShinjitai(plainLatin(String(value || "")
     .normalize("NFKC")
     .replace(/[\s　]+/g, " ")
     .trim()
-    .toLowerCase())
+    .toLowerCase())))
     // OpenCC 的简繁表未涵盖「焔 / 燄 / 焰」这组异体字。
     .replace(/[焔燄]/g, "焰");
 }
