@@ -71,7 +71,7 @@
     ["tap", "TAP（红/绿/蓝）"], ["critical", "金框＝CRITICAL"], ["hold", "HOLD"],
     ["side", "SIDE"], ["flick", "FLICK"], ["bell", "BELL"],
     ["bullet", "子弹 针/圆/方"], ["damage", "粉（普通）紫（硬）橙（危险）"], ["beam", "激光"], ["soflan", "变速 慢/快"],
-    ["block", "墙封锁"], ["inverted", "左右反转"],
+    ["block", "墙封锁"], ["inverted", "左右反转（两墙交叉）"],
   ];
   for (const [kind, label] of legend) {
     const item = el("li");

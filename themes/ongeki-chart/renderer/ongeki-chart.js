@@ -416,7 +416,7 @@
   function renderSvg(model, layout) {
     const o = layout.options;
     const parts = [];
-    const defs = [`<pattern id="inv-stripes" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="7" fill="#ffb347" opacity=".45"/></pattern>`];
+    const defs = [];
     for (const col of layout.columns) {
       defs.push(`<clipPath id="c${col.index}"><rect x="${f1(col.x + o.gutter)}" y="${f1(col.y)}" width="${f1(col.width)}" height="${f1(col.height)}" rx="6"/></clipPath>`);
       parts.push(renderColumn(model, layout, col));
@@ -449,11 +449,12 @@
       body.push(`<polygon class="outside" points="${edge},${Y(pts[0].t)} ${line.join(" ")} ${edge},${Y(pts[pts.length - 1].t)}"/>`);
     }
 
-    // 左右反转：左墙在右墙右边的那段，两墙之间铺斜纹
+    // 左右反转：左墙跑到右墙右边时，两墙之间仍然是场地（游戏里照样是黑底、能看到轨道）。
+    // 上面两侧的墙外阴影在这里会互相盖住，把两墙之间重新铺回场地底色
     const inverted = invertedRuns(model, from, to);
     for (const run of inverted) {
       const right = run.map((pt) => `${X(pt.wl)},${Y(pt.t)}`).reverse();
-      body.push(`<polygon class="inverted" fill="url(#inv-stripes)" points="${run.map((pt) => `${X(pt.wr)},${Y(pt.t)}`).join(" ")} ${right.join(" ")}"/>`);
+      body.push(`<polygon class="inverted" points="${run.map((pt) => `${X(pt.wr)},${Y(pt.t)}`).join(" ")} ${right.join(" ")}"/>`);
     }
 
     // 拍线与小节线
@@ -714,9 +715,11 @@
       case "damage": inner = bulletShape({ shape: "CIR", damage: "NML" }, x - 10, y) + bulletShape({ shape: "CIR", damage: "STR" }, x, y) + bulletShape({ shape: "CIR", damage: "DNG" }, x + 10, y); break;
       case "beam": inner = `<rect class="beam" x="${x - 6}" y="1" width="12" height="${H - 2}"/><line class="beam-core" x1="${x}" x2="${x}" y1="1" y2="${H - 1}"/>`; break;
       case "block": inner = `<line class="wall k-WL" x1="${x}" x2="${x}" y1="1" y2="${H - 1}"/><line class="block" x1="${x}" x2="${x}" y1="4" y2="${H - 4}"/>`; break;
-      case "inverted": inner = `<svg x="0" y="0" width="${W}" height="${H}"><defs><pattern id="inv-legend" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="7" fill="#ffb347" opacity=".45"/></pattern></defs>`
-        + `<polygon fill="url(#inv-legend)" points="${x - 10},${H - 1} ${x + 10},${H - 1} ${x - 10},1 ${x + 10},1"/>`
-        + `<line class="wall k-WL" x1="${x - 10}" y1="${H - 1}" x2="${x + 10}" y2="1"/><line class="wall k-WR" x1="${x + 10}" y1="${H - 1}" x2="${x - 10}" y2="1"/></svg>`; break;
+      // 两墙交叉：下半截正常，上半截左墙在右，两墙之间（菱形里外）都还是场地，墙外压暗
+      case "inverted": inner = `<rect class="col-bg" x="${x - 12}" y="0" width="24" height="${H}"/>`
+        + `<polygon class="outside" points="${x - 12},${H} ${x - 9},${H} ${x},${H / 2} ${x - 9},0 ${x - 12},0"/>`
+        + `<polygon class="outside" points="${x + 12},${H} ${x + 9},${H} ${x},${H / 2} ${x + 9},0 ${x + 12},0"/>`
+        + `<polyline class="wall k-WL" points="${x - 9},${H} ${x},${H / 2} ${x + 9},0"/><polyline class="wall k-WR" points="${x + 9},${H} ${x},${H / 2} ${x - 9},0"/>`; break;
       case "soflan": inner = `<rect class="sv sv-slow" x="${x - 6}" y="2" width="4" height="${H - 4}"/><rect class="sv sv-fast" x="${x + 2}" y="2" width="4" height="${H - 4}"/>`; break;
     }
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${inner}</svg>`;

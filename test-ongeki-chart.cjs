@@ -237,7 +237,7 @@ test("墙线瞬移：墙封锁停在瞬移之前的位置，不会被拉到跳�
   }
 });
 
-test("左右反转：只在左墙越过右墙的区间铺斜纹并标出", () => {
+test("左右反转：左墙越过右墙的区间两墙之间铺回场地底色，并标出", () => {
   const model = C.parseOgkr(JUMP_WALLS);
   const T = 1920;
   const runs = C.invertedRuns(model, 0, 60 * T);
@@ -251,7 +251,7 @@ test("左右反转：只在左墙越过右墙的区间铺斜纹并标出", () =>
   const svg = C.renderSvg(model, C.layoutChart(model));
   assert.equal((svg.match(/class="inverted"/g) || []).length, 1);
   assert.match(svg, /class="invert-mark"[^>]*>反转</);
-  assert.match(C.legendSvg("inverted"), /inv-legend/);
+  assert.match(C.legendSvg("inverted"), /class="col-bg"/);
   assert.match(C.legendSvg("block"), /class="block"/);
 });
 

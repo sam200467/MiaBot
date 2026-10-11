@@ -192,6 +192,7 @@ h1 {
 
 .col-bg { fill: var(--column); }
 .outside { fill: rgba(5, 8, 16, .5); }
+.inverted { fill: var(--column); }
 .bar { stroke: rgba(255, 255, 255, .22); stroke-width: 1; }
 .beat { stroke: rgba(255, 255, 255, .07); stroke-width: 1; }
 .overlap { fill: #0b0e16; opacity: .55; }
