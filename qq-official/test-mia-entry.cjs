@@ -202,7 +202,7 @@ test("随机抽样经QQ入口保存，同批翻页不重抽，用户间不能共
   };
   const { mock, bot } = await setup({}, { botDeps: { fetchImpl } });
   bot.settings.c.limits.userCooldownSeconds = 0;
-  const titles = text => [...text.matchAll(/《(.+?)》/g)].map(m => m[1].replace(/&amp;/g, "&"));
+  const titles = text => [...text.matchAll(/《(.+?)》/g)].map(m => m[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
   try {
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "随机选10张14.5的谱" }));
     const first = titles(lastText(mock));

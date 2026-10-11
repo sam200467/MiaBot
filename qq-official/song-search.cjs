@@ -175,16 +175,13 @@ const plainLine = line => line.map(part => typeof part === "string" ? part : par
 const isHintLine = line => line.length > 0 && line.every(part => part?.hint);
 
 // QQ 的指令链接：<qqbot-cmd-input text="…" show="…" />，点了只填输入框、不直接发出；群里会自动带上 @美亚（2026-10-10 实测）。
-// 属性值里放不下半角双引号和尖括号。显示的那段（show）把半角双引号换成弯引号：《Snow in "I love you"》显示成
-// 《Snow in “I love you”》（曲库里别的曲名本来就用弯引号，提比的《System “Z”》也是这么显示的，2026-10-11 截图）；
-// 显示的那段里的 & 写成 &amp;（2026-10-11 probe-layout.cjs 第三轮实测：直接写 & 那条没显示出来，写成 &amp; 显示成「C & B」，
-// 跟全角＆一样正常）。填进输入框的 text 不能改，里面有半角双引号、& 的不做链接。尖括号两边都不做链接，照原样显示。
-// 单个换行在 QQ 的 Markdown 里就是换行（同日实测），所以行与行之间不用改成空一行。
-// 曲名、谱师名里的 * 和 _ 反斜杠转义掉（「DECO*27 … TANO*C」同一行会被当成斜体）。
-// 只转这两个：2026-10-11 用 probe-layout.cjs 实测，QQ 认 \* \_，但 \[ \] 会把反斜杠原样显示出来。
-// 数据里的 [ ] # > 都在行中间，不转也不会变成格式。
+// 显示的那段（show）里的 & 和半角双引号写成 &amp; &quot;，QQ 会还原：probe-layout.cjs 实测（2026-10-11），
+// 第三轮直接写 & 那条没显示出来、写成 &amp; 显示成「C & B」；第四轮写成 &quot; 显示成《Snow in "I love you"》，
+// &#34; 和属性改用单引号包也行，反斜杠转义那条没显示出来。
+// 填进输入框的 text 没实测过，里面有半角双引号、& 的不做链接（曲名不进 text，实际碰不到）。
+// 尖括号两边都不做链接，照原样显示（曲库里没有带尖括号的曲名）。
 const escapeMarkdown = text => String(text).replace(/[*_]/g, ch => "\\" + ch);
-const showText = text => { let open = false; return String(text).replace(/"/g, () => (open = !open) ? "“" : "”").replace(/&/g, "&amp;"); };
+const showText = text => String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const linkable = (text, command) => !/["<>&]/.test(command) && !/[<>]/.test(text);
 function markdownLine(line) {
   return line.map(part => {

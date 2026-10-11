@@ -5,7 +5,8 @@
 // 第二轮（2026-10-11）：带按钮时第一行写成 # / ### / > 就没有开头空行，普通一行、粗体都有。
 // 第三轮（2026-10-11）：指令链接 <qqbot-cmd-input show="…" /> 里的曲名能不能带 &。直接写 & 的 A2 没显示出来；
 //   写成 &amp; 的 A3 显示成「C & B」，全角＆的 A4、写在链接外面的 A5 也正常。见 song-search.cjs 的 markdownLine。
-// 第四轮（现在这轮）：曲名里的半角双引号能不能转义了放进 show="…"。现在《Snow in "I love you"》显示成弯引号。
+// 第四轮（2026-10-11）：曲名里的半角双引号能不能转义了放进 show="…"。&quot;、&#34;、属性改用单引号包都显示成直引号，
+//   反斜杠转义的 B4 没显示出来。
 //
 // 部署包里带着打好的单文件版（build-deploy.cjs），在部署目录的 qq-official/ 里就能跑，
 // 跟 mia-entry.cjs、config.local.json 放在一起：
@@ -33,7 +34,7 @@ if (!String(cfg.appId || "").trim() || !String(cfg.clientSecret || "").trim()) {
   process.exit(1);
 }
 
-// 第四轮：五条各带一种写法，分开发，哪条被拒只影响那一条。被动回复一条消息最多回五条，正好五条。
+// 下面是第四轮的五条：各带一种写法，分开发，哪条被拒只影响那一条。被动回复一条消息最多回五条，正好五条。
 // 链接点了只填输入框（不发出去），填的是真的命令（《Snow in "I love you"》是 id390），回车就能核对。
 const link = (command, show, quote = '"') => `<qqbot-cmd-input text=${quote}${command}${quote} show=${quote}${show}${quote} reference=${quote}false${quote} />`;
 const MESSAGES = [
