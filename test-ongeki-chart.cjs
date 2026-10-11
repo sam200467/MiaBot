@@ -209,6 +209,52 @@ test("FLICK 箭头朝向：L 画 ≪，R 画 ≫（尖端在拍点那一侧）",
   assert.equal(apex("flick-arrow crit"), 1);    // CFK … R
 });
 
+// Event Horizon 第 48–56 单位的墙（同一 tick 两个点 = 瞬移）和墙封锁，简化自实际谱面
+const JUMP_WALLS = [
+  "[HEADER]", "TRESOLUTION\t1920", "[LANE]",
+  "WLS\t82\t48\t0\t-24", "WLN\t82\t49\t0\t0", "WLN\t82\t49\t0\t48", "WLN\t82\t50\t240\t48", "WLN\t82\t50\t240\t24",
+  "WLN\t82\t51\t240\t-4", "WLE\t82\t55\t0\t-24",
+  "WLS\t83\t55\t0\t-24", "WLN\t83\t55\t240\t0", "WLN\t83\t55\t720\t36", "WLN\t83\t55\t1200\t0", "WLE\t83\t55\t1440\t-24",
+  "WRS\t205\t48\t0\t24", "WRN\t205\t49\t0\t0", "WRN\t205\t49\t0\t48", "WRN\t205\t50\t240\t48", "WRN\t205\t50\t240\t24",
+  "WRN\t205\t51\t240\t4", "WRE\t205\t55\t0\t24",
+  "WRS\t207\t55\t0\t24", "WRN\t207\t55\t240\t0", "WRN\t207\t55\t720\t-36", "WRN\t207\t55\t1200\t0", "WRE\t207\t55\t1440\t24",
+  "[COMPOSITION]", "LBK\t82\t48\t0\t-24\t0\t49\t0\t0\t0", "LBK\t205\t48\t0\t24\t0\t49\t0\t0\t0",
+  "[NOTES]", "TAP\t0\t56\t0\t0\t0",
+].join("\n");
+
+test("墙线瞬移：墙封锁停在瞬移之前的位置，不会被拉到跳过去的地方", () => {
+  const model = C.parseOgkr(JUMP_WALLS);
+  const wl = model.laneById.get("82").points;
+  const T = 49 * 1920;
+  assert.equal(C.interpolate(wl, T), 48);          // 默认取瞬移之后
+  assert.equal(C.interpolate(wl, T, true), 0);     // before：瞬移之前
+  const clipped = C.clipPath(wl, 48 * 1920, T);
+  assert.deepEqual([clipped[0].x, clipped.at(-1).x], [-24, 0]);
+  const svg = C.renderSvg(model, C.layoutChart(model));
+  for (const m of svg.matchAll(/<polyline class="block" points="([^"]+)"/g)) {
+    const xs = m[1].split(" ").map((p) => Number(p.split(",")[0]));
+    assert.ok(Math.max(...xs) - Math.min(...xs) <= 24 * 2.5 + 0.5, "封锁线只在 ±24 到 0 之间走");
+  }
+});
+
+test("左右反转：只在左墙越过右墙的区间铺斜纹并标出", () => {
+  const model = C.parseOgkr(JUMP_WALLS);
+  const T = 1920;
+  const runs = C.invertedRuns(model, 0, 60 * T);
+  assert.equal(runs.length, 1);
+  const run = runs[0];
+  // 55:240 两墙都在 0，之后左墙往右、右墙往左，55:1200 又回到 0
+  assert.equal(run[0].t, 55 * T + 240);
+  assert.equal(run.at(-1).t, 55 * T + 1200);
+  assert.ok(run.some((pt) => pt.wl === 36 && pt.wr === -36));
+  // 49:0 瞬移到同一位置（两墙都在 48）不算反转
+  const svg = C.renderSvg(model, C.layoutChart(model));
+  assert.equal((svg.match(/class="inverted"/g) || []).length, 1);
+  assert.match(svg, /class="invert-mark"[^>]*>反转</);
+  assert.match(C.legendSvg("inverted"), /inv-legend/);
+  assert.match(C.legendSvg("block"), /class="block"/);
+});
+
 function tempTree(files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ogkr-index-"));
   for (const [name, content] of Object.entries(files)) {

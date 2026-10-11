@@ -341,8 +341,16 @@
   const f1 = (v) => Math.round(v * 10) / 10;
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
 
-  function interpolate(points, t) {
+  // 同一 tick 上可能有两个点（墙线瞬移）。默认取跳之后的值；before = true 取跳之前的值。
+  function interpolate(points, t, before = false) {
     if (!points.length) return 0;
+    if (before) {
+      const i = points.findIndex((pt) => pt.t >= t);
+      if (i < 0) return points[points.length - 1].x;
+      if (i === 0 || points[i].t === t) return points[i].x;
+      const a = points[i - 1], b = points[i];
+      return a.x + (b.x - a.x) * (t - a.t) / (b.t - a.t);
+    }
     if (t <= points[0].t) return points[0].x;
     let lo = 0, hi = points.length - 1;
     if (t >= points[hi].t) return points[hi].x;
@@ -354,15 +362,46 @@
     return b.t === a.t ? b.x : a.x + (b.x - a.x) * (t - a.t) / (b.t - a.t);
   }
 
-  // 折线在 [from, to] 内的部分（端点插值补齐）
+  // 折线在 [from, to] 内的部分（端点插值补齐）。起点取瞬移之后、终点取瞬移之前的位置，
+  // 否则在瞬移那一刻截断的线段（比如墙封锁）会被拉到跳过去的位置上
   function clipPath(points, from, to) {
     if (points.length < 2 || points[points.length - 1].t < from || points[0].t > to) return [];
     const out = [];
     const a = Math.max(from, points[0].t), b = Math.min(to, points[points.length - 1].t);
     out.push({ t: a, x: interpolate(points, a) });
     for (const pt of points) if (pt.t > a && pt.t < b) out.push(pt);
-    out.push({ t: b, x: interpolate(points, b) });
+    out.push({ t: b, x: interpolate(points, b, true) });
     return out;
+  }
+
+  // 左墙跑到右墙右边的区间（左右反转），返回每段反转区域的多边形：[{ t, wr, wl }…]
+  function invertedRuns(model, from, to) {
+    const wall = (kind) => model.lanes.filter((lane) => lane.kind === kind).flatMap((lane) => lane.points).sort((a, b) => a.t - b.t);
+    const wl = wall("WL"), wr = wall("WR");
+    if (wl.length < 2 || wr.length < 2) return [];
+    const lo = Math.max(from, wl[0].t, wr[0].t), hi = Math.min(to, wl[wl.length - 1].t, wr[wr.length - 1].t);
+    if (lo >= hi) return [];
+    const ticks = [...new Set([lo, hi, ...[...wl, ...wr].map((pt) => pt.t).filter((t) => t > lo && t < hi)])].sort((a, b) => a - b);
+    const runs = [];
+    let run = null;
+    const close = () => { if (run) runs.push(run); run = null; };
+    const add = (t, l, r) => {
+      if (!run) run = [];
+      const last = run[run.length - 1];
+      if (!last || last.t !== t || last.wl !== l || last.wr !== r) run.push({ t, wl: l, wr: r });
+    };
+    for (let i = 0; i + 1 < ticks.length; i++) {
+      const a = ticks[i], b = ticks[i + 1];
+      const la = interpolate(wl, a), ra = interpolate(wr, a), lb = interpolate(wl, b, true), rb = interpolate(wr, b, true);
+      const da = la - ra, db = lb - rb;
+      if (da <= 0 && db <= 0) { close(); continue; }
+      if (da > 0 && db > 0) { add(a, la, ra); add(b, lb, rb); continue; }
+      const k = da / (da - db), tc = a + (b - a) * k, xc = la + (lb - la) * k;
+      if (da > 0) { add(a, la, ra); add(tc, xc, xc); close(); }
+      else { close(); add(tc, xc, xc); add(b, lb, rb); }
+    }
+    close();
+    return runs.filter((r) => r.length >= 2 && r[r.length - 1].t > r[0].t);
   }
 
   function inRange(list, from, to) {
@@ -377,7 +416,7 @@
   function renderSvg(model, layout) {
     const o = layout.options;
     const parts = [];
-    const defs = [];
+    const defs = [`<pattern id="inv-stripes" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="7" fill="#ffb347" opacity=".45"/></pattern>`];
     for (const col of layout.columns) {
       defs.push(`<clipPath id="c${col.index}"><rect x="${f1(col.x + o.gutter)}" y="${f1(col.y)}" width="${f1(col.width)}" height="${f1(col.height)}" rx="6"/></clipPath>`);
       parts.push(renderColumn(model, layout, col));
@@ -408,6 +447,13 @@
       const edge = lane.kind === "WL" ? X(o.xMin - 2) : X(o.xMax + 2);
       const line = pts.map((pt) => `${X(pt.x)},${Y(pt.t)}`);
       body.push(`<polygon class="outside" points="${edge},${Y(pts[0].t)} ${line.join(" ")} ${edge},${Y(pts[pts.length - 1].t)}"/>`);
+    }
+
+    // 左右反转：左墙在右墙右边的那段，两墙之间铺斜纹
+    const inverted = invertedRuns(model, from, to);
+    for (const run of inverted) {
+      const right = run.map((pt) => `${X(pt.wl)},${Y(pt.t)}`).reverse();
+      body.push(`<polygon class="inverted" fill="url(#inv-stripes)" points="${run.map((pt) => `${X(pt.wr)},${Y(pt.t)}`).join(" ")} ${right.join(" ")}"/>`);
     }
 
     // 拍线与小节线
@@ -514,7 +560,11 @@
       if (e.t < col.start || e.t >= col.end || !/BOSS/i.test(e.label)) continue;
       labels.push({ y: Y(e.t), text: "BOSS", cls: "event-mark" });
     }
-    // 挨得太近的标签只留优先级高的（小节号 > BPM > 拍号 > 事件），连续变速时不会叠成一摞
+    for (const run of inverted) {
+      if (run[0].t < col.start || run[0].t >= col.end) continue;
+      labels.push({ y: Y(run[0].t), text: "反转", cls: "invert-mark" });
+    }
+    // 挨得太近的标签只留优先级高的（小节号 > BPM > 拍号 > 事件 > 反转），连续变速时不会叠成一摞
     const kept = [];
     for (const label of labels) {
       const y = Number(label.y);
@@ -663,6 +713,10 @@
       case "bullet": inner = bulletShape({ shape: "NDL", damage: "NML" }, x - 10, y + 7) + bulletShape({ shape: "CIR", damage: "NML" }, x, y + 1) + bulletShape({ shape: "SQR", damage: "NML" }, x + 10, y + 6); break;
       case "damage": inner = bulletShape({ shape: "CIR", damage: "NML" }, x - 10, y) + bulletShape({ shape: "CIR", damage: "STR" }, x, y) + bulletShape({ shape: "CIR", damage: "DNG" }, x + 10, y); break;
       case "beam": inner = `<rect class="beam" x="${x - 6}" y="1" width="12" height="${H - 2}"/><line class="beam-core" x1="${x}" x2="${x}" y1="1" y2="${H - 1}"/>`; break;
+      case "block": inner = `<line class="wall k-WL" x1="${x}" x2="${x}" y1="1" y2="${H - 1}"/><line class="block" x1="${x}" x2="${x}" y1="4" y2="${H - 4}"/>`; break;
+      case "inverted": inner = `<svg x="0" y="0" width="${W}" height="${H}"><defs><pattern id="inv-legend" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="7" fill="#ffb347" opacity=".45"/></pattern></defs>`
+        + `<polygon fill="url(#inv-legend)" points="${x - 10},${H - 1} ${x + 10},${H - 1} ${x - 10},1 ${x + 10},1"/>`
+        + `<line class="wall k-WL" x1="${x - 10}" y1="${H - 1}" x2="${x + 10}" y2="1"/><line class="wall k-WR" x1="${x + 10}" y1="${H - 1}" x2="${x - 10}" y2="1"/></svg>`; break;
       case "soflan": inner = `<rect class="sv sv-slow" x="${x - 6}" y="2" width="4" height="${H - 4}"/><rect class="sv sv-fast" x="${x + 2}" y="2" width="4" height="${H - 4}"/>`; break;
     }
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${inner}</svg>`;
@@ -681,5 +735,5 @@
     return lo === hi ? trimNumber(lo) : `${trimNumber(lo)}–${trimNumber(hi)}`;
   }
 
-  return { parseOgkr, layoutChart, renderSvg, legendSvg, measuresOf, interpolate, flickRuns, rhythmMarks, rhythmLabel, formatDuration, bpmText, DEFAULTS, COLORS };
+  return { parseOgkr, layoutChart, renderSvg, legendSvg, measuresOf, interpolate, invertedRuns, clipPath, flickRuns, rhythmMarks, rhythmLabel, formatDuration, bpmText, DEFAULTS, COLORS };
 });
