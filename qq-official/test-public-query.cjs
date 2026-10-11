@@ -163,7 +163,13 @@ test("BPM/谱师/物量等数据库字段可组合，按谱面排序和计数不
   assert.equal(total.total, all({ filters: [], entity: "charts" }).length);
   const umapi = run([filter("title", "eq", "うまぴょい伝説"), filter("opponent", "eq", "美亚")], { select: ["title", "difficulty", "opponent"] });
   assert.deepEqual(umapi.entries[0].rows.map(r => r.difficulty), ["LUN"]);
-  assert.match(formatResult(umapi), /补充谱面/);
+  // 删除标注只有两种：整首删了「（已删除）」，只是白谱删了「（白谱已删除）」。补录的事不另外说。
+  assert.match(formatResult(umapi), /^《うまぴょい伝説》（已删除）$/m);
+  const titania = formatResult(run([filter("title", "eq", "Titania")], { select: ["title", "constant"] }));
+  assert.match(titania, /^《Titania》（白谱已删除）$/m, "愚人节白谱在游戏数据里标了下线");
+  assert.doesNotMatch(titania, /※|补录|主曲库/);
+  assert.match(formatResult(run([filter("title", "eq", "Perfect Shining!!")], { select: ["title", "constant"] })), /^《Perfect Shining!!》$/m, "在线的补录白谱不加标注");
+  assert.match(formatResult(run([filter("title", "eq", "時空を超えて久しぶり！")])), /^《時空を超えて久しぶり！》$/m);
 });
 
 test("严格拒绝未支持的字段/操作/类型，不能静默丢失条件", () => {
@@ -189,7 +195,7 @@ test("翻页不漏不重，零结果/页码越界/计数都保留条件与来源
   assert.match(formatResult(executeQuery({ ...query, page: 999 })), /超出范围/);
   const empty = formatResult(run([filter("bpm", "gt", 99999)]));
   assert.match(empty, /BPM＞99999/); assert.match(empty, /0 首/); assert.match(empty, /没匹配到/);
-  assert.match(formatResult(run([], { mode: "count" })), /本地音击曲库快照/);
+  assert.match(formatResult(run([], { mode: "count" })), /^符合条件：\d+ 首$/m, "不再每条都注「本地音击曲库快照」");
 });
 
 test("换了新条目重新上架的歌，已删除的旧条目不再算进来", () => {
@@ -203,7 +209,7 @@ test("换了新条目重新上架的歌，已删除的旧条目不再算进来",
   assert.deepEqual(cogito.entries.map(e => e.title), ["Cogito ergo sum"]);
   assert.doesNotMatch(formatResult(cogito), /14\.7/);
   // 只去掉跟在线条目同一个 ID 的旧条目，别的已删除曲照常算、照常标。
-  assert.match(formatResult(run([filter("title", "eq", "ブリキノダンス")])), /已删除记录/);
+  assert.match(formatResult(run([filter("title", "eq", "ブリキノダンス")])), /（已删除）/);
 });
 
 const pickQuery = (selection, extra = {}) => ({ filters: [filter("constant", "eq", 14.5)], entity: "charts", select: ["title", "constant"], selection, ...extra });
@@ -295,7 +301,7 @@ test("游戏数据里的每张白谱都在表里，一张一行；曲库漏收�
   // 连歌都不在公开曲库里的：曲名搜索也找得到，标已删除，版本照曲库的写法补上「オンゲキ」前缀。
   const hibachi = run([filter("title", "search", "緋蜂")], { select: ["title", "botId", "constant", "version", "deleted"] });
   assert.deepEqual(hibachi.entries.map(e => e.rows.map(r => `${r.difficulty}:${r.botId}:${r.constant}:${r.version}:${r.deleted}`)), [["LUN:8042:14.7:オンゲキ SUMMER:true"]]);
-  assert.match(formatResult(hibachi), /已删除记录/);
+  assert.match(formatResult(hibachi), /（已删除）/);
   assert.equal(run([filter("version", "eq", "オンゲキ SUMMER"), filter("botId", "eq", 8042)]).total, 1);
   // 0 级白谱以前因为等级不在 1–15 里，配不上对手。
   assert.deepEqual(run([filter("title", "eq", "Gate of Doom"), filter("difficulty", "eq", "LUN")], { select: ["title", "opponent"] }).entries[0].rows[0].opponent, ["三角 葵"]);
@@ -355,4 +361,26 @@ test("曲名字形：希腊字母和纯符号", () => {
   // 描述一个符号的样子是找那一首，用 search 就对，不逼成 charset
   assert.ok(!queryMismatch(validateQuery({ filters: [filter("title", "search", "倒A")], select: ["title"] }), "倒A符号的歌是什么"));
   assert.deepEqual(run([filter("title", "search", "倒A")]).entries.map(e => e.title), ["∀"]);
+});
+
+test("排版：开头说明、结果列表、页码分段；每首带附加行时首与首之间也空一行", () => {
+  const titles = formatResult(run([filter("title", "contains", "ai")], { select: ["title"] }));
+  const [head, list, foot] = titles.split("\n\n");
+  assert.match(head, /^查到啦/); assert.doesNotMatch(head, /《/);
+  assert.ok(list.split("\n").every(line => line.startsWith("《")), "只问歌名时列表紧挨着排");
+  assert.match(foot, /^第 1\/\d+ 页，回复「下一页」继续看吧。\n想直接跳页的话，回复这条消息 @我 说「第\d+页」就行。$/, "三页以上提示怎么跳页");
+  assert.doesNotMatch(titles, /补录|补充谱面|内部曲库/, "只问歌名不提谱面补录");
+  const withIds = formatResult(run([filter("title", "contains", "ai")], { select: ["title", "botId"] })).split("\n\n");
+  assert.ok(withIds.slice(1, -1).every(block => /^《[^\n]+》[^\n]*\nID：/.test(block)), "每首一段");
+  assert.doesNotMatch(formatResult(run([filter("title", "eq", "Titania")], { select: ["title"] })), /第 1\/1 页/, "只有一页时不写页码");
+});
+
+test("按歌名排序用读音（五十音），不按汉字的拼音；只在游戏数据里的已删歌也排得进去", () => {
+  const titles = all({ filters: [filter("deleted", "eq", true)], select: ["title"] }).map(e => e.title);
+  const at = title => { const i = titles.indexOf(title); assert.ok(i >= 0, title); return i; };
+  // 原来按拼音：腐れ外道(fu)→告白(gao)→紅蓮華(hong)→花ハ(hua)→回レ(hui)。
+  for (const [a, b] of [["腐れ外道とチョコレゐト", "紅蓮華"], ["紅蓮華", "告白バンジージャンプ"], ["花ハ踊レヤいろはにほ", "回レ！雪月花"]]) assert.ok(at(a) < at(b), `${a} 在 ${b} 前面`);
+  // 曲库没有读音的（游戏数据补上的已删歌）：君の知らない物語(キミ)排在紅蓮華(クレンケ)前面，不再全堆在最后。
+  assert.ok(at("君の知らない物語") < at("紅蓮華"));
+  assert.ok(at("ADAMAS") < at("あの世行きのバスに乗ってさらば。"), "英文在假名前面");
 });

@@ -853,6 +853,11 @@ test("排版：正文的空行照旧折叠，来源脚注前面留一个空行",
   assert.equal(formatReply("参考资料：这一句只是正文。\n\n下一段").text, "参考资料：这一句只是正文。\n下一段", "正文里提到这几个字不算脚注");
 });
 
+test("排版：程序排好的查询结果保留段间空行，只压掉多余的、去掉首尾空白", () => {
+  assert.equal(formatReply("\n头\n筛选\n\n《A》\nID：1\n\n\n\n《B》\n\n第 1/2 页\n", { preformatted: true }).text,
+    "头\n筛选\n\n《A》\nID：1\n\n《B》\n\n第 1/2 页");
+});
+
 test("带来源的回复：发到 QQ 的那条里「参考资料」前面空一行，也不再误报「疑似未写完」", async () => {
   const { loadSettings } = require("../chat-core/chat.cjs");
   const { gateSettings, GATE_MARKER } = require("../chat-core/search-gate.cjs");
@@ -1219,7 +1224,8 @@ test("公共查询的翻页按钮：绑发起人；本人点了按存的查询�
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "歌名包含ai的有哪些" }));
     const first = mock.state.sent.at(-1).body;
     assert.equal(first.msg_type, 2);
-    assert.match(first.markdown.content, /第 1\/\d+ 页/);
+    assert.match(first.markdown.content, /第 1\/\d+ 页，点下面的按钮翻页吧。\n想直接跳页的话，回复这条消息 @我 说「第\d+页」就行。$/, "挂着按钮就别叫人回复「下一页」；公共查询没有页码按钮，跳页靠这句提示");
+    assert.match(first.markdown.content, /符合条件：\d+ 首\n\n《/, "开头说明和结果列表之间空一行，不被折叠");
     const buttons = first.keyboard.content.rows.flatMap((r) => r.buttons);
     assert.deepEqual(buttons.map((b) => b.id), ["next", "last"], "公共查询没有页码按钮（没有可手填的指令）");
     assert.equal(buttons[0].action.data, "mia:U1:第2页", "按钮绑着发起人");

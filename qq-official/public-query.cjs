@@ -218,10 +218,25 @@ for (const char of characters?.characters || []) {
     if (char.personal && titleKey(char.personal.title) === key) entry.personalFor.push(char.name);
   }
 }
-function songBase(songIndex, { title, artist, genre, version, release, bpm, deleted, officialId }) {
+// 按歌名排序用读音：曲库每首都带 reading（片假名、去掉浊点和长音、小写假名写大、英文大写，跟游戏里的排序键一样），
+// 汉字曲名按中文排序会变成拼音顺序（腐れ外道→告白→紅蓮華）。只在游戏数据里的歌没有 reading：
+// 汉字开头的那几首（全是已删歌，不会再变）在下面手写读音，其余的拿曲名照同样规则转。
+const SMALL_KANA = { ァ: "ア", ィ: "イ", ゥ: "ウ", ェ: "エ", ォ: "オ", ッ: "ツ", ャ: "ヤ", ュ: "ユ", ョ: "ヨ", ヮ: "ワ", ヵ: "カ", ヶ: "ケ" };
+const gameReading = text => String(text).normalize("NFKC").toUpperCase()
+  .replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60))
+  .normalize("NFD").replace(/[\u3099\u309a]/g, "").normalize("NFC")
+  .replace(/[ァィゥェォッャュョヮヵヶ]/g, ch => SMALL_KANA[ch]).replace(/[ー\s\p{P}\p{S}]/gu, "");
+const EXTRA_READINGS = {
+  "極上スマイル": "ゴクジョウスマイル", "君の知らない物語": "キミノシラナイモノガタリ", "終わりの先の音節": "オワリノサキノオンセツ",
+  "春擬き": "ハルモドキ", "深海のリトルクライ feat. 土岐麻子": "シンカイノリトルクライFEATトキアサコ", "星のダイアローグ": "ホシノダイアローグ",
+  "星屑☆シーカー": "ホシクズシーカー", "超電磁少女Days": "チョウデンジショウジョDAYS", "徒花ネクロマンシー": "アダバナネクロマンシー",
+  "怒槌～光吉猛修一部謎～": "イカヅチミツヨシタケノブイチブナゾ", "透明声彩": "トウメイセイサイ", "緋蜂": "ヒバチ", "流星": "リュウセイ",
+  "連れ去って・閉じ込めて・好きにして": "ツレサッテトジコメテスキニシテ",
+};
+function songBase(songIndex, { title, reading, artist, genre, version, release, bpm, deleted, officialId }) {
   const roles = rolesByTitle.get(titleKey(title)) || {};
   return {
-    songIndex, songKey: `${textKey(title)}\0${textKey(artist)}`, title, artist, genre, version, release, bpm: numeric(bpm), deleted, officialId,
+    songIndex, songKey: `${textKey(title)}\0${textKey(artist)}`, title, reading: reading || gameReading(EXTRA_READINGS[title] ?? title), artist, genre, version, release, bpm: numeric(bpm), deleted, officialId,
     singer: roles.singer || [], originalFor: roles.originalFor || [], personalFor: roles.personalFor || [],
   };
 }
@@ -232,7 +247,8 @@ const internalChart = (v, i) => ({ level: v.level[i], const: v.const?.[i], const
 // 《Singularity》）会把另一首的对手配上来，一首歌的几张白谱（《Perfect Shining!!》）也会互相串。
 function chartRow(base, difficulty, chart, v, botId, supplemental) {
   return {
-    ...base, supplemental, botId, difficulty, level: chart.level,
+    // offline：补录谱面在游戏数据里已标为下线（期间限定的愚人节白谱等），曲名后面标「白谱已删除」。曲库自己收的谱面以曲库为准，不看这个。
+    ...base, supplemental, offline: Boolean(supplemental && v && v.status !== "online"), botId, difficulty, level: chart.level,
     // 白谱一张一条、ID 各不相同（见 song-id.cjs），同一首歌的几张白谱要算几张谱面，不能并成一张。
     chartKey: `${base.songKey}\0${difficulty}${difficulty === "LUN" ? `\0${botId}` : ""}`,
     // 0 级白谱的定数就是 0（游戏数据里 23 张全是）；《Perfect Shining!!》那张在曲库里记成未知，也按 0 算。
@@ -244,7 +260,7 @@ function chartRow(base, difficulty, chart, v, botId, supplemental) {
 const rows = [
   ...catalogSongs.flatMap((song, songIndex) => {
     const meta = song.meta;
-    const base = songBase(songIndex, { title: meta.name, artist: meta.artist, genre: meta.genre, version: meta.song_release_version,
+    const base = songBase(songIndex, { title: meta.name, reading: meta.reading, artist: meta.artist, genre: meta.genre, version: meta.song_release_version,
       release: meta.song_release, bpm: meta.bpm, deleted: Boolean(meta.is_deleted), officialId: String(meta.official_id ?? "") });
     return DIFFICULTIES.flatMap((difficulty, i) => {
       const found = [];
@@ -313,7 +329,8 @@ function executeQuery(input, { preview = false, selectionKeys, excludeKeys = [],
   matched.sort((a, b) => {
     if (!known(a[field])) return known(b[field]) ? 1 : 0;
     if (!known(b[field])) return -1;
-    const diff = fields[field].type === "number" ? a[field] - b[field] : fields[field].type === "level" ? levelValue(a[field]) - levelValue(b[field]) : String(a[field]).localeCompare(String(b[field]), "zh-CN");
+    const diff = fields[field].type === "number" ? a[field] - b[field] : fields[field].type === "level" ? levelValue(a[field]) - levelValue(b[field])
+      : field === "title" ? a.reading.localeCompare(b.reading, "ja") || a.title.localeCompare(b.title, "ja") : String(a[field]).localeCompare(String(b[field]), "zh-CN");
     return (direction === "desc" ? -diff : diff) || a.songIndex - b.songIndex || DIFFICULTIES.indexOf(a.difficulty) - DIFFICULTIES.indexOf(b.difficulty);
   });
   let entries;
@@ -357,7 +374,6 @@ function executeQuery(input, { preview = false, selectionKeys, excludeKeys = [],
   const selectedTotal = chosen.length, pages = Math.max(1, Math.ceil(selectedTotal / PAGE_SIZE));
   return { query, total, eligibleTotal, selectedTotal, pages, fuzzy,
     selectionKeys: !preview ? (query.selection.kind === "all" ? chosen.slice((query.page - 1) * PAGE_SIZE, query.page * PAGE_SIZE) : chosen).map(keyOf) : [],
-    supplemental: chosen.some(e => e.rows.some(r => r.supplemental)),
     entries: query.mode === "count" ? [] : chosen.slice((query.page - 1) * PAGE_SIZE, query.page * PAGE_SIZE), source: "本地音击曲库快照", updatedAt: catalog.meta?.last_updated_at };
 }
 const opLabels = { eq: "＝", ne: "≠", gt: "＞", gte: "≥", lt: "＜", lte: "≤", contains: "包含", prefix: "开头是", suffix: "结尾是", search: "线索", in: "属于", charset: "全是" };
@@ -365,35 +381,47 @@ const show = value => Array.isArray(value) ? value.join("、") || "未知" : !kn
 function describeQuery(query) {
   return query.filters.length ? query.filters.map(f => `${fields[f.field].label}${opLabels[f.op]}${f.op === "charset" ? CHARSET_LABELS[f.value] : show(f.value)}`).join("；") : "全部曲目";
 }
+const CHART_FIELDS = ["difficulty", "level", "constant", "notes", "bells", "designer", "opponent", "bossLevel", "attribute"];
+// 排版分三段，段与段之间空一行：开头的说明（筛选、条数、排序……）、结果列表、结尾的说明和页码。
+// 每首只有一行（只问歌名）时列表紧挨着排；带 ID、定数这些附加行时，每首之间也空一行，免得看串。
+// 空行要发得出去，QQ 入口靠路由结果上的 preformatted 不折叠它（见 semantic-router.cjs 的 queryReply）。
 function formatResult(result) {
   const { query, total, pages } = result, unit = query.entity === "songs" ? "首" : "张谱面";
-  const lines = [!total ? "唔，按这些条件暂时没找到匹配的记录。" : result.fuzzy ? "没找到完全匹配的，美亚翻到了这些近似曲名，看看是不是你要找的？" : "查到啦，给你整理在这里♪", `筛选：${describeQuery(query)}`, `${result.fuzzy ? "近似候选" : "符合条件"}：${total} ${unit}（${result.source}）`];
-  if (query.selection.excludePrevious && query.selection.kind === "all") lines.push(`排除上一批后：${result.eligibleTotal} ${unit}。`);
+  const lines = [!total ? "唔，按这些条件暂时没找到匹配的记录。" : result.fuzzy ? "没找到完全匹配的，美亚翻到了这些近似曲名，看看是不是你要找的？" : "查到啦，给你整理在这里♪", `筛选：${describeQuery(query)}`, `${result.fuzzy ? "近似候选" : "符合条件"}：${total} ${unit}`];
+  if (query.selection.excludePrevious && query.selection.kind === "all") lines.push(`排除上一批后：${result.eligibleTotal} ${unit}`);
   if (query.selection.kind !== "all") {
     lines[0] = result.selectedTotal ? query.selection.kind === "random" ? "喵哼哼，帮你抽好啦♪" : "按顺序帮你选出来啦♪" : "唔，按这些条件没有可选的新结果啦。";
     lines.push(`${query.selection.kind === "random" ? "随机抽取" : "按顺序取前"}：${result.selectedTotal} ${unit}${query.selection.excludePrevious ? "（排除上一批）" : ""}`);
-    if (query.selection.kind === "first") lines.push(`排序：${fields[query.sort.field].label}，${query.sort.direction === "desc" ? "降序" : "升序"}。`);
+    if (query.selection.kind === "first") lines.push(`排序：${fields[query.sort.field].label}，${query.sort.direction === "desc" ? "降序" : "升序"}`);
     if (result.selectedTotal < query.selection.count) lines.push(`你要 ${query.selection.count} ${unit}，${query.selection.excludePrevious ? "排除上一批后" : "符合条件的"}只剩 ${result.selectedTotal} ${unit}，我都列在这里，不拿重复的凑数哦。`);
   }
   if (!total) lines.push("可以再确认一下名称或条件；这次没匹配到，不代表游戏里一定没有哦。");
   if (query.page > pages && total) lines.push(`这一页已经超出范围啦，一共 ${pages} 页。`);
-  for (const entry of result.entries) {
-    lines.push(`《${entry.title}》${entry.rows.every(r => r.deleted) ? "（已删除记录）" : entry.rows.some(r => r.deleted) ? "（含历史记录）" : ""}`);
+  const blocks = result.entries.map(entry => {
+    // 删除标注只有两种说法：整首删了写「已删除」，歌还在、只是白谱删了（《Titania》的愚人节白谱）写「白谱已删除」。
+    const gone = entry.rows.filter(r => r.deleted || r.offline);
+    const mark = !gone.length ? "" : gone.length === entry.rows.length ? "（已删除）" : gone.every(r => r.difficulty === "LUN") ? "（白谱已删除）" : "（部分谱面已删除）";
+    const out = [`《${entry.title}》${mark}`];
     for (const field of query.select.filter(f => f !== "title" && f !== "difficulty")) {
-      const chartField = ["constant", "level", "notes", "bells", "designer", "opponent", "bossLevel", "attribute"].includes(field);
+      const chartField = CHART_FIELDS.includes(field);
       const values = [...new Set(entry.rows.map(r => `${chartField ? r.difficulty + " " : ""}${show(r[field])}`))];
       // 带白谱的歌有两个 ID（本曲 39、白谱 8015），光列「39 / 8015」分不清哪个是哪个，就注上各管哪几张谱面。
       const labelled = field === "botId" && values.length > 1
         ? values.map(id => `${id}（${[...new Set(entry.rows.filter(r => show(r.botId) === id).map(r => r.difficulty))].join("/")}）`)
         : values;
-      lines.push(`${fields[field].label}：${labelled.join(" / ")}`);
+      out.push(`${fields[field].label}：${labelled.join(" / ")}`);
     }
-    if (query.select.includes("difficulty")) lines.push(`难度：${[...new Set(entry.rows.map(r => r.difficulty))].join(" / ")}`);
-    if (entry.rows.some(r => r.supplemental)) lines.push(`补充谱面记录：${[...new Set(entry.rows.filter(r => r.supplemental).map(r => r.difficulty))].join(" / ")}（来自内部曲库快照）`);
+    if (query.select.includes("difficulty")) out.push(`难度：${[...new Set(entry.rows.map(r => r.difficulty))].join(" / ")}`);
+    return out;
+  });
+  const footer = [];
+  if (query.mode !== "count" && result.selectedTotal && query.page <= pages && pages > 1) {
+    footer.push(`第 ${query.page}/${pages} 页${query.page < pages ? "，回复「下一页」继续看吧。" : "。"}`);
+    // 三页以上才提跳页：两页的话上一页、下一页就够了。例子挑一个不是当前页的页码。
+    if (pages > 2) footer.push(`想直接跳页的话，回复这条消息 @我 说「第${query.page === pages ? 1 : pages}页」就行。`);
   }
-  if (result.supplemental) lines.push("结果含主曲库缺录的本地补充谱面，不代表当前机台仍可游玩。");
-  if (query.mode !== "count" && result.selectedTotal && query.page <= pages && (query.selection.kind === "all" || pages > 1)) lines.push(`第 ${query.page}/${pages} 页${query.page < pages ? "，回复「下一页」继续看吧。" : "。"}`);
-  return lines.join("\n");
+  const list = blocks.map(block => block.join("\n")).join(blocks.some(block => block.length > 1) ? "\n\n" : "\n");
+  return [lines.join("\n"), list, footer.join("\n")].filter(Boolean).join("\n\n");
 }
 
 // Words that name a relation. 「梨绪有哪些歌」 names none, and then the answer is

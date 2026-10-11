@@ -207,10 +207,12 @@ function makeFileLog(logFile) {
 // 所以正文里的空行折叠成单个换行（保留分段感，但不留空行）。
 // 只有来源脚注（chat-core 的 attachSources 拼在最后的「参考资料：」那段）前面留一个空行：
 // 跟着一起折叠的话，它会跟正文黏在一起（2026-10-09 群里实测）。脚注标题有三种，跟那边保持一致。
+const PAGE_REPLY_HINT = /，回复「下一页」继续看吧。$/m;
 const SOURCE_FOOTER = /\n[ \t]*\n((?:参考资料|搜索结果（供核对）|资料出处[^\n]*?)：\n[\s\S]*)$/;
-function formatReply(text) {
+// preformatted：程序排好版的回复（公共查询结果），空行是分段用的，只把连着好几行的空行压成一行。
+function formatReply(text, { preformatted = false } = {}) {
   const raw = String(text ?? "");
-  const fold = (s) => s.replace(/\n{2,}/g, "\n").trim();
+  const fold = (s) => s.replace(preformatted ? /\n\s*\n(?:\s*\n)+/g : /\n{2,}/g, preformatted ? "\n\n" : "\n").trim();
   const m = raw.match(SOURCE_FOOTER);
   const body = fold(m ? raw.slice(0, m.index) : raw);
   const footer = m ? fold(m[1]) : "";
@@ -442,7 +444,11 @@ function createMiaBot(config, deps = {}) {
           targets: (message.__event?.mentionedOpenids || []).map(String).filter(id => id !== botOpenid),
           validateAction: (action, userText) => (action.name === "calculate" && commands?.calculateRoutingProblem(action.query, userText)) || "",
           ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
-        }).then((result) => { if (result?.pager) message.__pager = result.pager; return result; }),
+        }).then((result) => {
+          if (result?.pager) message.__pager = result.pager;
+          if (result?.preformatted) message.__preformatted = true;
+          return result;
+        }),
       images: (message) => message.__media?.images || [],
       ...(commands ? {
         actions: [...core.CAPABILITY_SPECS, songSearch.SEARCH_SPEC],
@@ -525,7 +531,7 @@ function createMiaBot(config, deps = {}) {
       typing: async () => {},
       send: async (message, text, file) => {
         const e = message.__event;
-        const { body, text: cleaned } = formatReply(text);   // 空行折叠、脚注前留空行，见 formatReply
+        const { body, text: cleaned } = formatReply(text, { preformatted: Boolean(message.__preformatted) });   // 空行折叠、脚注前留空行，见 formatReply
         // 截断取证：模型偶尔给出以半句话结尾的回复。没有稳定复现前不改共享代码，
         // 先把原始结尾记下来 —— 下次发生时能看出是模型本身就写到一半，还是被谁切了。
         // 只看正文：脚注以网址结尾，看整段的话每条带来源的回复都会误报。
@@ -536,9 +542,11 @@ function createMiaBot(config, deps = {}) {
         // 翻的是这个人自己存的查询，别人点了回「没有权限」。按钮或 Markdown 被拒时传输层退回原文。
         const pager = !file && message.__pager;
         const sent = pager
-          ? await transport.sendMarkdown(makeTarget(e), cleaned, cleaned, e.msgId, e.refId, {
+          // 挂着按钮时，结尾那句「回复「下一页」」换成指向按钮的说法；按钮被拒时发原文（markdownWithoutKeyboard）。
+          // 曲名里的 Markdown 符号转义掉，见 song-search.cjs 的 escapeMarkdown；纯文本补发用原文。
+          ? await transport.sendMarkdown(makeTarget(e), songSearch.escapeMarkdown(cleaned.replace(PAGE_REPLY_HINT, "，点下面的按钮翻页吧。")), cleaned, e.msgId, e.refId, {
             keyboard: pagerKeyboard({ ...pager, owner: e.userId, jump: (page) => "第" + page + "页" }),
-            markdownWithoutKeyboard: cleaned,
+            markdownWithoutKeyboard: songSearch.escapeMarkdown(cleaned),
           })
           : await send(e, cleaned, file);
         if (e.type === "group") remember(e.openid, settings.characterName, cleaned + (file ? "（图片）" : ""));

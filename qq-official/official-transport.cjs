@@ -351,6 +351,14 @@ function createOfficial(host) {
   //
   // options.requireMarkdown：这条离了 Markdown 就没意义（正文里引用着图片，纯文本补发等于把图丢了）。
   // 发不成 Markdown 时抛出，由调用方换别的发法。这时不记「平台不收 Markdown」：没有纯文本补发成功来证明是格式的错。
+  // 带按钮的 Markdown，第一块是普通段落时 QQ 会在消息顶上多空一行；第一行是标题或引用就不会（2026-10-11 用
+  // probe-layout.cjs 实测：普通一行、粗体都空，# / ### / > 都不空；提比的成绩列表开头是标题，也不空）。
+  // 所以带按钮发时把普通的第一行写成 ### 小标题（几种里字号最接近正文）。已经是标题、引用、图片、
+  // 指令链接开头的不动；不带按钮发（含按钮被拒后的补发）照原样。
+  const headingFirstLine = (markdown) => {
+    const text = String(markdown);
+    return /^\s*$|^(?:#|>|!\[|<)/.test(text.split("\n", 1)[0]) ? text : "### " + text;
+  };
   async function sendMarkdown(target, markdown, text, msgId, refId, options = {}) {
     // QQ 频道是另一套接口，没实测过，照旧发纯文本。
     if (markdownRejected || !config.markdown || target.kind === "channel") {
@@ -360,7 +368,7 @@ function createOfficial(host) {
     let keyboardError = null;
     if (options.keyboard && config.keyboard && !keyboardRejected) {
       try {
-        return await sendText(target, text, msgId, refId, markdown, options.keyboard);
+        return await sendText(target, text, msgId, refId, headingFirstLine(markdown), options.keyboard);
       } catch (error) {
         if (!rejected(error)) throw error;
         keyboardError = error;

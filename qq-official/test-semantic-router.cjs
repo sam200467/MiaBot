@@ -215,6 +215,12 @@ test("翻页按钮发来的「上一页」「第N页」也沿用保存的查询�
   assert.match((await turn("上一页")).text, /已经是第一页/);
   assert.match((await turn("第999页")).text, new RegExp(`一共只有 ${third.pager.pages} 页`));
   assert.match((await turn(`第${third.pager.pages}页`)).text, new RegExp(`第 ${third.pager.pages}/${third.pager.pages} 页`));
+  // 中文数字、带「帮我看/翻到」的说法也直接翻，不交给模型猜。
+  for (const [content, page] of [["第三页", 3], ["第二页吧", 2], ["帮我看一下第三页", 3], ["翻到第一页", 1], ["跳到第3页", 3]]) {
+    assert.equal((await turn(content)).queryState.page, page, content);
+  }
+  assert.match((await turn("第十二页")).text, new RegExp(`一共只有 ${third.pager.pages} 页`));
+  assert.match((await turn("第二十三页")).text, /一共只有/);
   assert.equal(model.calls.length, 0, "翻页不经模型");
 });
 test("公共查询不能代替个人未鸟筛选，也不能由复核触发写操作", async () => {

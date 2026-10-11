@@ -169,7 +169,7 @@ test("游戏数据里的每一条都搜得到：曲库漏收的挂在那首歌�
   // 同名不同曲：ユーフィリア那首（id212）单独一条，不会挂到 livetune 那首（id380）下面。
   assert.equal(reply("Hand in Hand"), "查到 2 首：\n\nid380   Hand in Hand\nBAS 2 / ADV 5 / EXP 8.4 / MAS 11.7\n\nid212   Hand in Hand（已删除）\nBAS 2 / ADV 7 / EXP 8.7 / MAS 12.6");
   assert.equal(search("ジャパリパーク").total, 0, "查曲绘用的 search() 照旧只认公开曲库");
-  assert.equal(reply("Titania"), "查到 1 首：\n\nid98   Titania\nBAS 5 / ADV 9.7 / EXP 13.2 / MAS 14.9（id8158：LUN 0）");
+  assert.equal(reply("Titania"), "查到 1 首：\n\nid98   Titania\nBAS 5 / ADV 9.7 / EXP 13.2 / MAS 14.9（id8158：LUN 0，已删除）");
   assert.equal(reply("No Remorse"), "查到 1 首：\n\nid8001   No Remorse（已删除）\nLUN 14");
   assert.equal(reply("ブリキノダンス"), "查到 1 首：\n\nid150   ブリキノダンス（已删除）\nBAS 2 / ADV 5 / EXP 9 / MAS 11.7（id8067：LUN 13.8）",
     "歌已经标了已删除，白谱那行就不再重复标");
@@ -297,4 +297,10 @@ test("打不出来的曲名：希腊字母按拼写、《∀》按叫法都搜�
   }
   // 叫法只认符号那几首，不把单个字母「a」也当成《∀》
   assert.ok(!names("a").includes("∀"));
+});
+
+test("Markdown 里曲名的格式符号转义掉，纯文本照原样", () => {
+  const { escapeMarkdown } = require("./song-search.cjs");
+  // QQ 认 \* \_，不认 \[ \]（2026-10-11 实测，转了会冒出反斜杠），所以方括号这些原样留着。
+  assert.equal(escapeMarkdown("ワタシConnect* [H.][Remix] ALLNIGHT_DANCER #1 (ok)!"), "ワタシConnect\\* [H.][Remix] ALLNIGHT\\_DANCER #1 (ok)!");
 });

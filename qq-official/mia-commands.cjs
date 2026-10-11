@@ -295,7 +295,7 @@ function createMiaCommands(options = {}) {
     if (!published) { log("图片合进 Markdown：没有临时地址（publicBaseUrl 没配，或图片不是 PNG/JPG），照旧发图片 + 翻页消息"); return false; }
     const { url, width, height } = published;
     // 图注里有玩家名，可能带 Markdown 符号；反斜杠转义掉，免得名字里的 * 或 _ 把排版弄乱。
-    const safeCaption = String(caption || "").replace(/[\\`*_~#<>\[\]()|]/g, (ch) => "\\" + ch);
+    const safeCaption = songSearch.escapeMarkdown(caption || "");
     const head = `![成绩图 #${width}px #${height}px](${url})` + (safeCaption ? "\n\n" + safeCaption : "");
     try {
       await sendMarkdown(event, head + "\n\n" + paging.hint, paging.text, {
