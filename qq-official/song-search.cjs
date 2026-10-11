@@ -102,7 +102,7 @@ function search(raw, { uncataloged = false } = {}) {
   if (!matches.length && !asNumber && needle.length >= 3) {
     const limit = needle.length < 5 ? 1 : Math.min(3, Math.floor(needle.length * 0.25));
     matches = pool.map(item => ({ ...item, distance: Math.abs(item.title.length - needle.length) <= limit ? distance(needle, item.title) : Infinity }))
-      .filter(item => item.distance <= limit).sort((a, b) => a.distance - b.distance || a.title.localeCompare(b.title));
+      .filter(item => item.distance <= limit).sort((a, b) => a.distance - b.distance || a.title.localeCompare(b.title, "zh-CN"));
     fuzzy = matches.length > 0;
   }
   // 最后一级：查询词里含着一首歌的完整曲名，而且曲名占了查询词的一半以上。照着封面抄曲名时会把作者
@@ -110,10 +110,10 @@ function search(raw, { uncataloged = false } = {}) {
   // 「占一半以上」是挡短曲名的：长查询里碰巧含着《39》《Ring》这种，不算。结果按候选给，不当精确命中。
   if (!matches.length && !asNumber && squashedNeedle.length >= 3) {
     matches = pool.filter(({ squashed }) => squashed.length >= 3 && squashed.length * 2 >= squashedNeedle.length && squashedNeedle.includes(squashed))
-      .sort((a, b) => b.squashed.length - a.squashed.length || a.title.localeCompare(b.title));
+      .sort((a, b) => b.squashed.length - a.squashed.length || a.title.localeCompare(b.title, "zh-CN"));
     fuzzy = matches.length > 0;
   }
-  if (!fuzzy) matches.sort((a, b) => Number(b.title === needle) - Number(a.title === needle) || a.title.localeCompare(b.title));
+  if (!fuzzy) matches.sort((a, b) => Number(b.title === needle) - Number(a.title === needle) || a.title.localeCompare(b.title, "zh-CN"));
   const total = matches.length;
   const pages = Math.max(1, Math.ceil(total / 8));
   return { matches: matches.slice((page - 1) * 8, page * 8).map(x => x.song), total, pages, page, fuzzy, repeatQuery };
