@@ -435,7 +435,7 @@ function formatResult(result) {
 // 条目里只有一张谱面（按谱面查的，或按歌查但条件只留下一个难度）时整条命令填好，回车即可；
 // 一首歌有好几张谱面时填到本曲 ID 为止，难度让用户补。白谱各有各的 ID，跟本曲那个 ID 配不上，
 // 所以只剩几张白谱的歌、ID 待核实的谱面不做链接，照原样显示。
-// 曲名带尖括号、& 的放不进链接，也不做链接；半角双引号显示成弯引号，照样能点（见 song-search.cjs 的 markdownLine）。
+// 曲名带尖括号的放不进链接，不做链接；半角双引号显示成弯引号、& 写成 &amp;，照样能点（见 song-search.cjs 的 markdownLine）。
 const DIFFICULTY_WORDS = { BAS: "绿", ADV: "黄", EXP: "红", MAS: "紫", LUN: "白" };
 function titleCommand({ title, rows }) {
   const make = (command, complete) => songSearch.linkable(`《${title}》`, command) ? { command, complete } : null;

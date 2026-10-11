@@ -202,13 +202,13 @@ test("随机抽样经QQ入口保存，同批翻页不重抽，用户间不能共
   };
   const { mock, bot } = await setup({}, { botDeps: { fetchImpl } });
   bot.settings.c.limits.userCooldownSeconds = 0;
-  const titles = text => [...text.matchAll(/《(.+?)》/g)].map(m => m[1]);
+  const titles = text => [...text.matchAll(/《(.+?)》/g)].map(m => m[1].replace(/&amp;/g, "&"));
   try {
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "随机选10张14.5的谱" }));
     const first = titles(lastText(mock));
     assert.equal(first.length, 8);
-    // 按谱面抽的，每条只有一张谱面：曲名链接把难度也填好，回车即可。曲名带 & 的（FLUFFY FLASH (C-Show & Maozon Remix)）放不进链接。
-    assert.equal([...lastText(mock).matchAll(/<qqbot-cmd-input text="\/谱面分析 id\d+ [绿黄红紫白]"/g)].length, first.filter(t => !/["<>&]/.test(t)).length);
+    // 按谱面抽的，每条只有一张谱面：曲名链接把难度也填好，回车即可。
+    assert.equal([...lastText(mock).matchAll(/<qqbot-cmd-input text="\/谱面分析 id\d+ [绿黄红紫白]"/g)].length, 8);
     assert.match(lastText(mock), /（点曲名会填好这张谱面的 \/谱面分析，回车即可）$/);
     await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "下一页" }));
     const second = titles(lastText(mock));

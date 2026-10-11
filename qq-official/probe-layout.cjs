@@ -3,9 +3,8 @@
 // 排版探针：一轮查一件 Markdown 排版上拿不准的事，在线上那个 AppID 实测。回几条对照，看完自动退出。
 // 第一轮（2026-10-11）：空行只在带按钮时出现，跟 Markdown 本身无关；QQ 认 \* \_，不认 \[ \]。
 // 第二轮（2026-10-11）：带按钮时第一行写成 # / ### / > 就没有开头空行，普通一行、粗体都有。
-// 第三轮（现在这轮）：指令链接 <qqbot-cmd-input show="…" /> 里的曲名能不能带 &。
-//   曲库里 8 首曲名带半角 &（《C & B》《Love & Justice》……），现在一律不做链接。
-//   见 song-search.cjs 的 markdownLine。
+// 第三轮（2026-10-11）：指令链接 <qqbot-cmd-input show="…" /> 里的曲名能不能带 &。直接写 & 的 A2 没显示出来；
+//   写成 &amp; 的 A3 显示成「C & B」，全角＆的 A4、写在链接外面的 A5 也正常。见 song-search.cjs 的 markdownLine。
 //
 // 部署包里带着打好的单文件版（build-deploy.cjs），在部署目录的 qq-official/ 里就能跑，
 // 跟 mia-entry.cjs、config.local.json 放在一起：
