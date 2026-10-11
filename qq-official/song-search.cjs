@@ -243,4 +243,4 @@ function replyChunks(query, limit) {
   });
 }
 
-module.exports = { search, reply, replyChunks, escapeMarkdown, SEARCH_SPEC };
+module.exports = { search, reply, replyChunks, escapeMarkdown, markdownLine, SEARCH_SPEC };

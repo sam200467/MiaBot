@@ -385,7 +385,8 @@ const CHART_FIELDS = ["difficulty", "level", "constant", "notes", "bells", "desi
 // 排版分三段，段与段之间空一行：开头的说明（筛选、条数、排序……）、结果列表、结尾的说明和页码。
 // 每首只有一行（只问歌名）时列表紧挨着排；带 ID、定数这些附加行时，每首之间也空一行，免得看串。
 // 空行要发得出去，QQ 入口靠路由结果上的 preformatted 不折叠它（见 semantic-router.cjs 的 queryReply）。
-function formatResult(result) {
+// 纯文本和 Markdown 两版共用这份排版；每首的第一行是 { title, mark, command }，其余行是字符串。
+function layout(result) {
   const { query, total, pages } = result, unit = query.entity === "songs" ? "首" : "张谱面";
   const lines = [!total ? "唔，按这些条件暂时没找到匹配的记录。" : result.fuzzy ? "没找到完全匹配的，美亚翻到了这些近似曲名，看看是不是你要找的？" : "查到啦，给你整理在这里♪", `筛选：${describeQuery(query)}`, `${result.fuzzy ? "近似候选" : "符合条件"}：${total} ${unit}`];
   if (query.selection.excludePrevious && query.selection.kind === "all") lines.push(`排除上一批后：${result.eligibleTotal} ${unit}`);
@@ -401,7 +402,7 @@ function formatResult(result) {
     // 删除标注只有两种说法：整首删了写「已删除」，歌还在、只是白谱删了（《Titania》的愚人节白谱）写「白谱已删除」。
     const gone = entry.rows.filter(r => r.deleted || r.offline);
     const mark = !gone.length ? "" : gone.length === entry.rows.length ? "（已删除）" : gone.every(r => r.difficulty === "LUN") ? "（白谱已删除）" : "（部分谱面已删除）";
-    const out = [`《${entry.title}》${mark}`];
+    const out = [{ title: entry.title, mark, command: titleCommand(entry) }];
     for (const field of query.select.filter(f => f !== "title" && f !== "difficulty")) {
       const chartField = CHART_FIELDS.includes(field);
       const values = [...new Set(entry.rows.map(r => `${chartField ? r.difficulty + " " : ""}${show(r[field])}`))];
@@ -420,8 +421,42 @@ function formatResult(result) {
     // 三页以上才提跳页：两页的话上一页、下一页就够了。例子挑一个不是当前页的页码。
     if (pages > 2) footer.push(`想直接跳页的话，回复这条消息 @我 说「第${query.page === pages ? 1 : pages}页」就行。`);
   }
-  const list = blocks.map(block => block.join("\n")).join(blocks.some(block => block.length > 1) ? "\n\n" : "\n");
-  return [lines.join("\n"), list, footer.join("\n")].filter(Boolean).join("\n\n");
+  return { lines, blocks, footer };
+}
+function render({ lines, blocks, footer }, line, extra = []) {
+  const list = blocks.map(block => block.map(line).join("\n")).join(blocks.some(block => block.length > 1) ? "\n\n" : "\n");
+  return [lines.map(line).join("\n"), list, footer.map(line).join("\n"), ...extra].filter(Boolean).join("\n\n");
+}
+function formatResult(result) {
+  return render(layout(result), part => typeof part === "string" ? part : `《${part.title}》${part.mark}`);
+}
+
+// 曲名做成指令链接，跟 /搜索歌曲 一样：点一下把 /谱面分析 填进输入框（见 song-search.cjs 的 replyLines）。
+// 条目里只有一张谱面（按谱面查的，或按歌查但条件只留下一个难度）时整条命令填好，回车即可；
+// 一首歌有好几张谱面时填到本曲 ID 为止，难度让用户补。白谱各有各的 ID，跟本曲那个 ID 配不上，
+// 所以只剩几张白谱的歌、ID 待核实的谱面不做链接，照原样显示。
+// 曲名里有半角双引号、尖括号的（《Snow in "I love you"》）放不进链接的属性值，也不做链接（同 song-search.cjs 的 markdownLine）。
+const DIFFICULTY_WORDS = { BAS: "绿", ADV: "黄", EXP: "红", MAS: "紫", LUN: "白" };
+function titleCommand({ title, rows }) {
+  if (/["<>&]/.test(title)) return null;
+  if (new Set(rows.map(r => `${r.botId}\0${r.difficulty}`)).size === 1) {
+    return rows[0].botId == null ? null : { command: `/谱面分析 id${rows[0].botId} ${DIFFICULTY_WORDS[rows[0].difficulty]}`, complete: true };
+  }
+  const main = new Set(rows.filter(r => r.difficulty !== "LUN").map(r => r.botId));
+  const [id] = main;
+  return main.size === 1 && id != null ? { command: `/谱面分析 id${id} `, complete: false } : null;
+}
+// Markdown 版：曲名是指令链接，其余照纯文本版逐字排，Markdown 符号转义掉（见 song-search.cjs 的 escapeMarkdown）。
+// 最后一段是怎么用链接的提示，只在 Markdown 里出现。一条链接都没有时返回 null，照旧发纯文本。
+function formatResultMarkdown(result) {
+  const parts = layout(result);
+  const commands = parts.blocks.map(block => block[0].command).filter(Boolean);
+  if (!commands.length) return null;
+  const hint = commands.every(c => c.complete) ? "（点曲名会填好这张谱面的 /谱面分析，回车即可）"
+    : commands.some(c => c.complete) ? "（点曲名会填入 /谱面分析；带了难度的回车即可，没带的再补一个难度字：绿/黄/红/紫）"
+      : "（点曲名会填入 /谱面分析 和曲目 ID，再补一个难度字：绿/黄/红/紫）";
+  return render(parts, part => typeof part === "string" ? songSearch.escapeMarkdown(part)
+    : songSearch.markdownLine([part.command ? { text: `《${part.title}》`, command: part.command.command } : `《${part.title}》`, part.mark]), [hint]);
 }
 
 // Words that name a relation. 「梨绪有哪些歌」 names none, and then the answer is
@@ -521,4 +556,4 @@ function selectionIntent(raw) {
     entity: countMatch ? countMatch[2] === "首" ? "songs" : /张|張/.test(countMatch[2]) ? "charts" : undefined : undefined,
     excludePrevious: /换一批|換一批|换两|换二|换[\d]+|不要刚才|排除刚才|(?:上次|上一批|刚才).{0,6}(?:不重复|别重复)|(?:不|别).{0,4}(?:上次|上一批|刚才).{0,3}重复/.test(text) };
 }
-module.exports = { SCHEMA, QueryError, validateQuery, executeQuery, formatResult, describeQuery, queryMismatch, selectionIntent, characterMentions };
+module.exports = { SCHEMA, QueryError, validateQuery, executeQuery, formatResult, formatResultMarkdown, describeQuery, queryMismatch, selectionIntent, characterMentions };

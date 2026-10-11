@@ -447,6 +447,8 @@ function createMiaBot(config, deps = {}) {
         }).then((result) => {
           if (result?.pager) message.__pager = result.pager;
           if (result?.preformatted) message.__preformatted = true;
+          // 曲名可点的 Markdown 版跟它对应的纯文本记在一起：send 只在发的正是这段纯文本时才用它。
+          if (result?.markdown) message.__markdown = { text: result.text, markdown: result.markdown };
           return result;
         }),
       images: (message) => message.__media?.images || [],
@@ -538,17 +540,22 @@ function createMiaBot(config, deps = {}) {
         if (body && !/[。！？…♪」）\)\?\!]$/.test(body)) {
           log("⚠ 回复疑似未写完（结尾：" + JSON.stringify(body.slice(-14)) + "，全长 " + body.length + "）");
         }
-        // 公共查询不止一页：用 Markdown 发，下面挂翻页按钮。按钮发的是「第N页」，绑着发起人 ——
-        // 翻的是这个人自己存的查询，别人点了回「没有权限」。按钮或 Markdown 被拒时传输层退回原文。
+        // 公共查询的结果用 Markdown 发：曲名是指令链接（跟 /搜索歌曲 一样），不止一页时下面还挂翻页按钮。
+        // 按钮发的是「第N页」，绑着发起人 —— 翻的是这个人自己存的查询，别人点了回「没有权限」。
+        // 按钮或 Markdown 被拒时传输层退回原文。
         const pager = !file && message.__pager;
+        // 没有可点曲名的那种（只问条数、没查到……）路由不给 Markdown 版，有翻页时照旧把原文转义了发。
+        const linked = !file && message.__markdown?.text === text ? formatReply(message.__markdown.markdown, { preformatted: true }).text : "";
+        const markdown = linked || (pager ? songSearch.escapeMarkdown(cleaned) : "");
         const sent = pager
           // 挂着按钮时，结尾那句「回复「下一页」」换成指向按钮的说法；按钮被拒时发原文（markdownWithoutKeyboard）。
           // 曲名里的 Markdown 符号转义掉，见 song-search.cjs 的 escapeMarkdown；纯文本补发用原文。
-          ? await transport.sendMarkdown(makeTarget(e), songSearch.escapeMarkdown(cleaned.replace(PAGE_REPLY_HINT, "，点下面的按钮翻页吧。")), cleaned, e.msgId, e.refId, {
+          ? await transport.sendMarkdown(makeTarget(e), markdown.replace(PAGE_REPLY_HINT, "，点下面的按钮翻页吧。"), cleaned, e.msgId, e.refId, {
             keyboard: pagerKeyboard({ ...pager, owner: e.userId, jump: (page) => "第" + page + "页" }),
-            markdownWithoutKeyboard: songSearch.escapeMarkdown(cleaned),
+            markdownWithoutKeyboard: markdown,
           })
-          : await send(e, cleaned, file);
+          : markdown ? await transport.sendMarkdown(makeTarget(e), markdown, cleaned, e.msgId, e.refId)
+            : await send(e, cleaned, file);
         if (e.type === "group") remember(e.openid, settings.characterName, cleaned + (file ? "（图片）" : ""));
         return sent;
       },
