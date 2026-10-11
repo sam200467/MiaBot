@@ -70,7 +70,7 @@
   const legend = [
     ["tap", "TAP（红/绿/蓝轨道）"], ["critical", "金框＝CRITICAL"], ["hold", "HOLD"],
     ["side", "SIDE（墙上）"], ["flick", "FLICK"], ["bell", "BELL"],
-    ["bullet", "子弹 普/硬/危"], ["beam", "激光"], ["soflan", "变速 慢/快"],
+    ["bullet", "子弹 针/圆/方"], ["damage", "粉普通 紫硬 橙危险"], ["beam", "激光"], ["soflan", "变速 慢/快"],
   ];
   for (const [kind, label] of legend) {
     const item = el("li");

@@ -212,19 +212,35 @@ h1 {
 .hold-end { stroke: none; opacity: .9; }
 
 .tap { stroke: rgba(10, 14, 24, .7); stroke-width: 1; }
-.tap-shine, .side-mark { fill: rgba(255, 255, 255, .75); stroke: none; }
-.side { stroke: rgba(10, 14, 24, .8); stroke-width: 1; }
-.tap.crit, .side.crit { stroke: #ffd447; stroke-width: 2; }
+.tap-shine { fill: rgba(255, 255, 255, .75); stroke: none; }
+.tap.crit { stroke: #ffd447; stroke-width: 2; }
 
-.flick { fill: #eef2ff; stroke: rgba(10, 14, 24, .75); stroke-width: 1; stroke-linejoin: round; }
-.flick.crit { fill: #ffd447; }
+/* 侧键：深色底、墙色描边、白色中线 */
+.side { stroke-width: 1.4; stroke-linejoin: round; }
+.side.k-WL { fill: #6d1747; stroke: #ff6fb5; }
+.side.k-WR { fill: #3e2580; stroke: #b59bff; }
+.side.crit { stroke: #ffd447; stroke-width: 2; }
+.side-mark { stroke: #fff; stroke-width: 1.4; stroke-linecap: round; }
 
-.bell { fill: #ffc93d; stroke: #5a3d00; stroke-width: 1; }
+/* FLICK：半透明银色宽条 + 三道箭头 */
+.flick { fill: rgba(200, 210, 235, .28); stroke: #dfe5f7; stroke-width: 1.2; }
+.flick.crit { fill: rgba(255, 212, 71, .22); stroke: #ffd447; stroke-width: 1.8; }
+.flick-arrow { fill: none; stroke: #f4f6ff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.flick-arrow.crit { stroke: #ffe27a; }
 
-.bullet { stroke: rgba(10, 14, 24, .55); stroke-width: .6; opacity: .9; }
-.d-NML { fill: #ff8fb0; }
-.d-STR { fill: #ff9a3c; }
-.d-DNG { fill: #ff3b4f; }
+.bell { fill: #ffc93d; stroke: #6b4700; stroke-width: 1; }
+.bell-core { fill: #fff6cf; stroke: none; }
+
+/* 子弹：形状对应调色板（针形/圆环/方形），颜色对应伤害（普通/硬/危险） */
+.bullet { stroke: rgba(255, 255, 255, .8); stroke-width: .8; stroke-linejoin: round; }
+.bullet.ring { fill: rgba(20, 10, 30, .55); stroke-width: 2.6; }
+.bullet-glow { fill: rgba(255, 255, 255, .6); stroke: none; }
+.d-NML { fill: #ff3fae; }
+.d-STR { fill: #8f46e6; }
+.d-DNG { fill: #ff8a2a; }
+.ring.d-NML { stroke: #ff3fae; }
+.ring.d-STR { stroke: #9a52f0; }
+.ring.d-DNG { stroke: #ff8a2a; }
 
 .beam { fill: rgba(255, 92, 200, .2); stroke: none; }
 .beam-core { fill: none; stroke: rgba(255, 150, 225, .75); stroke-width: 1.2; }

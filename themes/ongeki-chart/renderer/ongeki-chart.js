@@ -290,7 +290,7 @@
   const COLORS = {
     L: "#ff4f6e", C: "#35d68f", R: "#3fa0ff", WL: "#ff6fb5", WR: "#a98bff",
     critical: "#ffd447", bell: "#ffc93d", flick: "#eef2ff",
-    bullet: { NML: "#ff8fb0", STR: "#ff9a3c", DNG: "#ff3b4f" },
+    bullet: { NML: "#ff3fae", STR: "#8f46e6", DNG: "#ff8a2a" },
   };
 
   const f1 = (v) => Math.round(v * 10) / 10;
@@ -428,7 +428,7 @@
     for (const n of inRange(model.flicks, from, to)) body.push(flickShape(n, X(n.x), Y(n.t)));
     for (const n of inRange(model.bells, from, to)) {
       if (n.x < o.xMin - 2 || n.x > o.xMax + 2) continue;
-      body.push(`<circle class="bell" cx="${X(n.x)}" cy="${Y(n.t)}" r="3.6"/>`);
+      body.push(bellShape(X(n.x), Y(n.t)));
     }
 
     // 首尾重叠区：盖一层半透明，提示这是前后栏的内容
@@ -492,38 +492,55 @@
     return pts;
   }
 
+  // 尺寸比例参照游戏/编辑器贴图：TAP 40×16、侧键 40×40、FLICK 104×69、子弹 40×40（针形 30×80）。
+  // 这里 TAP 宽 12px，其余按同一比例缩放，子弹略缩小以免满屏遮挡音符。
   function tapShape(n, x, y) {
-    const side = n.kind === "WL" || n.kind === "WR";
-    const w = side ? 14 : 12, h = side ? 7 : 6;
     const crit = n.critical ? " crit" : "";
-    if (side) {
-      return `<rect class="side${crit} k-${n.kind}" x="${f1(x - w / 2)}" y="${f1(y - h / 2)}" width="${w}" height="${h}" rx="1.5"/>`
-        + `<rect class="side-mark" x="${f1(x - w / 2 + 3)}" y="${f1(y - 0.75)}" width="${w - 6}" height="1.5"/>`;
+    if (n.kind === "WL" || n.kind === "WR") {
+      // 侧键：五边形箭头，尖端指向场内，中间一道白线
+      const d = n.kind === "WL" ? 1 : -1, w = 13, h = 11;
+      const back = x - d * w / 2, shoulder = x + d * 1.5, tip = x + d * w / 2;
+      const pts = `${f1(back)},${f1(y - h / 2)} ${f1(shoulder)},${f1(y - h / 2)} ${f1(tip)},${f1(y)} ${f1(shoulder)},${f1(y + h / 2)} ${f1(back)},${f1(y + h / 2)}`;
+      return `<polygon class="side${crit} k-${n.kind}" points="${pts}"/>`
+        + `<line class="side-mark" x1="${f1(back + d * 2)}" x2="${f1(tip - d * 2.5)}" y1="${f1(y)}" y2="${f1(y)}"/>`;
     }
-    return `<rect class="tap${crit} k-${n.kind}" x="${f1(x - w / 2)}" y="${f1(y - h / 2)}" width="${w}" height="${h}" rx="3"/>`
-      + `<rect class="tap-shine" x="${f1(x - w / 2 + 2.5)}" y="${f1(y - h / 2 + 1)}" width="${w - 5}" height="1.4" rx=".7"/>`;
+    const w = 12, h = 5;
+    return `<rect class="tap${crit} k-${n.kind}" x="${f1(x - w / 2)}" y="${f1(y - h / 2)}" width="${w}" height="${h}" rx="2"/>`
+      + `<rect class="tap-shine" x="${f1(x - w / 2 + 2.5)}" y="${f1(y - h / 2 + 1)}" width="${w - 5}" height="1.2" rx=".6"/>`;
   }
 
   function flickShape(n, x, y) {
-    // 箭头尖朝滑动方向：◀ 或 ▶，后面拖一段尾巴
-    const d = n.dir, w = 16, h = 9;
-    const tip = x + d * w / 2, back = x - d * w / 2, mid = x + d * 1;
-    const pts = `${f1(tip)},${f1(y)} ${f1(mid)},${f1(y - h / 2)} ${f1(mid)},${f1(y - 1.6)} ${f1(back)},${f1(y - 1.6)} ${f1(back)},${f1(y + 1.6)} ${f1(mid)},${f1(y + 1.6)} ${f1(mid)},${f1(y + h / 2)}`;
-    return `<polygon class="flick${n.critical ? " crit" : ""}" points="${pts}"/>`;
+    // 宽条 + 三道朝滑动方向的箭头（≪≪≪ / ≫≫≫），CRITICAL 加金框
+    const d = n.dir, w = 30, h = 11;
+    const out = [`<rect class="flick${n.critical ? " crit" : ""}" x="${f1(x - w / 2)}" y="${f1(y - h / 2)}" width="${w}" height="${h}" rx="2"/>`];
+    for (let i = -1; i <= 1; i++) {
+      const cx = x + i * 7.5 + d * 2;
+      out.push(`<polyline class="flick-arrow${n.critical ? " crit" : ""}" points="${f1(cx - d * 3)},${f1(y - 3.6)} ${f1(cx + d * 1)},${f1(y)} ${f1(cx - d * 3)},${f1(y + 3.6)}"/>`);
+    }
+    return out.join("");
   }
 
   function bulletShape(b, x, y) {
-    const s = b.large ? 1.5 : 1;
+    const s = b.large ? 1.4 : 1;
     const cls = `bullet d-${COLORS.bullet[b.damage] ? b.damage : "NML"}`;
     if (b.shape === "NDL") {
-      const w = 2.4 * s, h = 6 * s;
-      return `<polygon class="${cls}" points="${f1(x)},${f1(y - h)} ${f1(x + w)},${f1(y)} ${f1(x)},${f1(y + h / 3)} ${f1(x - w)},${f1(y)}"/>`;
+      // 针形：上端平、下端尖，尖端是落点；下半截泛白
+      const w = 3.6 * s, top = y - 17 * s, shoulder = y - 6 * s, tip = y + 2 * s;
+      return `<polygon class="${cls}" points="${f1(x - w)},${f1(top)} ${f1(x + w)},${f1(top)} ${f1(x + w)},${f1(shoulder)} ${f1(x)},${f1(tip)} ${f1(x - w)},${f1(shoulder)}"/>`
+        + `<polygon class="bullet-glow" points="${f1(x - w * .55)},${f1(shoulder - 3 * s)} ${f1(x + w * .55)},${f1(shoulder - 3 * s)} ${f1(x)},${f1(tip - 2 * s)}"/>`;
     }
     if (b.shape === "SQR") {
-      const r = 2.6 * s;
-      return `<rect class="${cls}" x="${f1(x - r)}" y="${f1(y - r)}" width="${f1(2 * r)}" height="${f1(2 * r)}" transform="rotate(45 ${x} ${y})"/>`;
+      // 方形：竖长圆角块
+      const w = 3.6 * s, top = y - 14 * s, bottom = y + 2 * s;
+      return `<rect class="${cls}" x="${f1(x - w)}" y="${f1(top)}" width="${f1(2 * w)}" height="${f1(bottom - top)}" rx="${f1(1.6 * s)}"/>`
+        + `<rect class="bullet-glow" x="${f1(x - w * .45)}" y="${f1(top + 2 * s)}" width="${f1(w * .9)}" height="${f1(bottom - top - 4 * s)}" rx="${f1(.8 * s)}"/>`;
     }
-    return `<circle class="${cls}" cx="${x}" cy="${y}" r="${f1(2.4 * s)}"/>`;
+    // 圆形：圆环
+    return `<circle class="${cls} ring" cx="${x}" cy="${y}" r="${f1(4.2 * s)}"/>`;
+  }
+
+  function bellShape(x, y) {
+    return `<circle class="bell" cx="${x}" cy="${y}" r="4.6"/><circle class="bell-core" cx="${x}" cy="${y}" r="1.7"/>`;
   }
 
   function trimNumber(value) {
@@ -533,16 +550,17 @@
 
   // 图例用的小样（同一套形状，保证和谱面里看到的一致）
   function legendSvg(kind) {
-    const W = 34, H = 20, x = W / 2, y = H / 2;
+    const W = 36, H = 24, x = W / 2, y = H / 2;
     let inner = "";
     switch (kind) {
       case "tap": inner = tapShape({ kind: "L" }, x - 7, y) + tapShape({ kind: "R" }, x + 7, y); break;
       case "critical": inner = tapShape({ kind: "C", critical: true }, x, y); break;
       case "hold": inner = `<polyline class="hold-body k-C" points="${x},${H - 2} ${x},2"/>` + tapShape({ kind: "C" }, x, H - 4); break;
       case "side": inner = tapShape({ kind: "WL" }, x - 8, y) + tapShape({ kind: "WR" }, x + 8, y); break;
-      case "flick": inner = flickShape({ dir: -1 }, x - 8, y) + flickShape({ dir: 1, critical: true }, x + 8, y); break;
-      case "bell": inner = `<circle class="bell" cx="${x}" cy="${y}" r="4.2"/>`; break;
-      case "bullet": inner = bulletShape({ shape: "NDL", damage: "NML" }, x - 9, y + 2) + bulletShape({ shape: "CIR", damage: "STR" }, x, y) + bulletShape({ shape: "SQR", damage: "DNG" }, x + 9, y); break;
+      case "flick": inner = flickShape({ dir: -1 }, x, y); break;
+      case "bell": inner = bellShape(x, y); break;
+      case "bullet": inner = bulletShape({ shape: "NDL", damage: "NML" }, x - 10, y + 7) + bulletShape({ shape: "CIR", damage: "NML" }, x, y + 1) + bulletShape({ shape: "SQR", damage: "NML" }, x + 10, y + 6); break;
+      case "damage": inner = bulletShape({ shape: "CIR", damage: "NML" }, x - 10, y) + bulletShape({ shape: "CIR", damage: "STR" }, x, y) + bulletShape({ shape: "CIR", damage: "DNG" }, x + 10, y); break;
       case "beam": inner = `<rect class="beam" x="${x - 6}" y="1" width="12" height="${H - 2}"/><line class="beam-core" x1="${x}" x2="${x}" y1="1" y2="${H - 1}"/>`; break;
       case "soflan": inner = `<rect class="sv sv-slow" x="${x - 6}" y="2" width="4" height="${H - 4}"/><rect class="sv sv-fast" x="${x + 2}" y="2" width="4" height="${H - 4}"/>`; break;
     }

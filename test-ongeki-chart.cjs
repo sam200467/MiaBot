@@ -143,7 +143,7 @@ test("SVG：各类物件都画出来，场外子弹裁掉，文字转义", () =>
   }
   assert.ok(!svg.includes("d-DNG"), "x=90 的子弹在显示范围外");
   assert.ok(!svg.includes("<x>"));
-  for (const kind of ["tap", "critical", "hold", "side", "flick", "bell", "bullet", "beam", "soflan"]) {
+  for (const kind of ["tap", "critical", "hold", "side", "flick", "bell", "bullet", "damage", "beam", "soflan"]) {
     assert.match(C.legendSvg(kind), /^<svg[^>]*>.+<\/svg>$/);
   }
 });
