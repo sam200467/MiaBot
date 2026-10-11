@@ -33,7 +33,7 @@ if (!String(cfg.appId || "").trim() || !String(cfg.clientSecret || "").trim()) {
 }
 
 // 跟公共查询现在发出去的一样：三段、段间空一行；曲名行带着需要转义的符号。
-const escape = (text) => String(text).replace(/[\\`*_~#<>[\]|]/g, (ch) => "\\" + ch);
+const escape = (text) => String(text).replace(/[*_]/g, (ch) => "\\" + ch);   // 跟 song-search.cjs 的 escapeMarkdown 一致
 const body = (title) => [
   title,
   "筛选：歌名包含ai",

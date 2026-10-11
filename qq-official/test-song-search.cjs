@@ -301,5 +301,6 @@ test("打不出来的曲名：希腊字母按拼写、《∀》按叫法都搜�
 
 test("Markdown 里曲名的格式符号转义掉，纯文本照原样", () => {
   const { escapeMarkdown } = require("./song-search.cjs");
-  assert.equal(escapeMarkdown("ワタシConnect* [H.][Remix] ALLNIGHT_DANCER #1 (ok)!"), "ワタシConnect\\* \\[H.\\]\\[Remix\\] ALLNIGHT\\_DANCER \\#1 (ok)!");
+  // QQ 认 \* \_，不认 \[ \]（2026-10-11 实测，转了会冒出反斜杠），所以方括号这些原样留着。
+  assert.equal(escapeMarkdown("ワタシConnect* [H.][Remix] ALLNIGHT_DANCER #1 (ok)!"), "ワタシConnect\\* [H.][Remix] ALLNIGHT\\_DANCER #1 (ok)!");
 });
