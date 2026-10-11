@@ -259,12 +259,23 @@ test("翻页按钮：翻页是回调按钮，页码只填输入框；到头的�
   assert.ok(split.at(-1).keyboard);
 });
 
-test("Markdown 版按纯文本长度切块，每块的纯文本拼起来就是原来的回复", () => {
+test("Markdown 版按纯文本长度切块，只在歌与歌之间切：每块的纯文本拼起来就是原来的回复", () => {
   const { replyChunks } = require("./song-search.cjs");
-  const chunks = replyChunks("a", 200);
-  assert.ok(chunks.length > 1);
-  for (const c of chunks) assert.ok(c.text.length <= 200, c.text);
-  assert.equal(chunks.map(c => c.text).join("\n\n"), reply("a"));
+  assert.ok(replyChunks("a", 200).length > 1);
+  // 切点落在哪儿要看这一页排到了哪几首歌，而排序跟着系统语言走（localeCompare 没指定语言）：英文环境下
+  // 上限 200 碰巧切在空行上，中文 Windows 上就切进了《反撃! 突撃! Back To Back! -星咲 あかりソロver.-》中间。
+  // 所以每个上限都试一遍。拼回去多出一个空行，就是把一首歌的曲名行和谱面行分到了两条消息里。
+  const full = reply("a");
+  for (let limit = Math.max(...full.split("\n\n").map(block => block.length)); limit <= full.length; limit++) {
+    const chunks = replyChunks("a", limit);
+    for (const c of chunks) assert.ok(c.text.length <= limit, c.text);
+    assert.equal(chunks.map(c => c.text).join("\n\n"), full, `上限 ${limit}`);
+  }
+  // 一首歌自己就超过上限时，才退回按行切：每块照样不超过上限，一行也不丢。
+  const longestLine = Math.max(...full.split("\n").map(line => line.length));
+  const tight = replyChunks("a", longestLine);
+  for (const c of tight) assert.ok(c.text.length <= longestLine, c.text);
+  assert.deepEqual(tight.flatMap(c => c.text.split("\n")).filter(Boolean), full.split("\n").filter(Boolean));
 });
 
 test("翻页按钮绑发起人：data 前面带上 openid，拆得回来；没绑的原样", () => {
