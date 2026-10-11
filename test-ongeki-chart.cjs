@@ -321,6 +321,12 @@ test("子弹 / BELL 落点 = X + 调色板偏移；瞄准玩家的调淡；隐�
   assert.match(svg, /class="sv sv-reverse"/);
   assert.match(svg, /class="sv sv-stop"/);
   assert.equal((C.legendSvg("soflan").match(/class="sv /g) || []).length, 4);
+  // 弹道：K1、K2 有偏移，从 -18 射出各画一道；瞄准玩家的和没有偏移的（ZZ 找不到调色板）不画
+  assert.deepEqual(model.bullets.map((b) => b.origin), [-18, -18, 10, 5]);
+  const trails = [...svg.matchAll(/<line class="bullet-trail[^"]*" x1="([^"]+)" y1="([^"]+)" x2="([^"]+)" y2="([^"]+)"/g)];
+  assert.equal(trails.length, 2);
+  assert.equal(new Set(trails.map((m) => m[3] + "," + m[4])).size, 1, "同一组的线收在同一个发射点");
+  for (const m of trails) assert.ok(Number(m[4]) < Number(m[2]), "发射点在落点上方");
 });
 
 function tempTree(files) {

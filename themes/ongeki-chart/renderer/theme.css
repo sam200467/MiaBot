@@ -243,6 +243,10 @@ h1 {
 .ring.d-NML { stroke: #ff3fae; }
 .ring.d-STR { stroke: #9a52f0; }
 .ring.d-DNG { stroke: #ff8a2a; }
+.bullet-trail { stroke-width: 1; opacity: .35; stroke-linecap: round; fill: none; }
+.bullet-trail.d-NML { stroke: #ff3fae; }
+.bullet-trail.d-STR { stroke: #9a52f0; }
+.bullet-trail.d-DNG { stroke: #ff8a2a; }
 
 .beam { fill: rgba(255, 92, 200, .2); stroke: none; }
 .beam-core { fill: none; stroke: rgba(255, 150, 225, .75); stroke-width: 1.2; }

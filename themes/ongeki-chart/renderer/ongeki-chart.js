@@ -79,7 +79,7 @@
         // BPL 编号 发射源(UPS/ENE/CEN) 偏移 目标(FIX/PLR) 速度 大小(N/L) 形状(CIR/NDL/SQR) 随机偏移
         // 落点 = 目标位置 + 偏移：FIX 的目标位置是 BLT 写的 X，PLR 是子弹出现时玩家所在的 X（谱面里无从得知）
         case "BPL": palettes.set(p[1], {
-          offset: num(p[3]), aimed: String(p[4] || "FIX").toUpperCase() === "PLR",
+          shooter: String(p[2] || "UPS").toUpperCase(), offset: num(p[3]), aimed: String(p[4] || "FIX").toUpperCase() === "PLR",
           shape: String(p[7] || "CIR").toUpperCase(), large: String(p[6] || "N").toUpperCase() === "L",
         }); break;
         case "LBK": raw.blocks.push({ lane: p[1], u: num(p[2]), g: num(p[3]), eu: num(p[6]), eg: num(p[7]) }); break;
@@ -122,9 +122,11 @@
         return { t: tick(n.u, n.g), x: n.x + (palette && !palette.aimed ? palette.offset : 0), aimed: !!palette?.aimed };
       }).sort(byTick),
       bullets: raw.bullets.map((n) => {
-        const palette = palettes.get(n.palette) || { offset: 0, aimed: false, shape: "CIR", large: false };
+        const palette = palettes.get(n.palette) || { shooter: "UPS", offset: 0, aimed: false, shape: "CIR", large: false };
+        // 发射点：UPS 从写的 X 射出，CEN 从场地正中射出，ENE 跟着敌人走（谱面里只有敌人轨迹，不画）
+        const origin = palette.shooter === "CEN" ? 0 : palette.shooter === "ENE" ? null : n.x;
         return {
-          t: tick(n.u, n.g), x: n.x + (palette.aimed ? 0 : palette.offset), aimed: palette.aimed,
+          t: tick(n.u, n.g), x: n.x + (palette.aimed ? 0 : palette.offset), origin, aimed: palette.aimed,
           damage: n.damage, shape: palette.shape, large: palette.large,
         };
       }).sort(byTick),
@@ -567,6 +569,16 @@
       const side = hold.kind === "WL" || hold.kind === "WR";
       body.push(`<polyline class="hold-body${side ? " side" : ""} k-${hold.kind}" points="${pts.map((pt) => `${X(pt.x)},${Y(pt.t)}`).join(" ")}"/>`);
       if (hold.end <= to && hold.end >= from) body.push(`<rect class="hold-end k-${hold.kind}" x="${f1(X(hold.endX) - 5)}" y="${f1(Y(hold.end) - 1.5)}" width="10" height="3" rx="1.5"/>`);
+    }
+
+    // 弹道：发射点和落点不在一处的子弹（扇形弹、从中间射出的），从落点往上半拍画一道淡线收向发射点，
+    // 同一组子弹的线汇成一个尖，看得出是一扇从哪儿射出的弹幕、缺口在哪
+    const lead = TR / 8 * layout.pxPerTick;
+    for (const b of inRange(model.bullets, from, to)) {
+      if (b.aimed || b.origin == null || Math.abs(b.origin - b.x) < 0.5) continue;
+      if (b.x < o.xMin - 1 || b.x > o.xMax + 1) continue;
+      const y = Number(Y(b.t));
+      body.push(`<line class="bullet-trail d-${COLORS.bullet[b.damage] ? b.damage : "NML"}" x1="${X(b.x)}" y1="${f1(y)}" x2="${X(b.origin)}" y2="${f1(y - lead)}"/>`);
     }
 
     // 子弹放在最下层的音符之下，避免盖住音符
