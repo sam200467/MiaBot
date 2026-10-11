@@ -1,10 +1,7 @@
 #!/usr/bin/env node
 "use strict";
-// 排版探针：查清两件事，各回一条对照消息，看完自动退出。
-//   1. 带翻页按钮的消息开头多出来的那个空行，是 Markdown 带来的，还是按钮带来的？
-//      → 同一段正文发三遍：E 是 Markdown 不带按钮，F 是 Markdown 带按钮，G 是纯文本。
-//   2. QQ 的 Markdown 认不认反斜杠转义？（曲名里的 * [ ] _ 现在是转义了再发的）
-//      → E、F 里有一行转义过的曲名：显示成原样的曲名就是认；冒出反斜杠就是不认。
+// 排版探针：带翻页按钮的 Markdown 消息开头会多出一个空行，找一种能去掉它的开头写法。回五条对照，看完自动退出。
+// 第一轮（2026-10-11）已查明：空行只在带按钮时出现，跟 Markdown 本身无关；QQ 认 \* \_，不认 \[ \]。
 //
 // 部署包里带着打好的单文件版（build-deploy.cjs），在部署目录的 qq-official/ 里就能跑，
 // 跟 mia-entry.cjs、config.local.json 放在一起：
@@ -32,16 +29,15 @@ if (!String(cfg.appId || "").trim() || !String(cfg.clientSecret || "").trim()) {
   process.exit(1);
 }
 
-// 跟公共查询现在发出去的一样：三段、段间空一行；曲名行带着需要转义的符号。
-const escape = (text) => String(text).replace(/[*_]/g, (ch) => "\\" + ch);   // 跟 song-search.cjs 的 escapeMarkdown 一致
-const body = (title) => [
-  title,
+// 第二轮：开头空行只在带按钮时出现（第一轮 E/F/G 已确认），但别的机器人（提比）开头是标题，点按钮翻页也不空行。
+// 所以五条都带按钮，只改第一行的写法，看哪种能把空行去掉：
+//   H1 对照（跟现在一样，普通一行） / H2 大标题 # / H3 小标题 ### / H4 粗体 / H5 引用 >
+const rest = [
   "筛选：歌名包含ai",
   "符合条件：25 首",
   "",
-  "《ワタシConnect*》",
-  "《セガサターン起動音[H.][Remix]》",
-  "《ALLNIGHT_DANCER》",
+  "《Ai C》",
+  "《Ai Drew》",
   "",
   "第 1/4 页，点下面的按钮翻页吧。",
 ].join("\n");
@@ -50,11 +46,15 @@ const button = (id, label) => ({
   id, render_data: { label, visited_label: label, style: 1 },
   action: { type: 2, data: "探针按钮" + label, enter: false, permission: { type: 2 }, unsupport_tips: "这个版本的 QQ 不支持按钮" },
 });
+const keyboard = { rows: [{ buttons: [button("next", "下一页 ▶")] }, { buttons: [button("last", "末页 ⏭")] }] };
+// 标题、引用后面要空一行，不然下一行会被并进标题/引用里。
 const MESSAGES = [
-  { name: "E｜Markdown，不带按钮", markdown: escape(body("【探针 E】Markdown，不带按钮")) },
-  { name: "F｜Markdown，带按钮", markdown: escape(body("【探针 F】Markdown，带按钮")), keyboard: { rows: [{ buttons: [button("next", "下一页 ▶")] }, { buttons: [button("last", "末页 ⏭")] }] } },
-  { name: "G｜纯文本（对照）", text: body("【探针 G】纯文本") },
-];
+  ["H1｜对照：普通一行", "【探针 H1】查到啦，给你整理在这里♪\n"],
+  ["H2｜大标题 #", "# 【探针 H2】查到啦\n\n"],
+  ["H3｜小标题 ###", "### 【探针 H3】查到啦\n\n"],
+  ["H4｜粗体", "**【探针 H4】查到啦，给你整理在这里♪**\n"],
+  ["H5｜引用 >", "> 【探针 H5】查到啦，给你整理在这里♪\n\n"],
+].map(([name, head]) => ({ name, markdown: head + rest, keyboard }));
 
 console.log("appId :", cfg.appId, "（secret 不回显）");
 console.log("环境  :", cfg.sandbox ? "沙箱" : "正式");
@@ -70,11 +70,9 @@ function finish() {
   if (!results.length) console.log("一条消息都没收到。私聊它，或在群里 @ 它一句话再跑一次。");
   for (const r of results) console.log("  " + (r.ok ? "✔" : "✘") + " " + r.name + (r.ok ? "" : "  err_code=" + (r.code ?? "?") + "  " + r.message));
   if (results.length) {
-    console.log("\n回 QQ 里看这三条，截图贴回来：");
-    console.log("  1. 开头空行：E 有没有？F 有没有？（G 是纯文本，应该没有）");
-    console.log("  2. E、F 里的三个曲名：显示成「ワタシConnect*」「セガサターン起動音[H.][Remix]」「ALLNIGHT_DANCER」，");
-    console.log("     还是冒出了反斜杠？");
-    console.log("  3. E、F 里段与段之间有没有空一行？");
+    console.log("\n回 QQ 里看这五条，截图贴回来：");
+    console.log("  哪几条开头没有空行？（H1 是现在的写法，应该有空行）");
+    console.log("  标题（H2、H3）的字号能不能接受？");
   }
   console.log("\n记得把美亚开回来（启动美亚.vbs）。");
   transport.stop();
@@ -107,7 +105,7 @@ async function reply(target, msgId) {
     const msgId = String(d?.id || "");
     if (!msgId) return;
     done = true;
-    console.log("\n收到" + (shape.type === "group" ? "群聊" : "私聊") + "消息，回三条对照：");
+    console.log("\n收到" + (shape.type === "group" ? "群聊" : "私聊") + "消息，回五条对照：");
     reply({ kind: shape.type, openid: shape.openid }, msgId).catch((e) => { console.log("  出错：" + (e?.message || e)); finish(); });
   });
   console.log("连上了。现在私聊它，或在群里 @ 它随便说一句。");
