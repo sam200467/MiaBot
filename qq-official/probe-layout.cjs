@@ -5,6 +5,7 @@
 // 第二轮（2026-10-11）：带按钮时第一行写成 # / ### / > 就没有开头空行，普通一行、粗体都有。
 // 第三轮（2026-10-11）：指令链接 <qqbot-cmd-input show="…" /> 里的曲名能不能带 &。直接写 & 的 A2 没显示出来；
 //   写成 &amp; 的 A3 显示成「C & B」，全角＆的 A4、写在链接外面的 A5 也正常。见 song-search.cjs 的 markdownLine。
+// 第四轮（现在这轮）：曲名里的半角双引号能不能转义了放进 show="…"。现在《Snow in "I love you"》显示成弯引号。
 //
 // 部署包里带着打好的单文件版（build-deploy.cjs），在部署目录的 qq-official/ 里就能跑，
 // 跟 mia-entry.cjs、config.local.json 放在一起：
@@ -32,15 +33,15 @@ if (!String(cfg.appId || "").trim() || !String(cfg.clientSecret || "").trim()) {
   process.exit(1);
 }
 
-// 第三轮：五条各带一种写法，分开发，哪条被拒只影响那一条。被动回复一条消息最多回五条，正好五条。
-// 链接点了只填输入框（不发出去），填的是真的命令，回车就能核对 ID 对不对。
-const link = (command, show) => `<qqbot-cmd-input text="${command}" show="${show}" reference="false" />`;
+// 第四轮：五条各带一种写法，分开发，哪条被拒只影响那一条。被动回复一条消息最多回五条，正好五条。
+// 链接点了只填输入框（不发出去），填的是真的命令（《Snow in "I love you"》是 id390），回车就能核对。
+const link = (command, show, quote = '"') => `<qqbot-cmd-input text=${quote}${command}${quote} show=${quote}${show}${quote} reference=${quote}false${quote} />`;
 const MESSAGES = [
-  ["A1｜对照：曲名不带 &", "【探针 A1】对照，下面这个应该是蓝字、能点\n\n" + link("/谱面分析 id837 ", "《C and B》")],
-  ["A2｜链接里直接写 &", "【探针 A2】链接里直接写 &\n\n" + link("/谱面分析 id837 ", "《C & B》") + "\n" + link("/谱面分析 id530 ", "《Love & Justice》")],
-  ["A3｜链接里写成 &amp;", "【探针 A3】链接里写成 HTML 转义（＆amp;）\n\n" + link("/谱面分析 id837 ", "《C &amp; B》") + "\n" + link("/谱面分析 id530 ", "《Love &amp; Justice》")],
-  ["A4｜链接里换成全角＆", "【探针 A4】链接里换成全角＆\n\n" + link("/谱面分析 id837 ", "《C ＆ B》") + "\n" + link("/谱面分析 id530 ", "《Love ＆ Justice》")],
-  ["A5｜& 写在链接外面", "【探针 A5】& 写在链接外面（现在美亚就是这么发的）\n\n《C & B》\n" + link("/谱面分析 id793 ", "《FLUFFY FLASH》") + " (C-Show & Maozon Remix)"],
+  ["B1｜对照：弯引号（现在的发法）", "【探针 B1】对照：弯引号，现在美亚就是这么发的\n\n" + link("/谱面分析 id390 ", "《Snow in “I love you”》")],
+  ["B2｜写成 &quot;", "【探针 B2】直引号写成 HTML 转义（＆quot;）\n\n" + link("/谱面分析 id390 ", "《Snow in &quot;I love you&quot;》")],
+  ["B3｜写成 &#34;", "【探针 B3】直引号写成数字转义（＆#34;）\n\n" + link("/谱面分析 id390 ", "《Snow in &#34;I love you&#34;》")],
+  ["B4｜写成 \\\"", "【探针 B4】直引号前面加反斜杠\n\n" + link("/谱面分析 id390 ", "《Snow in \\\"I love you\\\"》")],
+  ["B5｜属性用单引号包", "【探针 B5】属性值用单引号包，里面直接写直引号\n\n" + link("/谱面分析 id390 ", "《Snow in \"I love you\"》", "'")],
 ].map(([name, markdown]) => ({ name, markdown }));
 
 console.log("appId :", cfg.appId, "（secret 不回显）");
@@ -58,9 +59,9 @@ function finish() {
   for (const r of results) console.log("  " + (r.ok ? "✔" : "✘") + " " + r.name + (r.ok ? "" : "  err_code=" + (r.code ?? "?") + "  " + r.message));
   if (results.length) {
     console.log("\n回 QQ 里看这五条，截图贴回来：");
-    console.log("  A2、A3 的曲名是不是蓝字？显示出来的是「C & B」，还是「C &amp; B」、乱码、整段源码？");
-    console.log("  点一下 A2、A3 的曲名，输入框里填进去的是不是「/谱面分析 id837 」？");
-    console.log("  A1 是对照，应该正常；A5 是现在的发法，& 在链接外面应该照常显示。");
+    console.log("  B2～B5 哪几条是蓝字？显示出来的是不是「Snow in \"I love you\"」（直引号），有没有多出反斜杠、＆quot; 或整段源码？");
+    console.log("  点一下能显示的那几条，输入框里填进去的是不是「/谱面分析 id390 」？");
+    console.log("  B1 是对照（现在的弯引号），应该正常。");
   }
   console.log("\n记得把美亚开回来（启动美亚.vbs）。");
   transport.stop();
