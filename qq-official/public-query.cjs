@@ -4,6 +4,7 @@
 // never SQL, code, a path, or an instruction to the player-record executor.
 const catalog = require("../ongeki-song-catalog.json");
 const internal = require("../ongeki-music-internal.json");
+const sddtExtras = require("../ongeki-sddt-extras.json");
 const { loadCharacters, normalize: titleKey } = require("../chat-core/knowledge.cjs");
 const path = require("node:path");
 const songSearch = require("./song-search.cjs");
@@ -97,6 +98,8 @@ const fields = {
   release: { label: "收录日期", type: "date", note: "YYYY-MM-DD；没有记录就未知" },
   bpm: { label: "BPM", type: "number" },
   deleted: { label: "已删除", type: "boolean" },
+  deletedDate: { label: "删除日期", type: "date", note: "YYYY-MM-DD；只有已删除的歌有；问某年删了哪些用 gte/lte 框住那一年" },
+  duration: { label: "时长", type: "duration", note: "歌曲长度，写成 m:ss 字符串（如 \"2:30\"）或秒数；「2 分钟以内」用 lte \"2:00\"；没有记录就未知" },
   botId: { label: "ID", type: "number", note: "分表和 Bot 指令使用的短 ID（最多四位的整数，比如 870）；用户问某首歌的 id 时返回此字段。用户拿一串数字问是哪首歌或问它的资料时用 title search：曲名本身也可能就是数字，比如《39》《2112410403927243233368》" },
   officialId: { label: "官方曲目ID", type: "text", note: "仅用户明确说“官方曲目 ID”时返回；用户输入 id870 查歌时用 title search" },
   difficulty: { label: "谱面难度", type: "enum", values: DIFFICULTIES },
@@ -119,6 +122,7 @@ const operations = {
   date: ["eq", "gt", "gte", "lt", "lte"],
   boolean: ["eq", "ne"], enum: ["eq", "ne", "in"],
   level: ["eq", "ne", "gt", "gte", "lt", "lte", "in"],
+  duration: ["eq", "ne", "gt", "gte", "lt", "lte", "in"],
   character: ["eq", "ne", "in"],
 };
 // 「全是数字的歌」这种按曲名字形问的，prefix/contains 都表达不了。模型只能编出不支持的写法，复核两轮都过不了校验，
@@ -154,6 +158,11 @@ function scalar(field, value) {
   const spec = fields[field];
   if (spec.type === "number") {
     if (typeof value !== "number" || !Number.isFinite(value)) reject(`${spec.label}需要明确的数值`);
+  } else if (spec.type === "duration") {
+    // 时长统一换成秒比较：模型可能给 "2:30"，也可能直接给 150。
+    const match = typeof value === "string" && value.normalize("NFKC").trim().match(/^(\d{1,2})[:：](\d{2})$/);
+    value = match && Number(match[2]) < 60 ? Number(match[1]) * 60 + Number(match[2]) : value;
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) reject(`${spec.label}需要 m:ss（如 2:30）或秒数`);
   } else if (spec.type === "boolean") {
     if (typeof value !== "boolean") reject(`${spec.label}需要 true 或 false`);
   } else {
@@ -191,7 +200,7 @@ function validateQuery(input) {
   if (!Array.isArray(select) || !select.length || select.length > 8 || select.some(f => !Object.hasOwn(fields, f))) reject("返回字段不在本地资料范围内");
   const sort = input.sort ?? { field: "title", direction: "asc" };
   if (!sort || Object.keys(sort).some(k => !["field", "direction"].includes(k)) || !Object.hasOwn(fields, sort.field) || !["asc", "desc"].includes(sort.direction) || fields[sort.field].type === "character") reject("排序字段或顺序不受支持");
-  if (entity === "songs" && ["difficulty", "level", "constant", "notes", "bells", "designer", "bossLevel", "bossCard", "attribute"].includes(sort.field)) reject("按谱面数据排序时请使用 charts，避免一首歌的多张谱面混算");
+  if (entity === "songs" && ["difficulty", "level", "constant", "notes", "bells", "designer", "bossLevel", "bossCard", "attribute", "duration"].includes(sort.field)) reject("按谱面数据排序时请使用 charts，避免一首歌的多张谱面混算");
   const choice = input.selection ?? { kind: "all" };
   if (!choice || typeof choice !== "object" || Object.keys(choice).some(k => !["kind", "count", "excludePrevious"].includes(k)) || !["all", "first", "random"].includes(choice.kind)) reject("selection需要all/first/random选取方式");
   if (choice.excludePrevious !== undefined && typeof choice.excludePrevious !== "boolean") reject("excludePrevious需要布尔值");
@@ -234,13 +243,15 @@ const EXTRA_READINGS = {
   "怒槌～光吉猛修一部謎～": "イカヅチミツヨシタケノブイチブナゾ", "透明声彩": "トウメイセイサイ", "緋蜂": "ヒバチ", "流星": "リュウセイ",
   "連れ去って・閉じ込めて・好きにして": "ツレサッテトジコメテスキニシテ",
 };
-function songBase(songIndex, { title, reading, artist, genre, version, release, bpm, deleted, officialId }) {
+function songBase(songIndex, { title, reading, artist, genre, version, release, bpm, deleted, deletedDate = null, officialId }) {
   const roles = rolesByTitle.get(titleKey(title)) || {};
   return {
-    songIndex, songKey: `${textKey(title)}\0${textKey(artist)}`, title, reading: reading || gameReading(EXTRA_READINGS[title] ?? title), artist, genre, version, release, bpm: numeric(bpm), deleted, officialId,
+    songIndex, songKey: `${textKey(title)}\0${textKey(artist)}`, title, reading: reading || gameReading(EXTRA_READINGS[title] ?? title), artist, genre, version, release, bpm: numeric(bpm), deleted, deletedDate: deletedDate || null, officialId,
     singer: roles.singer || [], originalFor: roles.originalFor || [], personalFor: roles.personalFor || [],
   };
 }
+const seconds = text => { const m = String(text ?? "").match(/^(\d+):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+const clock = value => `${Math.floor(value / 60)}:${String(value % 60).padStart(2, "0")}`;
 // Supplement only charts absent from the primary snapshot. An explicitly
 // unknown constant in an existing chart stays unknown, not overwritten.
 const internalChart = (v, i) => ({ level: v.level[i], const: v.const?.[i], const_status: numeric(v.const?.[i]) > 0 ? "known" : "unknown", notes_all: v.noteTotal?.[i], bell: v.bellTotal?.[i], notesdesigner: v.creator?.[i] });
@@ -255,6 +266,8 @@ function chartRow(base, difficulty, chart, v, botId, supplemental) {
     // 0 级白谱的定数就是 0（游戏数据里 23 张全是）；《Perfect Shining!!》那张在曲库里记成未知，也按 0 算。
     constant: difficulty === "LUN" && String(chart.level) === "0" ? 0 : chart.const_status === "known" ? numeric(chart.const) : null,
     notes: numeric(chart.notes_all), bells: numeric(chart.bell), designer: chart.notesdesigner,
+    // 时长按这张谱面实际对应的内部曲目取：白谱有自己的 ID，长度也可能跟本曲不一样。
+    duration: seconds(sddtExtras[String(v?.id ?? botId)]?.duration),
     opponent: v?.boss ? [v.boss] : [], bossLevel: numeric(v?.bossLevel), bossCard: v?.bossCardName || null, attribute: v?.attributeType ?? null,
   };
 }
@@ -262,7 +275,7 @@ const rows = [
   ...catalogSongs.flatMap((song, songIndex) => {
     const meta = song.meta;
     const base = songBase(songIndex, { title: meta.name, reading: meta.reading, artist: meta.artist, genre: meta.genre, version: meta.song_release_version,
-      release: meta.song_release, bpm: meta.bpm, deleted: Boolean(meta.is_deleted), officialId: String(meta.official_id ?? "") });
+      release: meta.song_release, bpm: meta.bpm, deleted: Boolean(meta.is_deleted), deletedDate: meta.deleted_date, officialId: String(meta.official_id ?? "") });
     return DIFFICULTIES.flatMap((difficulty, i) => {
       const found = [];
       // 白谱单独编号：LUN 那一行给白谱自己的 ID 和对手；其余难度是本曲那条。曲库里只剩白谱的已删歌
@@ -300,7 +313,7 @@ function compare(value, filter) {
   if (filter.op === "in") return filter.value.some(v => compare(value, { ...filter, op: "eq", value: v }));
   if (Array.isArray(value)) return filter.op === "ne" ? value.every(v => compare(v, filter)) : value.some(v => compare(v, filter));
   const type = fields[filter.field].type;
-  const key = v => type === "level" ? levelValue(v) : ["number", "boolean"].includes(type) ? v : textKey(v);
+  const key = v => type === "level" ? levelValue(v) : ["number", "boolean", "duration"].includes(type) ? v : textKey(v);
   const a = key(value), b = key(filter.value);
   switch (filter.op) {
     case "eq": return a === b; case "ne": return a !== b;
@@ -330,7 +343,7 @@ function executeQuery(input, { preview = false, selectionKeys, excludeKeys = [],
   matched.sort((a, b) => {
     if (!known(a[field])) return known(b[field]) ? 1 : 0;
     if (!known(b[field])) return -1;
-    const diff = fields[field].type === "number" ? a[field] - b[field] : fields[field].type === "level" ? levelValue(a[field]) - levelValue(b[field])
+    const diff = ["number", "duration"].includes(fields[field].type) ? a[field] - b[field] : fields[field].type === "level" ? levelValue(a[field]) - levelValue(b[field])
       : field === "title" ? a.reading.localeCompare(b.reading, "ja") || a.title.localeCompare(b.title, "ja") : String(a[field]).localeCompare(String(b[field]), "zh-CN");
     return (direction === "desc" ? -diff : diff) || a.songIndex - b.songIndex || DIFFICULTIES.indexOf(a.difficulty) - DIFFICULTIES.indexOf(b.difficulty);
   });
@@ -379,10 +392,11 @@ function executeQuery(input, { preview = false, selectionKeys, excludeKeys = [],
 }
 const opLabels = { eq: "＝", ne: "≠", gt: "＞", gte: "≥", lt: "＜", lte: "≤", contains: "包含", prefix: "开头是", suffix: "结尾是", search: "线索", in: "属于", charset: "全是" };
 const show = value => Array.isArray(value) ? value.join("、") || "未知" : !known(value) ? "未知" : typeof value === "boolean" ? value ? "是" : "否" : String(value);
+const showField = (field, value) => fields[field].type === "duration" ? Array.isArray(value) ? value.map(clock).join("、") : known(value) ? clock(value) : "未知" : show(value);
 function describeQuery(query) {
-  return query.filters.length ? query.filters.map(f => `${fields[f.field].label}${opLabels[f.op]}${f.op === "charset" ? CHARSET_LABELS[f.value] : show(f.value)}`).join("；") : "全部曲目";
+  return query.filters.length ? query.filters.map(f => `${fields[f.field].label}${opLabels[f.op]}${f.op === "charset" ? CHARSET_LABELS[f.value] : showField(f.field, f.value)}`).join("；") : "全部曲目";
 }
-const CHART_FIELDS = ["difficulty", "level", "constant", "notes", "bells", "designer", "opponent", "bossLevel", "bossCard", "attribute"];
+const CHART_FIELDS = ["difficulty", "level", "constant", "notes", "bells", "designer", "opponent", "bossLevel", "bossCard", "attribute", "duration"];
 // 排版分三段，段与段之间空一行：开头的说明（筛选、条数、排序……）、结果列表、结尾的说明和页码。
 // 每首只有一行（只问歌名）时列表紧挨着排；带 ID、定数这些附加行时，每首之间也空一行，免得看串。
 // 空行要发得出去，QQ 入口靠路由结果上的 preformatted 不折叠它（见 semantic-router.cjs 的 queryReply）。
@@ -407,8 +421,8 @@ function layout(result) {
     for (const field of query.select.filter(f => f !== "title" && f !== "difficulty")) {
       const chartField = CHART_FIELDS.includes(field);
       // 几张谱面取值都一样（同一首歌的对战相手、boss 卡）就只写一次，不排成「BAS X / ADV X / EXP X / MAS X」。
-      const same = entry.rows.length > 1 && new Set(entry.rows.map(r => show(r[field]))).size === 1;
-      const values = [...new Set(entry.rows.map(r => `${chartField && !same ? r.difficulty + " " : ""}${show(r[field])}`))];
+      const same = entry.rows.length > 1 && new Set(entry.rows.map(r => showField(field, r[field]))).size === 1;
+      const values = [...new Set(entry.rows.map(r => `${chartField && !same ? r.difficulty + " " : ""}${showField(field, r[field])}`))];
       // 带白谱的歌有两个 ID（本曲 39、白谱 8015），光列「39 / 8015」分不清哪个是哪个，就注上各管哪几张谱面。
       const labelled = field === "botId" && values.length > 1
         ? values.map(id => `${id}（${[...new Set(entry.rows.filter(r => show(r.botId) === id).map(r => r.difficulty))].join("/")}）`)
@@ -540,6 +554,9 @@ function queryMismatch(query, text, { self } = {}) {
     : /(?:全是|全都是|纯|純|只有)\s*符号|没有(?:字母|文字)/.test(text) ? "symbol" : null;
   if (charset && !title.some(f => f.op === "charset" && f.value === charset)) return `用户问曲名全由某类字符组成，歌名用 charset 筛选，value=${charset}`;
   if (/对战相手|對戰相手/.test(text) && !query.filters.some(f => f.field === "opponent") && !query.select.includes("opponent")) return "用户问对战相手，查询必须筛选或返回 opponent，不能只查演唱者";
+  const uses = field => query.select.includes(field) || query.filters.some(f => f.field === field);
+  if (/时长|時長|多长时间|多長時間|几分钟|幾分鐘|多少分钟|多少秒|(?:歌|曲子?)有?多长/.test(text) && !uses("duration")) return "用户问歌曲时长，查询必须筛选或返回 duration";
+  if (/(?:什么时候|什麼時候|哪天|何时|何時|几号|哪一?年|\d{4}\s*年?)\s*(?:被|给)?删|删除(?:日期|时间|時間)|刪除(?:日期|時間)/.test(text) && !uses("deletedDate")) return "用户问删除时间，查询必须筛选或返回 deletedDate，不能只看是否已删除";
   if (/(?:boss|ボス|对手|對手|相手)\s*(?:卡|カード|card)/i.test(text) && !query.select.includes("bossCard")) return "用户问 boss 卡（对战相手卡牌），查询必须返回 bossCard，不能只返回对战相手的角色名";
   return characterMismatch(query, text, self);
 }

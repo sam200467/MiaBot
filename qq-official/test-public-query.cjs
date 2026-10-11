@@ -419,3 +419,19 @@ test("boss 卡：能查卡名，几张谱面同一张卡只写一次；问 boss 
   assert.match(queryMismatch(validateQuery({ ...query, select: ["title", "opponent"] }), text2), /bossCard/);
   assert.ok(!queryMismatch(validateQuery(query), text2));
 });
+
+test("时长与删除日期：按 m:ss 或秒数筛，显示成 m:ss；问到时必须查这两个字段", () => {
+  const text = formatResult(run([filter("title", "eq", "Love & Justice")], { select: ["title", "duration"] }));
+  assert.match(text, /^时长：2:14$/m);
+  const short = run([filter("duration", "lte", "1:50")], { entity: "charts", select: ["title", "duration"] });
+  assert.ok(short.total && short.total === run([filter("duration", "lte", 110)], { entity: "charts" }).total);
+  assert.match(formatResult(short), /^筛选：时长≤1:50$/m);
+  assert.throws(() => validateQuery({ filters: [filter("duration", "lte", "两分钟")], select: ["title"] }), /m:ss/);
+  const in2024 = all({ filters: [filter("deletedDate", "gte", "2024-01-01"), filter("deletedDate", "lte", "2024-12-31")] });
+  assert.ok(in2024.some(e => e.title === "Departure"));
+  assert.ok(!in2024.some(e => e.title === "Love & Justice"));
+  const plain = validateQuery({ filters: [filter("title", "eq", "Departure")], select: ["title", "deleted"] });
+  assert.match(queryMismatch(plain, "Departure什么时候删的"), /deletedDate/);
+  assert.match(queryMismatch(plain, "Departure这首歌多长"), /duration/);
+  assert.ok(!queryMismatch(validateQuery({ filters: [filter("title", "eq", "Departure")], select: ["title", "deletedDate", "duration"] }), "Departure什么时候删的，时长多少"));
+});
