@@ -191,30 +191,39 @@ function reply(query) {
   return replyLines(query).lines.filter(line => !isHintLine(line)).map(plainLine).join("\n").replace(/\n+$/, "");
 }
 
-// 按纯文本长度切块（跟 core.splitLines 同一个规则），每块同时给出 Markdown 和纯文本，
-// Markdown 被拒时传输层用纯文本补发。提示行跟着最后一块走。
+// 按顺序往当前这块里装，装不下就另起一块；单个就超过上限的独占一块。gap 是相邻两个之间的分隔长度。
+function pack(items, size, gap, limit) {
+  const groups = [];
+  let current = [], length = 0;
+  for (const item of items) {
+    if (current.length && length + gap + size(item) > limit) { groups.push(current); current = []; }
+    length = current.length ? length + gap + size(item) : size(item);
+    current.push(item);
+  }
+  if (current.length) groups.push(current);
+  return groups;
+}
+
+// 按纯文本长度切块，每块同时给出 Markdown 和纯文本，Markdown 被拒时传输层用纯文本补发。提示行跟着最后一块走。
+// 只在空行处切：一首歌的曲名行和谱面行不分到两条消息里（曲名链接在上一条末尾、谱面在下一条开头，
+// 群里中间还可能插进别人的话）。一段自己就超过上限时，才退回按行切（跟 core.splitLines 同一个规则）。
 // 翻页那一块另带 keyboard：带按钮发时正文里那行「下一页：…」换成一句提示，
 // 按钮被拒时传输层改发 markdownWithoutKeyboard（原来那行指令链接还在）。
 function replyChunks(query, limit) {
   const { lines, pager, pagerLine } = replyLines(query);
   const hints = lines.filter(isHintLine);
-  const body = lines.filter(line => !isHintLine(line));
-  while (body.length && plainLine(body[body.length - 1]) === "") body.pop();
-  const chunks = [];
-  let current = [], length = 0;
-  for (const line of body) {
-    const addition = (current.length ? 1 : 0) + plainLine(line).length;
-    if (current.length && length + addition > limit) {
-      while (plainLine(current[current.length - 1]) === "") current.pop();
-      chunks.push(current);
-      current = [];
-      length = 0;
-      if (plainLine(line) === "") continue;
-      length = plainLine(line).length;
-      current.push(line);
-    } else { current.push(line); length += addition; }
+  // 按空行分段：开头的「查到 N 首」、每首歌、候选说明、翻页那行各是一段。
+  const blocks = [[]];
+  for (const line of lines) {
+    if (isHintLine(line)) continue;
+    if (plainLine(line) !== "") blocks[blocks.length - 1].push(line);
+    else if (blocks[blocks.length - 1].length) blocks.push([]);
   }
-  if (current.length) chunks.push(current);
+  if (!blocks[blocks.length - 1].length) blocks.pop();
+  const lineLength = line => plainLine(line).length;
+  const blockLength = block => block.map(plainLine).join("\n").length;
+  const pieces = blocks.flatMap(block => blockLength(block) > limit ? pack(block, lineLength, 1, limit) : [block]);
+  const chunks = pack(pieces, blockLength, 2, limit).map(group => group.flatMap((piece, i) => i ? [[""], ...piece] : piece));
   if (hints.length && chunks.length) chunks[chunks.length - 1].push([""], ...hints);
   return chunks.map(chunk => {
     const markdown = chunk.map(markdownLine).join("\n");
