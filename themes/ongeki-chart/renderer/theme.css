@@ -232,8 +232,8 @@ h1 {
 .bell-core { fill: #fff6cf; stroke: none; }
 
 /* 子弹：形状对应调色板（针形/圆环/方形），颜色对应伤害（普通/硬/危险） */
-.bullet { stroke: rgba(255, 255, 255, .8); stroke-width: .8; stroke-linejoin: round; }
-.bullet.ring { fill: rgba(20, 10, 30, .55); stroke-width: 2.6; }
+.bullet { stroke: rgba(255, 255, 255, .8); stroke-width: .7; stroke-linejoin: round; }
+.bullet.ring { fill: rgba(20, 10, 30, .55); stroke-width: 2; }
 .bullet-glow { fill: rgba(255, 255, 255, .6); stroke: none; }
 .d-NML { fill: #ff3fae; }
 .d-STR { fill: #8f46e6; }

@@ -551,7 +551,8 @@
   }
 
   function bulletShape(b, x, y) {
-    const s = b.large ? 1.4 : 1;
+    // 弹幕常常很密，整体按 0.75 缩小，免得相邻的叠成一片
+    const s = (b.large ? 1.4 : 1) * 0.75;
     const cls = `bullet d-${COLORS.bullet[b.damage] ? b.damage : "NML"}`;
     if (b.shape === "NDL") {
       // 针形：上端平、下端尖，尖端是落点；下半截泛白
@@ -566,11 +567,11 @@
         + `<rect class="bullet-glow" x="${f1(x - w * .45)}" y="${f1(top + 2 * s)}" width="${f1(w * .9)}" height="${f1(bottom - top - 4 * s)}" rx="${f1(.8 * s)}"/>`;
     }
     // 圆形：圆环
-    return `<circle class="${cls} ring" cx="${x}" cy="${y}" r="${f1(4.2 * s)}"/>`;
+    return `<circle class="${cls} ring" cx="${x}" cy="${y}" r="${f1(4.4 * s)}"/>`;
   }
 
   function bellShape(x, y) {
-    return `<circle class="bell" cx="${x}" cy="${y}" r="4.6"/><circle class="bell-core" cx="${x}" cy="${y}" r="1.7"/>`;
+    return `<circle class="bell" cx="${x}" cy="${y}" r="3.6"/><circle class="bell-core" cx="${x}" cy="${y}" r="1.3"/>`;
   }
 
   function trimNumber(value) {
