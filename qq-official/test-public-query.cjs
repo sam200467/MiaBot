@@ -163,13 +163,13 @@ test("BPM/谱师/物量等数据库字段可组合，按谱面排序和计数不
   assert.equal(total.total, all({ filters: [], entity: "charts" }).length);
   const umapi = run([filter("title", "eq", "うまぴょい伝説"), filter("opponent", "eq", "美亚")], { select: ["title", "difficulty", "opponent"] });
   assert.deepEqual(umapi.entries[0].rows.map(r => r.difficulty), ["LUN"]);
-  // 补录提示只给仍在线的歌、而且只在列出谱面资料时给：已删除的歌本来就玩不到，只问歌名时也用不着。
-  assert.doesNotMatch(formatResult(umapi), /补录/);
-  assert.match(formatResult(run([filter("title", "eq", "Perfect Shining!!")], { select: ["title", "constant"] })), /^※ LUN（ID 8091）谱面主曲库未收录，资料取自游戏数据$/m);
+  // 删除标注只有两种：整首删了「（已删除）」，只是白谱删了「（白谱已删除）」。补录的事不另外说。
+  assert.match(formatResult(umapi), /^《うまぴょい伝説》（已删除）$/m);
   const titania = formatResult(run([filter("title", "eq", "Titania")], { select: ["title", "constant"] }));
-  assert.match(titania, /^※ LUN（ID 8158）谱面是期间限定谱面，已经下线了$/m, "愚人节白谱在游戏数据里标了下线");
-  assert.doesNotMatch(titania, /已删除|主曲库未收录/, "歌本身还在，只是那张白谱下线了");
-  assert.doesNotMatch(formatResult(run([filter("title", "eq", "Titania")], { select: ["title"] })), /补录/);
+  assert.match(titania, /^《Titania》（白谱已删除）$/m, "愚人节白谱在游戏数据里标了下线");
+  assert.doesNotMatch(titania, /※|补录|主曲库/);
+  assert.match(formatResult(run([filter("title", "eq", "Perfect Shining!!")], { select: ["title", "constant"] })), /^《Perfect Shining!!》$/m, "在线的补录白谱不加标注");
+  assert.match(formatResult(run([filter("title", "eq", "時空を超えて久しぶり！")])), /^《時空を超えて久しぶり！》$/m);
 });
 
 test("严格拒绝未支持的字段/操作/类型，不能静默丢失条件", () => {
@@ -209,7 +209,7 @@ test("换了新条目重新上架的歌，已删除的旧条目不再算进来",
   assert.deepEqual(cogito.entries.map(e => e.title), ["Cogito ergo sum"]);
   assert.doesNotMatch(formatResult(cogito), /14\.7/);
   // 只去掉跟在线条目同一个 ID 的旧条目，别的已删除曲照常算、照常标。
-  assert.match(formatResult(run([filter("title", "eq", "ブリキノダンス")])), /已删除记录/);
+  assert.match(formatResult(run([filter("title", "eq", "ブリキノダンス")])), /（已删除）/);
 });
 
 const pickQuery = (selection, extra = {}) => ({ filters: [filter("constant", "eq", 14.5)], entity: "charts", select: ["title", "constant"], selection, ...extra });
@@ -301,7 +301,7 @@ test("游戏数据里的每张白谱都在表里，一张一行；曲库漏收�
   // 连歌都不在公开曲库里的：曲名搜索也找得到，标已删除，版本照曲库的写法补上「オンゲキ」前缀。
   const hibachi = run([filter("title", "search", "緋蜂")], { select: ["title", "botId", "constant", "version", "deleted"] });
   assert.deepEqual(hibachi.entries.map(e => e.rows.map(r => `${r.difficulty}:${r.botId}:${r.constant}:${r.version}:${r.deleted}`)), [["LUN:8042:14.7:オンゲキ SUMMER:true"]]);
-  assert.match(formatResult(hibachi), /已删除记录/);
+  assert.match(formatResult(hibachi), /（已删除）/);
   assert.equal(run([filter("version", "eq", "オンゲキ SUMMER"), filter("botId", "eq", 8042)]).total, 1);
   // 0 级白谱以前因为等级不在 1–15 里，配不上对手。
   assert.deepEqual(run([filter("title", "eq", "Gate of Doom"), filter("difficulty", "eq", "LUN")], { select: ["title", "opponent"] }).entries[0].rows[0].opponent, ["三角 葵"]);

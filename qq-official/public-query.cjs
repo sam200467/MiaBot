@@ -232,7 +232,7 @@ const internalChart = (v, i) => ({ level: v.level[i], const: v.const?.[i], const
 // 《Singularity》）会把另一首的对手配上来，一首歌的几张白谱（《Perfect Shining!!》）也会互相串。
 function chartRow(base, difficulty, chart, v, botId, supplemental) {
   return {
-    // offline：补录谱面在游戏数据里已标为下线（期间限定的愚人节谱面等）。曲库自己收的谱面以曲库为准，不看这个。
+    // offline：补录谱面在游戏数据里已标为下线（期间限定的愚人节白谱等），曲名后面标「白谱已删除」。曲库自己收的谱面以曲库为准，不看这个。
     ...base, supplemental, offline: Boolean(supplemental && v && v.status !== "online"), botId, difficulty, level: chart.level,
     // 白谱一张一条、ID 各不相同（见 song-id.cjs），同一首歌的几张白谱要算几张谱面，不能并成一张。
     chartKey: `${base.songKey}\0${difficulty}${difficulty === "LUN" ? `\0${botId}` : ""}`,
@@ -381,10 +381,11 @@ function formatResult(result) {
   }
   if (!total) lines.push("可以再确认一下名称或条件；这次没匹配到，不代表游戏里一定没有哦。");
   if (query.page > pages && total) lines.push(`这一页已经超出范围啦，一共 ${pages} 页。`);
-  // 谱面资料只在用得上时才提补录：列了难度/定数这类谱面字段，或者是按谱面字段筛出来的。只问歌名时不提。
-  const showsCharts = query.entity === "charts" || query.select.some(f => CHART_FIELDS.includes(f)) || query.filters.some(f => CHART_FIELDS.includes(f.field));
   const blocks = result.entries.map(entry => {
-    const out = [`《${entry.title}》${entry.rows.every(r => r.deleted) ? "（已删除记录）" : entry.rows.some(r => r.deleted) ? "（含历史记录）" : ""}`];
+    // 删除标注只有两种说法：整首删了写「已删除」，歌还在、只是白谱删了（《Titania》的愚人节白谱）写「白谱已删除」。
+    const gone = entry.rows.filter(r => r.deleted || r.offline);
+    const mark = !gone.length ? "" : gone.length === entry.rows.length ? "（已删除）" : gone.every(r => r.difficulty === "LUN") ? "（白谱已删除）" : "（部分谱面已删除）";
+    const out = [`《${entry.title}》${mark}`];
     for (const field of query.select.filter(f => f !== "title" && f !== "difficulty")) {
       const chartField = CHART_FIELDS.includes(field);
       const values = [...new Set(entry.rows.map(r => `${chartField ? r.difficulty + " " : ""}${show(r[field])}`))];
@@ -395,13 +396,6 @@ function formatResult(result) {
       out.push(`${fields[field].label}：${labelled.join(" / ")}`);
     }
     if (query.select.includes("difficulty")) out.push(`难度：${[...new Set(entry.rows.map(r => r.difficulty))].join(" / ")}`);
-    // 补录 = 公开曲库没收、从游戏数据里补上的谱面。已删除的歌本来就玩不到，不再多说一遍；
-    // 歌还在、补录的谱面已下线（《Titania》《脳天直撃》的愚人节白谱）的，要说清楚现在玩不到。
-    // 白谱带上 ID：《Perfect Shining!!》有两张白谱，只说「LUN」分不清是哪张。
-    const supplemental = offline => [...new Set(entry.rows.filter(r => r.supplemental && !r.deleted && r.offline === offline)
-      .map(r => r.difficulty === "LUN" ? `LUN（ID ${r.botId}）` : r.difficulty))].join(" / ").replace(/[^）]$/, "$& ");
-    if (showsCharts && supplemental(false)) out.push(`※ ${supplemental(false)}谱面主曲库未收录，资料取自游戏数据`);
-    if (showsCharts && supplemental(true)) out.push(`※ ${supplemental(true)}谱面是期间限定谱面，已经下线了`);
     return out;
   });
   const footer = [];
