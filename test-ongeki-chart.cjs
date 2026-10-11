@@ -205,14 +205,15 @@ test("谱面文件索引：递归找，ID 去前导零，后面的包覆盖前�
   const root = tempTree({
     "A000/music/music0036/0036_03.ogkr": "old",
     "option/A001/music/music0036/0036_03.ogkr": "new",
-    "A000/music/music8003/8003_04.ogkr": "lun",
+    "A000/music/music8003/8003_10.ogkr": "lun",
     "A000/music/music0036/readme.txt": "",
   });
   try {
     let clock = 0;
     const index = createChartFileIndex([root], { now: () => clock });
     assert.equal(fs.readFileSync(index.find(36, 3), "utf8"), "new");
-    assert.equal(fs.readFileSync(index.find("8003", 4), "utf8"), "lun");
+    assert.equal(fs.readFileSync(index.find("8003", 10), "utf8"), "lun");
+    assert.equal(index.find(8003, 4), null);
     assert.equal(index.find(36, 2), null);
     // 新放进去的谱面：一分钟内不重扫，之后重扫能找到
     fs.writeFileSync(path.join(root, "A000/music/music0036/0036_02.ogkr"), "exp");
@@ -223,6 +224,28 @@ test("谱面文件索引：递归找，ID 去前导零，后面的包覆盖前�
     assert.equal(createChartFileIndex([]).find(36, 3), null);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("谱面文件索引：option 包号大的优先，跟盘符和根目录顺序无关", () => {
+  const { preferChartFile, chartFileName } = require("./ongeki-chart-files.cjs");
+  // 本体 .vhd 挂载成 Z:，option 在 F: 上
+  assert.equal(preferChartFile("F:\\SDDT\\option\\A037\\music\\music0036\\0036_03.ogkr", "Z:\\package\\A000\\music\\0036_03.ogkr"), false);
+  assert.equal(preferChartFile("Z:\\A000\\0036_03.ogkr", "C:\\option\\A001\\0036_03.ogkr"), true);
+  assert.equal(preferChartFile("/opt/A040/x/0036_03.ogkr", "/opt/A052/x/0036_03.ogkr"), true);
+  assert.equal(preferChartFile(null, "/a/0036_03.ogkr"), true);
+  assert.equal(chartFileName(8180, 10), "8180_10.ogkr");
+  assert.equal(chartFileName("36", 3), "0036_03.ogkr");
+
+  const base = tempTree({ "package/A000/music/0036_03.ogkr": "base" });
+  const option = tempTree({ "option/A037/music/0036_03.ogkr": "opt" });
+  try {
+    for (const roots of [[base, option], [option, base]]) {
+      assert.equal(fs.readFileSync(createChartFileIndex(roots).find(36, 3), "utf8"), "opt");
+    }
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+    fs.rmSync(option, { recursive: true, force: true });
   }
 });
 

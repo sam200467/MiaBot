@@ -5,17 +5,19 @@
 //
 //   node tools/collect-ongeki-charts.cjs <游戏目录> [更多目录…] --out <输出目录>
 //
-// 例：node tools/collect-ongeki-charts.cjs "D:\SDDT\package" --out D:\ongeki-charts
+// 例：node tools/collect-ongeki-charts.cjs E:\ "D:\SDDT\option" --out D:\ongeki-charts
 //
-// 递归查找形如 0036_03.ogkr 的文件（曲目 ID_难度序号），按 ID 补零到 4 位平铺到输出目录。
-// 同一张谱面有多份时取路径排序靠后的那份（option 包排在 A000 之后），和机器人的查找规则一致。
+// 递归查找形如 0036_03.ogkr 的文件（曲目 ID_难度号，LUNATIC 是 10），按 ID 补零到 4 位平铺到输出目录。
+// 同一张谱面有多份时取 option 包号最大的那份，和机器人的查找规则一致。
+// 本体谱面通常在 HDD 里的 .vhd 镜像中，要先挂载，再把挂载出来的盘符一起传进来。
 // 只拷谱面，不碰其他游戏文件。输出目录里的谱面属于游戏数据，不要提交进仓库或公开分发。
 const fs = require("node:fs");
 const path = require("node:path");
-const { FILE_PATTERN } = require("../ongeki-chart-files.cjs");
+const { FILE_PATTERN, preferChartFile, chartFileName } = require("../ongeki-chart-files.cjs");
 
 const MAX_BYTES = 4 * 1024 * 1024;   // 与 /谱面图 读取上限一致
 const DIFFICULTIES = ["BASIC", "ADVANCED", "EXPERT", "MASTER", "LUNATIC"];
+const FILE_DIFFICULTY = [0, 1, 2, 3, 10];   // 曲库 level 数组下标 -> 文件里的难度号
 
 const args = process.argv.slice(2);
 const outAt = args.indexOf("--out");
@@ -35,7 +37,7 @@ for (const root of roots) {
   }
 }
 
-const found = new Map();      // "36_3" -> 源文件
+const found = new Map();      // "36_3" / "8003_10" -> 源文件
 const unmatched = [];         // 扩展名是 .ogkr 但文件名对不上的
 const tooLarge = [];
 let scanned = 0;
@@ -52,8 +54,7 @@ const walk = (dir) => {
     if (!match) { unmatched.push(full); continue; }
     if (fs.statSync(full).size > MAX_BYTES) { tooLarge.push(full); continue; }
     const key = Number(match[1]) + "_" + Number(match[2]);
-    const previous = found.get(key);
-    if (!previous || previous.localeCompare(full) < 0) found.set(key, full);
+    if (preferChartFile(found.get(key), full)) found.set(key, full);
   }
 };
 for (const root of roots) walk(path.resolve(root));
@@ -65,7 +66,7 @@ if (unmatched.length) {
 }
 if (tooLarge.length) console.log(`${tooLarge.length} 个文件超过 4 MB，跳过：${tooLarge.slice(0, 3).join("、")}`);
 if (!found.size) {
-  console.log("一张谱面都没找到。请确认目录选对了（游戏的 package 目录或其中的 StreamingAssets），");
+  console.log("一张谱面都没找到。请确认目录选对了（游戏的 package 目录、挂载出来的 .vhd 盘符或 option 目录），");
   console.log("或者在游戏目录里搜一下 *.ogkr，把找到的路径和文件名发给开发者。");
   process.exit(1);
 }
@@ -73,8 +74,8 @@ if (!found.size) {
 fs.mkdirSync(outDir, { recursive: true });
 let bytes = 0;
 for (const [key, source] of found) {
-  const [id, position] = key.split("_");
-  const target = path.join(outDir, `${id.padStart(4, "0")}_0${position}.ogkr`);
+  const [id, difficulty] = key.split("_");
+  const target = path.join(outDir, chartFileName(id, difficulty));
   fs.copyFileSync(source, target);
   bytes += fs.statSync(target).size;
 }
@@ -90,7 +91,7 @@ try {
     (song.level || []).forEach((level, position) => {
       if (level == null || String(level).trim() === "" || String(level) === "-") return;
       expected++;
-      if (!found.has(song.id + "_" + position)) missing.push(`id${song.id} ${song.name} ${DIFFICULTIES[position]}`);
+      if (!found.has(song.id + "_" + FILE_DIFFICULTY[position])) missing.push(`id${song.id} ${song.name} ${DIFFICULTIES[position]}`);
     });
   }
   console.log(`本地曲库在线谱面 ${expected} 张，其中 ${expected - missing.length} 张找到了文件。`);

@@ -12,14 +12,41 @@
 ```
 
 可以填多个目录（本体和 option 包）。会递归查找形如 `0036_03.ogkr` 的文件：前半是曲目 ID（与
-`ongeki-music-internal.json` 的 `id` 相同，前导零不计），后半是难度 `00`–`03`（BASIC–MASTER）、`04`（LUNATIC）。
-同一张谱面有多份时，取路径排序靠后的那份。没找到的谱面一分钟后会重扫，所以更新游戏数据不用重启机器人。
+`ongeki-music-internal.json` 的 `id` 相同，前导零不计），后半是难度 `00`–`03`（BASIC–MASTER）、`10`（LUNATIC）。
+同一张谱面有多份时，取 option 包号（`A037` 这样的目录名）最大的那份，包号相同再取路径排序靠后的。
+没找到的谱面一分钟后会重扫，所以更新游戏数据不用重启机器人。
 
-**服务器上没有装游戏**时，在装了游戏的电脑上把谱面单独收集出来，再拷到服务器：
+**服务器上没有装游戏**时，在装了游戏的电脑上把谱面单独收集出来，再拷到服务器。
+
+本体谱面（A000）一般不是散装文件，而是在 `HDD\SDDT_*.vhd` 镜像里；部分 option 包也可能还是 `.zip`。
+散装目录里只能找到已经解开的 option 包，所以先把这两样打开：
 
 ```powershell
-node tools/collect-ongeki-charts.cjs "D:\SDDT\package" --out D:\ongeki-charts
+$g = "D:\SDDT"   # 游戏根目录
+# 1. 只读挂载本体镜像，看看分到了哪个盘符
+Mount-DiskImage -ImagePath (Resolve-Path "$g\HDD\SDDT_*.vhd").Path -Access ReadOnly
+Get-DiskImage -ImagePath (Resolve-Path "$g\HDD\SDDT_*.vhd").Path | Get-Disk | Get-Partition | Get-Volume
+
+# 2. 只从 option 压缩包里取出谱面，放到游戏目录外面
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$dst = "D:\ongeki-option-zip"
+foreach ($zipPath in Get-ChildItem "$g\option\*.zip") {
+  $zip = [IO.Compression.ZipFile]::OpenRead($zipPath.FullName)
+  foreach ($e in $zip.Entries | Where-Object Name -like "*.ogkr") {
+    $to = Join-Path $dst $e.FullName; New-Item -ItemType Directory -Force (Split-Path $to) | Out-Null
+    [IO.Compression.ZipFileExtensions]::ExtractToFile($e, $to, $true)
+  }
+  $zip.Dispose()
+}
+
+# 3. 三处一起收集（E: 换成第 1 步看到的盘符）
+node tools/collect-ongeki-charts.cjs E:\ "$g\option" $dst --out D:\ongeki-charts
+
+# 4. 卸载镜像
+Dismount-DiskImage -ImagePath (Resolve-Path "$g\HDD\SDDT_*.vhd").Path
 ```
+
+镜像挂不上（提示文件损坏、或者挂上后打不开）说明是加密镜像，需要先用对应工具解密，这一步脚本帮不了。
 
 脚本只拷 `.ogkr` 谱面文件，平铺成 `0036_03.ogkr` 这样，并对照本地曲库报告缺了哪些。把输出目录压缩后传到服务器、解压，
 `ongekiChartRoots` 指向解压后的目录即可。这些谱面属于游戏数据，只放在自己的服务器上，不要提交进仓库或公开分发。

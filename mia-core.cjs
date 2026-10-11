@@ -1151,11 +1151,10 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
       return { kind: "lines", header: result.matches.length ? "找到多张谱面，请用完整 Song ID 明确选择：" : "没有找到符合要求的谱面。", lines: [...chartInfoMatchLines(result.matches), ...chartInfoSuggestionLines(result, capabilityHints.chartViewCommand)], footer: "" };
     }
     const match = result.matches[0];
-    const position = CHART_INFO_DIFFICULTY_POSITIONS[match.difficultyId];
-    const file = index.find(match.song.id, position);
+    const file = index.find(match.song.id, match.difficultyId);
     if (!file) {
       return text("本地游戏数据里没有找到 id" + match.song.id + " " + escapeText(match.song.name) + " 的 " + match.difficultyName +
-        " 谱面文件（" + String(match.song.id).padStart(4, "0") + "_0" + position + ".ogkr）。");
+        " 谱面文件（" + chartFiles.chartFileName(match.song.id, match.difficultyId) + "）。");
     }
     return {
       kind: "image", key: "chartview", label: "正在生成谱面图", failText: "谱面图生成失败：",
