@@ -363,6 +363,8 @@
     bullet: { NML: "#ff3fae", STR: "#8f46e6", DNG: "#ff8a2a" },
   };
 
+  const FLOOR_LIMIT = 40;
+
   // 装饰轨道的颜色号：常见的 0 / 1 / 19 对着游戏画面取红、绿、蓝，其余一律淡紫
   const CL_COLORS = { 0: "#ff4f6e", 1: "#35d68f", 19: "#5aa8ff", other: "#b9a6ff" };
 
@@ -402,9 +404,11 @@
     return out;
   }
 
-  // 地板消失的区间：左墙不在右墙左边（两墙重合、一起瞬移到场外，或左右反转）。
-  // 这时角色只能悬空，游戏画面整片压暗。返回 [{ start, end, inverted }]，inverted = 期间出现过左墙在右墙右边
-  function floorlessRuns(model, from, to) {
+  // 地板消失的区间：左墙越过右墙（左右反转），或者两墙之间整段都在场外（一起瞬移到场外）。
+  // 这时角色只能悬空，游戏画面整片压暗。两墙贴在一起（宽度正好为 0）不算：角色还能站在那条线上。
+  // limit：离中线多远之外不算地板。两墙一起瞬移离场常见 ±48；扫墙时墙会短暂推到 ±36，角色是被推着走的，不算悬空。
+  // 返回 [{ start, end, inverted }]，inverted = 期间出现过左墙在右墙右边
+  function floorlessRuns(model, from, to, limit = FLOOR_LIMIT) {
     const wall = (kind) => model.lanes.filter((lane) => lane.kind === kind).flatMap((lane) => lane.points).sort((a, b) => a.t - b.t);
     const wl = wall("WL"), wr = wall("WR");
     if (wl.length < 2 || wr.length < 2) return [];
@@ -415,15 +419,19 @@
     let run = null;
     const open = (t, inverted) => { if (!run) run = { start: t, end: t, inverted: false }; run.inverted = run.inverted || inverted; };
     const close = (t) => { if (run) { run.end = t; if (run.end > run.start) runs.push(run); } run = null; };
+    // 场内地板宽度 = min(右墙, 场地右缘) − max(左墙, 场地左缘)，小于 0 就是没有地板
+    const width = (l, r) => Math.min(r, limit) - Math.max(l, -limit);
     for (let i = 0; i + 1 < ticks.length; i++) {
       const a = ticks[i], b = ticks[i + 1];
-      // 宽度 = 右墙 − 左墙；区间两端分别取瞬移之后 / 之前的位置
-      const wa = interpolate(wr, a) - interpolate(wl, a), wb = interpolate(wr, b, true) - interpolate(wl, b, true);
-      if (wa > 0 && wb > 0) { close(a); continue; }
-      if (wa <= 0 && wb <= 0) { open(a, wa < 0 || wb < 0); run.end = b; continue; }
+      // 区间两端分别取瞬移之后 / 之前的位置
+      const la = interpolate(wl, a), ra = interpolate(wr, a), lb = interpolate(wl, b, true), rb = interpolate(wr, b, true);
+      const wa = width(la, ra), wb = width(lb, rb);
+      const inverted = la > ra || lb > rb;
+      if (wa >= 0 && wb >= 0) { close(a); continue; }
+      if (wa < 0 && wb < 0) { open(a, inverted); run.end = b; continue; }
       const tc = a + (b - a) * wa / (wa - wb);   // 宽度过零的时刻
-      if (wa <= 0) { open(a, wa < 0); close(tc); }
-      else { close(a); open(tc, wb < 0); run.end = b; }
+      if (wa < 0) { open(a, inverted); close(tc); }
+      else { close(a); open(tc, inverted); run.end = b; }
     }
     close(run ? run.end : hi);
     // 相邻（首尾相接）的合并

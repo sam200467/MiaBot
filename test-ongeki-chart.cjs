@@ -265,7 +265,7 @@ test("墙线瞬移：墙封锁停在瞬移之前的位置，不会被拉到跳�
   }
 });
 
-test("地板消失：两墙重合、一起跳到场外、左右反转的区间整栏铺青色并标出", () => {
+test("地板消失：两墙一起跳到场外、左右反转的区间整栏铺青色并标出；两墙贴住不算", () => {
   const model = C.parseOgkr(JUMP_WALLS);
   const T = 1920;
   const runs = C.floorlessRuns(model, 0, 60 * T);
@@ -283,6 +283,16 @@ test("地板消失：两墙重合、一起跳到场外、左右反转的区间�
   assert.match(C.legendSvg("block"), /class="block"/);
   // 正常张开的墙没有悬空区间
   assert.deepEqual(C.floorlessRuns(C.parseOgkr(SAMPLE), 0, 20 * T), []);
+  // 两墙贴在一起（左墙扫到右墙上，宽度正好为 0）：角色还能站在那条线上，不算悬空（Event Horizon 第 29 小节后）
+  const touch = C.parseOgkr(["[HEADER]", "TRESOLUTION\t1920", "[LANE]",
+    "WLS\t40\t29\t1280\t-24", "WLN\t40\t30\t0\t-24", "WLN\t40\t30\t555\t24", "WLN\t40\t30\t960\t24", "WLN\t40\t30\t960\t-24", "WLE\t40\t30\t1680\t-24",
+    "WRS\t167\t29\t1280\t24", "WRE\t167\t30\t1680\t24", "[NOTES]", "TAP\t0\t29\t0\t0\t0"].join("\n"));
+  assert.deepEqual(C.floorlessRuns(touch, 0, 40 * T), []);
+  // 扫墙：两墙一起被推到 x=36 贴住片刻（场外一点点），角色被推着走，不算悬空（Event Horizon unit 68）
+  const sweep = C.parseOgkr(["[HEADER]", "TRESOLUTION\t1920", "[LANE]",
+    "WLS\t90\t68\t0\t-24", "WLN\t90\t68\t145\t36", "WLN\t90\t68\t200\t36", "WLE\t90\t68\t480\t-24",
+    "WRS\t214\t68\t0\t24", "WRN\t214\t68\t130\t36", "WRN\t214\t68\t260\t36", "WRE\t214\t68\t480\t24", "[NOTES]", "TAP\t0\t68\t0\t0\t0"].join("\n"));
+  assert.deepEqual(C.floorlessRuns(sweep, 0, 70 * T), []);
 });
 
 function tempTree(files) {
