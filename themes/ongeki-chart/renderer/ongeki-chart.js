@@ -242,7 +242,7 @@
   }
 
   const DEFAULTS = {
-    measurePx: 196,         // 一个 4/4 小节的高度
+    measurePx: 240,         // 一个 4/4 小节的高度
     columnMeasures: 4,      // 一栏约放几个 4/4 小节
     xMin: -30, xMax: 30,    // 显示的横向范围
     unitPx: 2.5,            // 每个 X 单位的像素
@@ -598,7 +598,8 @@
     const start = (left + right) / 2 - (count - 1) * step / 2;
     for (let i = 0; i < count; i++) {
       const cx = start + i * step;
-      out.push(`<polyline class="flick-arrow${crit}" points="${f1(cx + d * 1.5)},${f1(y - 11)} ${f1(cx - d * 1.5)},${f1(y - 7.5)} ${f1(cx + d * 1.5)},${f1(y - 4)}"/>`);
+      // 尖端朝 dir 那边：左 ≪、右 ≫
+      out.push(`<polyline class="flick-arrow${crit}" points="${f1(cx - d * 1.5)},${f1(y - 11)} ${f1(cx + d * 1.5)},${f1(y - 7.5)} ${f1(cx - d * 1.5)},${f1(y - 4)}"/>`);
     }
     return out.join("");
   }

@@ -191,6 +191,18 @@ test("空谱面和坏行不会抛错", () => {
   assert.match(C.renderSvg(model, layout), /^<svg/);
 });
 
+test("FLICK 箭头朝向：L 画 ≪，R 画 ≫（尖端在拍点那一侧）", () => {
+  const model = C.parseOgkr(SAMPLE);
+  const svg = C.renderSvg(model, C.layoutChart(model));
+  const apex = (cls) => {
+    const m = new RegExp(`<polyline class="${cls}" points="([^"]+)"`).exec(svg);
+    const [[x1], [x2]] = m[1].split(" ").map((p) => p.split(",").map(Number));
+    return Math.sign(x2 - x1);   // 中点在两端左边 = ≪
+  };
+  assert.equal(apex("flick-arrow"), -1);        // FLK … L
+  assert.equal(apex("flick-arrow crit"), 1);    // CFK … R
+});
+
 function tempTree(files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ogkr-index-"));
   for (const [name, content] of Object.entries(files)) {
