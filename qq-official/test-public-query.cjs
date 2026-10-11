@@ -330,3 +330,29 @@ test("同名不同曲的歌不互相借对手；曲库里只剩白谱的已删�
   const setsugekka = run([filter("title", "eq", "回レ！雪月花")], { entity: "charts", select: ["title", "botId"] }).entries.flatMap(e => e.rows);
   assert.deepEqual(setsugekka.map(r => `${r.difficulty}:${r.botId}:${r.supplemental}`), ["BAS:25:true", "ADV:25:true", "EXP:25:true", "MAS:25:true", "LUN:8058:false"]);
 });
+
+test("曲名字形：「全是数字的歌」用 charset 筛，查得到《39》《2112410403927243233368》", () => {
+  // 群里实测「有首歌全是数字的是什么歌」：schema 表达不了，复核两轮都没过，回「这次查询条件没能核对好」。
+  const digits = all({ filters: [filter("title", "charset", "digits")], select: ["title"] }).map(e => e.title).sort();
+  assert.deepEqual(digits, ["2112410403927243233368", "39"]);
+  assert.match(formatResult(run([filter("title", "charset", "digits")])), /歌名全是数字/);
+  // 纯符号的《∀》不算任何一类；纯数字的不算英文
+  assert.ok(!all({ filters: [filter("title", "charset", "latin")] }).some(e => ["∀", "39"].includes(e.title)));
+  assert.ok(all({ filters: [filter("title", "charset", "latin")] }).some(e => e.title === "Air"));
+  assert.throws(() => validateQuery({ filters: [filter("title", "charset", "emoji")] }), /charset 只能是/);
+  // 模型拿 contains/search 凑数时点名改成 charset
+  const wrong = validateQuery({ filters: [filter("title", "search", "数字")], select: ["title"] });
+  assert.match(queryMismatch(wrong, "有首歌全是数字的是什么歌"), /charset/);
+  assert.ok(!queryMismatch(validateQuery({ filters: [filter("title", "charset", "digits")], select: ["title"] }), "有首歌全是数字的是什么歌"));
+  assert.ok(!queryMismatch(validateQuery({ filters: [filter("title", "search", "39")], select: ["title"] }), "39是什么歌"));
+});
+
+test("曲名字形：希腊字母和纯符号", () => {
+  const titles = value => all({ filters: [filter("title", "charset", value)], select: ["title"] }).map(e => e.title).sort();
+  assert.deepEqual(titles("greek"), ["Ἀταραξία", "μ3", "μάγια", "ω4"].sort());
+  assert.deepEqual(titles("symbol"), ["∀"]);
+  assert.match(queryMismatch(validateQuery({ filters: [filter("title", "search", "希腊")], select: ["title"] }), "有哪些歌是希腊字母名"), /greek/);
+  // 描述一个符号的样子是找那一首，用 search 就对，不逼成 charset
+  assert.ok(!queryMismatch(validateQuery({ filters: [filter("title", "search", "倒A")], select: ["title"] }), "倒A符号的歌是什么"));
+  assert.deepEqual(run([filter("title", "search", "倒A")]).entries.map(e => e.title), ["∀"]);
+});

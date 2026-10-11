@@ -30,7 +30,7 @@ const internalBase = entry => BASE_DIFFICULTIES.flatMap((difficulty, i) => hasLe
 function makeEntry(song, id, main, lunatics) {
   lunatics.sort((a, b) => (a.id ?? Infinity) - (b.id ?? Infinity));
   // 白谱的 ID 也算这首歌的 ID：「id8015」要搜得到《Gate of Doom》，「id8091」要搜得到《Perfect Shining!!》。
-  return { song, title: normalize(song.meta.name), squashed: squash(song.meta.name), id, main, lunatics, ids: [id, ...lunatics.map(l => l.id)] };
+  return { song, title: normalize(song.meta.name), squashed: squash(song.meta.name), readings: core.readingKeys(song.meta.name, normalize), id, main, lunatics, ids: [id, ...lunatics.map(l => l.id)] };
 }
 
 function catalogEntry(song) {
@@ -96,8 +96,8 @@ function search(raw, { uncataloged = false } = {}) {
   const asNumber = Boolean(idMatch && (idMatch[1] || byId.length || sameTitle.length));
   const aliasTitles = asNumber ? null : new Set(core.searchSongs(query).map(s => normalize(s.name)));
   let matches = asNumber ? [...byId, ...sameTitle]
-    : pool.filter(({ title, squashed }) =>
-      title.includes(needle) || (squashedNeedle && squashed.includes(squashedNeedle)) || aliasTitles.has(title));
+    : pool.filter(({ title, squashed, readings }) =>
+      title.includes(needle) || (squashedNeedle && squashed.includes(squashedNeedle)) || core.matchesReading(readings, needle) || aliasTitles.has(title));
   let fuzzy = false;
   if (!matches.length && !asNumber && needle.length >= 3) {
     const limit = needle.length < 5 ? 1 : Math.min(3, Math.floor(needle.length * 0.25));

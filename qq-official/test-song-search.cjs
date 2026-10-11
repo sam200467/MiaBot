@@ -287,3 +287,14 @@ test("翻页按钮绑发起人：data 前面带上 openid，拆得回来；没�
   const keyboard = pagerKeyboard({ page: 1, pages: 2, jump: (p) => `第${p}页`, owner: "U1" });
   assert.deepEqual(keyboard.rows.map((r) => r.buttons.map((b) => b.action.data)), [["mia:U1:第2页"], ["mia:U1:第2页"]]);
 });
+
+test("打不出来的曲名：希腊字母按拼写、《∀》按叫法都搜得到", () => {
+  const names = q => search(q).matches.map(s => s.meta.name);
+  for (const [q, title] of [["ataraxia", "Ἀταραξία"], ["magia", "μάγια"], ["mu3", "μ3"], ["omega4", "ω4"], ["Ω", "ω4"],
+    ["alteration", "Λlteration"], ["azure vixen", "Λzure Vixen"], ["fear titan", "Op.I《fear-TITΛN-》"],
+    ["倒A", "∀"], ["倒A符号的歌", "∀"], ["for all", "∀"], ["全称量词", "∀"]]) {
+    assert.ok(names(q).includes(title), `${q} → ${JSON.stringify(names(q))}`);
+  }
+  // 叫法只认符号那几首，不把单个字母「a」也当成《∀》
+  assert.ok(!names("a").includes("∀"));
+});

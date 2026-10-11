@@ -90,7 +90,7 @@ function textNamesCharacter(text, name) {
 const DIFFICULTIES = ["BAS", "ADV", "EXP", "MAS", "LUN"];
 const PAGE_SIZE = 8;
 const fields = {
-  title: { label: "歌名", type: "text", note: "prefix=开头，contains=包含，eq=完整歌名；search 才允许别名/ID/拼写候选" },
+  title: { label: "歌名", type: "text", note: "prefix=开头，contains=包含，eq=完整歌名；search 才允许别名/ID/拼写候选；charset=曲名的字全是某类字符（digits 数字/latin 英文字母/greek 希腊字母/kana 假名/han 汉字/symbol 没有字母数字、整条是符号，空格和标点不算），比如「全是数字的歌」用 charset digits；用户描述一个符号或希腊字母的读法（倒A、omega）用 search" },
   artist: { label: "艺术家署名", type: "text" },
   genre: { label: "分类", type: "text" },
   version: { label: "收录版本", type: "text" },
@@ -120,9 +120,25 @@ const operations = {
   level: ["eq", "ne", "gt", "gte", "lt", "lte", "in"],
   character: ["eq", "ne", "in"],
 };
+// 「全是数字的歌」这种按曲名字形问的，prefix/contains 都表达不了。模型只能编出不支持的写法，复核两轮都过不了校验，
+// 群里实测回「这次查询条件没能核对好」（曲库里明明有《39》《2112410403927243233368》）。
+// 只看字母和数字：空格、标点、符号不算，至少得有一个字。《∀》这种一个字母数字都没有的归 symbol。
+const CHARSETS = {
+  digits: /^\p{Nd}$/u,
+  latin: /^[\p{Script=Latin}\p{Nd}]$/u,
+  kana: /^[\p{Script=Hiragana}\p{Script=Katakana}ー\p{Nd}]$/u,
+  han: /^[\p{Script=Han}\p{Nd}]$/u,
+  greek: /^[\p{Script=Greek}\p{Nd}]$/u,
+};
+const CHARSET_LABELS = { digits: "数字", latin: "英文字母", greek: "希腊字母", kana: "假名", han: "汉字", symbol: "符号" };
+function titleCharset(title, charset) {
+  const chars = [...String(title ?? "").normalize("NFKC")].filter(c => /[\p{L}\p{N}]/u.test(c));
+  if (charset === "symbol") return chars.length === 0 && /\S/.test(String(title ?? ""));
+  return chars.length > 0 && chars.every(c => CHARSETS[charset].test(c)) && (charset === "digits" || chars.some(c => !/\p{Nd}/u.test(c)));
+}
 const SCHEMA = {
   game: "ongeki", fields,
-  operations: { ...operations, titleOnly: ["search"] },
+  operations: { ...operations, titleOnly: ["search", "charset"] },
   query: { filters: [{ field: "title", op: "prefix", value: "ai" }], entity: "songs或charts", select: ["title", "constant"], mode: "list或count", page: 1, sort: { field: "title", direction: "asc或desc" }, selection: { kind: "all或first或random", count: "first/random必填，1到50的整数；all省略", excludePrevious: false } },
   rules: "用户问歌曲的 id/ID 时选 botId（分表用短 ID），只有明确问官方曲目 ID 才选 officialId。filters 全部为 AND，in 的数组为 OR；每条谱面必须同时满足所有条件，不能拿红谱的等级配紫谱的定数。selection决定筛选后怎么选：随机/随便/任意选N项用random+count=N，前N项用first+count=N，列全部用all且不填count。换一批/排除刚才的用excludePrevious=true。排序后取前几项才是first；随机从完整候选池不放回抽取，不是第一分页。count模式统计全部候选，不与抽样混用。只支持上述字段，不支持的条件不能丢弃，应具体说明或追问。歌曲计数去重，谱面计数不去重。新查询page=1；翻页沿用完整条件和同一批抽样。空结果不放宽条件。",
 };
@@ -159,7 +175,8 @@ function validateQuery(input) {
   if (!Array.isArray(input.filters) || input.filters.length > 12) reject("需要 filters 条件列表，最多 12 项");
   const filters = input.filters.map(f => {
     if (!f || Object.keys(f).some(k => !["field", "op", "value"].includes(k)) || !Object.hasOwn(fields, f.field)) reject("包含未支持的数据库字段");
-    if (!(operations[fields[f.field].type].includes(f.op) || (f.field === "title" && f.op === "search"))) reject(`${fields[f.field].label}不支持这个比较方式`);
+    if (!(operations[fields[f.field].type].includes(f.op) || (f.field === "title" && ["search", "charset"].includes(f.op)))) reject(`${fields[f.field].label}不支持这个比较方式`);
+    if (f.op === "charset") return Object.hasOwn(CHARSET_LABELS, f.value) ? { field: f.field, op: f.op, value: f.value } : reject(`charset 只能是 ${Object.keys(CHARSET_LABELS).join("/")}`);
     if (f.op === "search" && /\s+--page\s+\d+$/i.test(String(f.value))) reject("翻页参数只能放在 query.page，不能混入曲名线索");
     const value = f.op === "in"
       ? (Array.isArray(f.value) && f.value.length && f.value.length <= 12 ? f.value.map(v => scalar(f.field, v)) : reject("in 需要非空数组，最多 12 项"))
@@ -281,6 +298,7 @@ function executeQuery(input, { preview = false, selectionKeys, excludeKeys = [],
   // contains/prefix/eq never inherit the legacy searcher's fuzzy suggestions.
   let fuzzy = false;
   const predicates = query.filters.map(f => {
+    if (f.op === "charset") return row => titleCharset(row.title, f.value);
     if (f.op !== "search") return row => compare(row[f.field], f);
     // 连歌都不在曲库里的白谱也要搜得到：它们在这张表里单独成行，官方曲目 ID 是空的。
     const first = songSearch.search(f.value, { uncataloged: true });
@@ -342,10 +360,10 @@ function executeQuery(input, { preview = false, selectionKeys, excludeKeys = [],
     supplemental: chosen.some(e => e.rows.some(r => r.supplemental)),
     entries: query.mode === "count" ? [] : chosen.slice((query.page - 1) * PAGE_SIZE, query.page * PAGE_SIZE), source: "本地音击曲库快照", updatedAt: catalog.meta?.last_updated_at };
 }
-const opLabels = { eq: "＝", ne: "≠", gt: "＞", gte: "≥", lt: "＜", lte: "≤", contains: "包含", prefix: "开头是", suffix: "结尾是", search: "线索", in: "属于" };
+const opLabels = { eq: "＝", ne: "≠", gt: "＞", gte: "≥", lt: "＜", lte: "≤", contains: "包含", prefix: "开头是", suffix: "结尾是", search: "线索", in: "属于", charset: "全是" };
 const show = value => Array.isArray(value) ? value.join("、") || "未知" : !known(value) ? "未知" : typeof value === "boolean" ? value ? "是" : "否" : String(value);
 function describeQuery(query) {
-  return query.filters.length ? query.filters.map(f => `${fields[f.field].label}${opLabels[f.op]}${show(f.value)}`).join("；") : "全部曲目";
+  return query.filters.length ? query.filters.map(f => `${fields[f.field].label}${opLabels[f.op]}${f.op === "charset" ? CHARSET_LABELS[f.value] : show(f.value)}`).join("；") : "全部曲目";
 }
 function formatResult(result) {
   const { query, total, pages } = result, unit = query.entity === "songs" ? "首" : "张谱面";
@@ -450,6 +468,11 @@ function queryMismatch(query, text, { self } = {}) {
     expected = /开头|開頭|前/.test(match[0]) ? "prefix" : /结尾|結尾|后|後/.test(match[0]) ? "suffix" : "contains";
   }
   if (expected && title.length && !title.some(f => f.op === expected)) return `用户要求歌名 ${expected} 匹配，不能改成其他比较方式或模糊搜索`;
+  // 问曲名字形（全是数字/纯英文……）就得真按字形筛，不能拿「1」开头、包含「0」之类凑一部分交差。
+  const charset = /(?:全是|全都是|都是|纯|純|只有|只含|全部是|全由)\s*(?:阿拉伯)?(?:数字|數字)|(?:数字|數字)组成|(?:歌名|曲名|名字)(?:是|为|叫)?(?:数字|數字)/.test(text) ? "digits" : /(?:全是|全都是|纯|純|只有)\s*(?:英文|英语|字母)/.test(text) ? "latin"
+    : /希腊字母|希臘字母/.test(text) && !/倒|读作|念作|叫/.test(text) ? "greek"
+    : /(?:全是|全都是|纯|純|只有)\s*符号|没有(?:字母|文字)/.test(text) ? "symbol" : null;
+  if (charset && !title.some(f => f.op === "charset" && f.value === charset)) return `用户问曲名全由某类字符组成，歌名用 charset 筛选，value=${charset}`;
   if (/对战相手|對戰相手/.test(text) && !query.filters.some(f => f.field === "opponent") && !query.select.includes("opponent")) return "用户问对战相手，查询必须筛选或返回 opponent，不能只查演唱者";
   return characterMismatch(query, text, self);
 }
