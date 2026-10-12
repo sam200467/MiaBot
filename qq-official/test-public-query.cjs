@@ -450,3 +450,13 @@ test("收录版本认牌子名：辉击＝bright，几种版本写法算同一�
   const red = all({ filters: [filter("version", "eq", "皇击")] });
   assert.ok(red.some(e => e.rows[0].version === "RED Plus") && red.some(e => e.rows[0].version === "オンゲキ R.E.D. PLUS"));
 });
+
+test("收录版本认简称：act2 是现在的 Re:Fresh Act.2，带 memory 的才是 bright MEMORY", () => {
+  const act2 = all({ filters: [filter("version", "eq", "act2")] });
+  assert.ok(act2.length > 0 && act2.every(e => e.rows.every(r => r.version === "オンゲキ Re:Fresh Act.2")));
+  for (const name of ["Act.2", "ACT 2", "Re:Fresh Act.2", "refresh act2", "オンゲキ Re:Fresh Act.2"]) {
+    assert.equal(run([filter("version", "eq", name)]).total, act2.length, name);
+  }
+  assert.equal(run([filter("version", "eq", "memory act2")]).total, run([filter("version", "eq", "闪击")]).total);
+  assert.match(formatResult(run([filter("version", "eq", "act2")])), /^筛选：收录版本＝オンゲキ Re:Fresh Act\.2$/m);
+});

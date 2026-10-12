@@ -95,7 +95,7 @@ const fields = {
   title: { label: "歌名", type: "text", note: "prefix=开头，contains=包含，eq=完整歌名；search 才允许别名/ID/拼写候选；charset=曲名的字全是某类字符（digits 数字/latin 英文字母/greek 希腊字母/kana 假名/han 汉字/symbol 没有字母数字、整条是符号，空格和标点不算），比如「全是数字的歌」用 charset digits；用户描述一个符号或希腊字母的读法（倒A、omega）用 search" },
   artist: { label: "艺术家署名", type: "text" },
   genre: { label: "分类", type: "text" },
-  version: { label: "收录版本", type: "text", note: "可以直接写版本牌子名（辉击、闪击、赤击……）或版本名（bright、R.E.D. PLUS），程序会换成对应版本；问某个牌子收了哪些歌用 eq" },
+  version: { label: "收录版本", type: "text", note: "可以直接写版本牌子名（辉击、闪击、赤击……）或版本名（bright、R.E.D. PLUS、Re:Fresh Act.2），程序会换成对应版本；只说 act1/act2 的照原话写，指当前的 Re:Fresh 系列；问某个牌子收了哪些歌用 eq" },
   release: { label: "收录日期", type: "date", note: "YYYY-MM-DD；没有记录就未知" },
   bpm: { label: "BPM", type: "number" },
   deleted: { label: "已删除", type: "boolean" },
@@ -151,12 +151,19 @@ const SCHEMA = {
 
 // 收录版本的写法很乱：曲库里同一个版本有「オンゲキ R.E.D. PLUS」「RED Plus」两种，bright 也有不带前缀的。
 // 比较时去掉 オンゲキ/ONGEKI 前缀、空格和点，大小写不分，这几种写法就成了同一个键。
-const versionKey = value => String(value ?? "").normalize("NFKC").toLowerCase().replace(/^(?:オンゲキ|ongeki)/, "").replace(/[\s.]/g, "") || "ongeki";
+const versionKey = value => String(value ?? "").normalize("NFKC").toLowerCase().replace(/^(?:オンゲキ|ongeki)/, "").replace(/[\s.:]/g, "") || "ongeki";
 // 群友说的多半是牌子名（「辉击这个牌子对应哪个版本」），曲库里只有版本名，原来按「收录版本＝辉击」筛必然 0 首。
 // 牌子表跟 /牌子 共用 mia-core 的 PLATE_CHOICES；繁简、日文写法（輝撃）都认，尾巴上的「牌子」「版本」不算。
 function plateByName(value) {
   const key = foldHan(value).replace(/\s+/g, "").replace(/(?:的)?(?:牌子|牌|版本)$/, "");
   return key ? PLATE_CHOICES.find(p => [p.nameZhHans, p.nameJa].some(name => foldHan(name) === key)) ?? null : null;
+}
+// 还没有牌子名的版本按简称认。只说「act2」指的是现在的 Re:Fresh 系列：bright MEMORY 那几个 Act 有牌子（耀击/闪击/想击），
+// 群友问它们会说牌子名或带上 memory。
+function versionByAlias(value) {
+  const key = versionKey(value), act = key.match(/^(?:(refresh|rf)|(brightmemory|memory|bm))?act(\d)$/);
+  if (!act) return null;
+  return act[2] ? `オンゲキ bright MEMORY Act.${act[3]}` : `オンゲキ Re:Fresh Act.${act[3]}`;
 }
 const plateForVersion = value => PLATE_CHOICES.find(p => versionKey(p.version) === versionKey(value)) ?? null;
 
@@ -180,7 +187,7 @@ function scalar(field, value) {
   } else {
     if (typeof value !== "string" || !value.trim() || value.length > 120) reject(`${spec.label}需要有效文字`);
     value = value.normalize("NFKC").trim();
-    if (field === "version") value = plateByName(value)?.version ?? value;
+    if (field === "version") value = plateByName(value)?.version ?? versionByAlias(value) ?? value;
     if (spec.type === "enum" && !spec.values.includes(value)) reject(`${spec.label}必须是 ${spec.values.join("/")}`);
     if (spec.type === "level" && !/^(?:[1-9]|1[0-5])\+?$/.test(value)) reject("显示等级用 13 或 13+ 这样的写法，不能混成定数");
     if (spec.type === "date" && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value)) reject("日期需要 YYYY-MM-DD");
