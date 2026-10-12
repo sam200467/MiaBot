@@ -1,0 +1,284 @@
+@font-face {
+  font-family: "Noto CJK";
+  src: url("../../shared/fonts/NotoSansCJKsc-Regular.otf") format("opentype");
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Noto CJK";
+  src: url("../../shared/fonts/NotoSansCJKsc-Bold.otf") format("opentype");
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "Gakusan Maru";
+  src: url("../../shared/fonts/FOT-GMARUGOPRO-DB.OTF") format("opentype");
+  font-weight: 700;
+  font-display: block;
+}
+
+:root {
+  --page: #eceff6;
+  --ink: #1d2433;
+  --muted: #6c7489;
+  --card: #ffffff;
+  --line: #dfe3ec;
+  --column: #1c2232;
+  --diff: #9b63ea;
+  font-family: "Noto CJK", "Microsoft YaHei", "PingFang SC", sans-serif;
+  color: var(--ink);
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; background: var(--page); }
+
+#sheet {
+  display: inline-block;
+  min-width: 1240px;
+  padding: 36px 40px 22px;
+  background:
+    radial-gradient(1200px 360px at 0 0, color-mix(in srgb, var(--diff) 14%, transparent), transparent 70%),
+    var(--page);
+}
+
+/* ---------------- 头部 ---------------- */
+.hero {
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr) auto;
+  gap: 28px;
+  align-items: stretch;
+  padding: 22px;
+  margin-bottom: 26px;
+  background: var(--card);
+  border-radius: 20px;
+  box-shadow: 0 1px 0 var(--line), 0 10px 30px rgba(30, 40, 70, .07);
+}
+
+.jacket {
+  width: 196px;
+  height: 196px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #d9def0, #c5cbe0);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .06);
+}
+.jacket img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.jacket img[hidden] { display: none; }
+.jacket:has(img[hidden]) {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--diff) 70%, #fff), var(--diff));
+}
+
+.song { min-width: 0; display: flex; flex-direction: column; }
+.song-top { display: flex; align-items: center; gap: 14px; height: 38px; }
+
+/* 难度、等级、定数同一字号、同一行高，靠基线对齐；等级和定数之间只用竖线和透明度区分。
+   固定行高是为了不让回退字体（假名、汉字）把某一段撑高，导致上下错位。 */
+.difficulty {
+  display: inline-flex;
+  align-items: baseline;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--diff);
+  color: #fff;
+  font: 700 19px/38px "Gakusan Maru", "Noto CJK", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.difficulty span, .difficulty b, .difficulty small { font: inherit; line-height: 38px; }
+.difficulty span { letter-spacing: .06em; }
+.difficulty b {
+  position: relative;
+  margin-left: 13px;
+  padding-left: 13px;
+}
+.difficulty b::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  border-left: 1.5px solid currentColor;
+  opacity: .45;
+}
+.difficulty small { margin-left: 9px; opacity: .78; }
+.difficulty.light { color: #2a2f3d; box-shadow: inset 0 0 0 1.5px #aab0c2; }
+
+.song-id {
+  color: var(--muted);
+  font: 700 19px/38px "Gakusan Maru", "Noto CJK", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+h1 {
+  margin: 12px 0 2px;
+  font: 700 38px/1.18 "Gakusan Maru", "Noto CJK", sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#artist {
+  margin: 0;
+  color: var(--muted);
+  font-size: 17px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 四项的标签与数值各自同一字号、固定行高，横向一排顶端和基线都对齐 */
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 34px;
+  margin: auto 0 0;
+  padding-top: 14px;
+}
+.facts div { display: flex; flex-direction: column; min-width: 0; max-width: 560px; }
+.facts dt {
+  height: 18px;
+  color: var(--muted);
+  font: 400 13px/18px "Noto CJK", "Microsoft YaHei", "PingFang SC", sans-serif;
+  letter-spacing: .04em;
+}
+.facts dd {
+  height: 30px;
+  margin: 3px 0 0;
+  font: 700 22px/30px "Noto CJK", "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-panel { display: flex; flex-direction: column; gap: 14px; justify-content: space-between; }
+
+.counts {
+  display: grid;
+  grid-template-columns: repeat(6, 74px);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.counts li {
+  padding: 8px 0 7px;
+  border-radius: 12px;
+  background: #f3f5fa;
+  text-align: center;
+}
+.counts strong { display: block; font-size: 22px; line-height: 26px; height: 26px; font-variant-numeric: tabular-nums; }
+.counts span { color: var(--muted); font-size: 11px; letter-spacing: .1em; }
+
+.legend {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 6px 14px;
+  margin: 0;
+  padding: 10px 12px;
+  list-style: none;
+  border-radius: 12px;
+  background: var(--column);
+  color: #c9d0e2;
+  font-size: 12.5px;
+}
+.legend li { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.legend svg { flex: none; }
+
+/* ---------------- 谱面 ---------------- */
+.chart svg { display: block; overflow: visible; }
+
+.col-bg { fill: var(--column); }
+.outside { fill: rgba(5, 8, 16, .5); }
+.floorless { fill: rgba(38, 150, 168, .3); }
+.bar { stroke: rgba(255, 255, 255, .22); stroke-width: 1; }
+.beat { stroke: rgba(255, 255, 255, .07); stroke-width: 1; }
+.overlap { fill: #0b0e16; opacity: .55; }
+.seam { stroke: rgba(255, 255, 255, .35); stroke-width: 1; stroke-dasharray: 4 3; }
+
+.rail { fill: none; stroke-width: 1.2; opacity: .3; stroke-linejoin: round; }
+.deco { fill: none; stroke-width: 1; opacity: .45; stroke-linejoin: round; }
+.wall { fill: none; stroke-width: 2; opacity: .95; stroke-linejoin: round; }
+.block { fill: none; stroke: #ff3b4f; stroke-width: 4; stroke-dasharray: 3 3; opacity: .9; }
+.k-L { stroke: #ff4f6e; fill: #ff4f6e; }
+.k-C { stroke: #35d68f; fill: #35d68f; }
+.k-R { stroke: #3fa0ff; fill: #3fa0ff; }
+.k-WL { stroke: #ff6fb5; fill: #ff6fb5; }
+.k-WR { stroke: #a98bff; fill: #a98bff; }
+.rail, .wall, .hold-body { fill: none; }
+
+.hold-body { stroke-width: 7; stroke-opacity: .5; stroke-linejoin: round; stroke-linecap: butt; }
+.hold-body.side { stroke-width: 9; stroke-opacity: .45; }
+.hold-end { stroke: none; opacity: .9; }
+
+.tap { stroke: rgba(10, 14, 24, .7); stroke-width: 1; }
+.tap-shine { fill: rgba(255, 255, 255, .75); stroke: none; }
+.tap.crit { stroke: #ffd447; stroke-width: 2; }
+
+/* 侧键：深色底、墙色描边、白色中线 */
+.side { stroke-width: 1.4; stroke-linejoin: round; }
+.side.k-WL { fill: #6d1747; stroke: #ff6fb5; }
+.side.k-WR { fill: #3e2580; stroke: #b59bff; }
+.side.crit { stroke: #ffd447; stroke-width: 2; }
+.side-mark { stroke: #fff; stroke-width: 1.4; stroke-linecap: round; }
+
+/* FLICK：判定拍上一根细条，箭头在条的上方 */
+.flick { fill: #dfe5f7; stroke: rgba(10, 14, 24, .7); stroke-width: .8; }
+.flick.crit { fill: #ffd447; }
+.flick-arrow { fill: none; stroke: #eef2ff; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.flick-arrow.crit { stroke: #ffd447; }
+
+.bell { fill: #ffc93d; stroke: #6b4700; stroke-width: 1; }
+.bell-core { fill: #fff6cf; stroke: none; }
+
+/* 子弹：形状对应调色板（针形/圆环/方形），颜色对应伤害（普通/硬/危险） */
+.bullet { stroke: rgba(255, 255, 255, .8); stroke-width: .7; stroke-linejoin: round; }
+.bullet.ring { fill: rgba(20, 10, 30, .55); stroke-width: 2; }
+.bullet-glow { fill: rgba(255, 255, 255, .6); stroke: none; }
+.d-NML { fill: #ff3fae; }
+.d-STR { fill: #8f46e6; }
+.d-DNG { fill: #ff8a2a; }
+.ring.d-NML { stroke: #ff3fae; }
+.ring.d-STR { stroke: #9a52f0; }
+.ring.d-DNG { stroke: #ff8a2a; }
+
+.beam { fill: rgba(255, 92, 200, .2); stroke: none; }
+.beam-core { fill: none; stroke: rgba(255, 150, 225, .75); stroke-width: 1.2; }
+
+.sv { stroke: none; }
+.sv-slow { fill: #3cc8e6; }
+.sv-fast { fill: #ff9a3c; }
+.sv-stop { fill: #8a93a8; }
+.sv-reverse { fill: #ff4f6e; }
+.aimed { opacity: .45; }
+
+.measure-no { fill: #8b93a7; font: 700 11px "Noto CJK", sans-serif; }
+.rhythm { fill: #4d5568; font: 700 9.5px "Noto CJK", sans-serif; font-variant-numeric: tabular-nums; }
+.rhythm-tick { stroke: #8b93a7; stroke-width: 1; }
+.bpm-mark { fill: #e07a1f; font: 700 10px "Noto CJK", sans-serif; }
+.meter-mark { fill: #3a8fd6; font: 700 10px "Noto CJK", sans-serif; }
+.event-mark { fill: #9b63ea; font: 700 9px "Noto CJK", sans-serif; }
+.floorless-mark { fill: #3fb6c8; font: 700 9px "Noto CJK", sans-serif; }
+
+/* ---------------- 页脚 ---------------- */
+.credits {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 22px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.credits b { color: var(--ink); }
+.bpm-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin: 0 4px 0 2px;
+  border-radius: 50%;
+  background: #e07a1f;
+}
+
+#render-error { color: #c00; }

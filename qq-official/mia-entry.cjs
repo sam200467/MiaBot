@@ -160,6 +160,11 @@ function loadConfig(file) {
   }
 
   resolveFrom(c, ["workDir", "outputDir", "corePath", "vaultPath", "vaultHelperPath", "aliasDir", "characterDir"]);
+  // 谱面图读本地游戏数据里的 .ogkr，可以填一个目录或目录数组
+  if (c.ongekiChartRoots !== undefined) {
+    const roots = Array.isArray(c.ongekiChartRoots) ? c.ongekiChartRoots : [c.ongekiChartRoots];
+    c.ongekiChartRoots = roots.map((item) => String(item || "").trim()).filter(Boolean).map((item) => path.resolve(HERE, item));
+  }
   if (c.assetBrowser && String(c.assetBrowser.assetRoot || "").trim()) {
     c.assetBrowser.assetRoot = path.resolve(HERE, c.assetBrowser.assetRoot);
   }

@@ -44,6 +44,7 @@ function miaHelp({ webSearch = false, quotedMessage = false, privateChat = true 
     "/是什么歌 <别名/曲名片段>　这个叫法指的是哪首",
     "/查曲绘 <曲名或ID>　找一首歌的曲绘",
     "/谱面分析 <曲名/ID 难度>　分数线与容错图，比如 /谱面分析 id870 master",
+    "/谱面图 <曲名/ID [难度]>　整张谱面的预览长图，不写难度看紫谱，比如 /谱面图 id870 expert",
     "/定数表 <14 或 14.2>　按定数列谱面",
     "/计算 <定数> <技术分> <铃铛> <连击>　算单曲 Rating，比如 /计算 14.2 1000737 fb none",
     "/查看别名 <曲目>　这首歌都有哪些叫法",
@@ -101,6 +102,8 @@ const MIA_HINTS = Object.freeze({
 
   chartInfoUsage: "还差一个难度啦～像 /谱面分析 id870 master，或者 /谱面分析 初音ミクの激唱 lunatic。绿黄红紫白，美亚都认得。",
   chartInfoCommand: "/谱面分析",
+  chartViewUsage: "告诉美亚是哪首歌嘛～像 /谱面图 id870，想看别的难度就在后面加颜色，比如 /谱面图 id870 红。",
+  chartViewCommand: "/谱面图",
   levelUsage: "等级要这样递给美亚：/等级 14、/等级 14+、/等级 14.1 或 /等级 ABFB；想翻页就在后面加 1 到 99。",
   constantUsage: "给美亚一个 0 到 20 的数嘛，整数或一位小数都行——比如 /定数表 14.2。",
   calculateUsage: "四样都要有哦：/计算 <定数> <技术分> <铃铛 none/fb> <连击 none/fc/ab/ab-plus>。比如 /计算 14.2 1000737 fb none。",

@@ -4,7 +4,14 @@ const {execFileSync}=require("node:child_process");
 const root=path.resolve(__dirname,"..");
 const name=process.argv[2]||"MiaBot-render-timeout-update-20261004";
 if(!/^[A-Za-z0-9._-]+$/.test(name))throw new Error("Invalid package name");
-const skipLiveVerification=process.argv.includes("--skip-live-verification");
+// --notes <文件>：本次更新的说明（UTF-8 文本，写「本次变化」和「验收」两段）。给了就用它代替下面那份
+// 2026-10-04 分表超时修复的旧说明，安装、回退部分照旧自动附上；那次的实账号联调闸门也只对旧说明生效。
+// --with-panel：顺带打一份 QQ 指令面板更新工具（Update-Panel.cmd），新增或改名指令时用。
+const flagValue=(flag)=>{const i=process.argv.indexOf(flag);return i<0?null:process.argv[i+1]};
+const notesPath=flagValue("--notes");
+const notes=notesPath?fs.readFileSync(path.resolve(notesPath),"utf8").replace(/^\uFEFF/,"").replace(/\r\n/g,"\n").trimEnd().split("\n"):null;
+const withPanel=process.argv.includes("--with-panel");
+const skipLiveVerification=process.argv.includes("--skip-live-verification")||Boolean(notes);
 let liveVerified=false;
 if(!skipLiveVerification){
   const proof=JSON.parse(fs.readFileSync(path.join(root,"output","otogame-live-20261003","verification.json"),"utf8"));
@@ -26,10 +33,31 @@ const version=fs.readFileSync(path.join(root,"app-template.js"),"utf8").match(/c
 if(!version)throw new Error("Missing core version");
 const entryBytes=fs.readFileSync(entry);
 fs.writeFileSync(path.join(payload,"mia-entry.cjs"),entryBytes);
-fs.writeFileSync(path.join(out,"manifest.json"),JSON.stringify({name,version,kind:"core-and-entry",platform:"win32-x64",dataSources:["u.otogame.net","rinnet"],constantSources:{otogame:"server-rating-inference-only",rinnet:"server-music-catalog-only"},liveVerified,verificationStatus:liveVerified?"passed":"pending-server-validation",files:[{path:"qq-official/ongeki-core.exe",bytes:bytes.length,sha256:hash},{path:"qq-official/mia-entry.cjs",bytes:entryBytes.length,sha256:crypto.createHash("sha256").update(entryBytes).digest("hex")}]},null,2)+"\n");
+fs.writeFileSync(path.join(out,"manifest.json"),JSON.stringify({name,version,kind:"core-and-entry",platform:"win32-x64",...(notes?{}:{dataSources:["u.otogame.net","rinnet"],constantSources:{otogame:"server-rating-inference-only",rinnet:"server-music-catalog-only"}}),liveVerified,verificationStatus:liveVerified?"passed":"pending-server-validation",files:[{path:"qq-official/ongeki-core.exe",bytes:bytes.length,sha256:hash},{path:"qq-official/mia-entry.cjs",bytes:entryBytes.length,sha256:crypto.createHash("sha256").update(entryBytes).digest("hex")}]},null,2)+"\n");
 for(const file of ["Apply-Update.ps1","Restore-Backup.ps1"])fs.copyFileSync(path.join(__dirname,"core-update",file),path.join(out,file));
 fs.writeFileSync(path.join(out,"Apply-Update.cmd"),'@echo off\r\nif "%~1"=="" (\r\n powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Apply-Update.ps1"\r\n) else (\r\n powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Apply-Update.ps1" -TargetRoot "%~1"\r\n)\r\nif errorlevel 1 (echo UPDATE FAILED. Read the error above.)\r\npause\r\n');
-const readme=[
+if(withPanel){
+  execFileSync(process.execPath,[path.join(root,"node_modules/esbuild/bin/esbuild"),path.join(root,"qq-official/register-panel-update.cjs"),"--bundle","--platform=node","--format=cjs","--target=node22","--external:bufferutil","--external:utf-8-validate","--outfile="+path.join(out,"panel","register-panel-update.cjs")],{stdio:"inherit",windowsHide:true});
+  fs.writeFileSync(path.join(out,"Update-Panel.cmd"),'@echo off\r\nset "ROOT=%~1"\r\nif "%ROOT%"=="" set "ROOT=C:\\MiaBot\\deploy-windows-server"\r\nnode "%~dp0panel\\register-panel-update.cjs" "%ROOT%\\qq-official\\config.local.json"\r\nif errorlevel 1 (echo PANEL UPDATE FAILED. The bot itself is not affected; retry later.)\r\npause\r\n');
+}
+const commonInstall=[
+"安装",
+"1. 完整解压更新包到独立目录。暂停自动重启任务，停止机器人，并等待出图任务结束。",
+"2. 默认路径可双击 Apply-Update.cmd。自定义路径在 PowerShell 中执行：",
+'powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\Apply-Update.ps1 -TargetRoot "D:\\实际部署目录"',
+"加 -CheckOnly 可仅检查，不修改部署文件。",
+"3. 看到 UPDATE COMPLETE 后，用原启动方式启动机器人，再恢复自动重启任务。",
+"",
+"安装程序按 config.local.json 的 corePath 定位核心，同时更新 qq-official/mia-entry.cjs。两者一并备份和回退，保留账号绑定、配置、别名、曲绘缓存及所有其他程序。",
+...(withPanel?["","指令面板（可选）","机器人启动后双击 Update-Panel.cmd（自定义路径：Update-Panel.cmd \"D:\\实际部署目录\"），把新指令加进 QQ 群的指令面板。面板更新失败不影响机器人本身，直接打字发指令照样可用。"]:[]),
+"",
+"回退",
+"停止机器人后，使用安装程序打印的 Backup 路径执行：",
+'powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\Restore-Backup.ps1 -TargetRoot "D:\\实际部署目录" -BackupPath "D:\\实际部署目录\\update-backups\\本次备份目录"',
+"",
+"包中只含核心及安装工具，个人成绩、账号、密码、令牌、曲绘缓存均未打包。"
+];
+const readme=notes?[...notes,"",...commonInstall]:[
 "MiaBot 分表下载超时修复（2026-10-04，v4.1.6）",
 "适用于已部署的 Windows x64 MiaBot，同时更新 QQ 入口与出图核心。默认部署根目录：C:\\MiaBot\\deploy-windows-server。",
 "",

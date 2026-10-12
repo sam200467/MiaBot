@@ -67,7 +67,7 @@ const BROWSER_CANDIDATES = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
 ];
-const VERSION = "4.1.9-level0-rating";
+const VERSION = "4.2.0-chart-view";
 
 // 开发模式（node ongenki-exe.js 直跑）时用 cwd，exe 模式用 exe 所在目录；
 // GUI 会把核心解压到临时目录运行，用 ONGEKI_APP_DIR 指回 GUI 所在目录（配置文件放那里）
@@ -2783,6 +2783,118 @@ async function runConstantTableJobData(job){
   if(job.streamOutput) console.log('CONSTANT_OUTPUT_BASE64:'+name+':'+image.toString('base64'));
   else {const output=path.join(job.saveDir || appDir,name);fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,image);console.log('CONSTANT_OUTPUT_FILE:'+output)}
 }
+// 谱面图：谱面文件由调用方（mia-core）从本地游戏数据里读好，经 stdin 交进来；
+// 核心只补曲目信息和曲绘，解析、排版、绘制都在 ongeki-chart 主题里完成。
+const CHART_PREVIEW_MAX_BYTES = 4 * 1024 * 1024;
+
+function buildChartPreviewThemeData(song, difficultyId, ogkr) {
+  const definition = chartInfoDefinition(difficultyId);
+  if (!definition) throw new Error(`不支持的谱面难度 ID：${difficultyId}`);
+  const position = definition.position;
+  const catalogIndex = buildThemeCatalogIndex();
+  const meta = findSongSupplement(catalogIndex, song)?.meta || {};
+  const imageUrl = String(meta.image_url || "").trim();
+  const level = song?.level?.[position];
+  const constant = Number(song?.const?.[position]);
+  const noteCount = Number(song?.noteTotal?.[position]);
+  const bellCount = Number(song?.bellTotal?.[position]);
+  return {
+    song: {
+      songId: Number(song.id),
+      title: String(song.name || ""),
+      artist: String(song.artistName || meta.artist || ""),
+      jacketUrl: imageUrl ? SONG_JACKET_URL + encodeURIComponent(imageUrl) : songJacketPlaceholder(song?.name, song?.id),
+    },
+    chart: {
+      difficultyId: Number(difficultyId),
+      difficulty: definition.name,
+      level: level != null && String(level) !== "-" ? String(level) : "",
+      constant: Number.isFinite(constant) && constant > 0 ? constant : null,
+      designer: song.creator?.[position] || "",
+      noteCount: Number.isFinite(noteCount) && noteCount > 0 ? noteCount : null,
+      bellCount: Number.isFinite(bellCount) && bellCount >= 0 ? bellCount : null,
+    },
+    ogkr,
+  };
+}
+
+async function runChartPreviewJobData(job) {
+  if (!job || typeof job !== "object") throw new Error("谱面图任务参数格式无效");
+  const songId = Number(job.songId);
+  const difficultyId = Number(job.difficultyId);
+  if (!Number.isInteger(songId) || songId <= 0) throw new Error("谱面图任务缺少有效 Song ID");
+  if (!chartInfoDefinition(difficultyId)) throw new Error("谱面图任务缺少有效难度");
+  const ogkr = typeof job.ogkr === "string" ? job.ogkr : "";
+  if (!ogkr.trim()) throw new Error("谱面图任务缺少谱面文件内容");
+  if (Buffer.byteLength(ogkr, "utf8") > CHART_PREVIEW_MAX_BYTES) throw new Error("谱面文件过大");
+  const song = buildThemeCatalogIndex().internalById.get(songId);
+  if (!song) throw new Error("内置曲库中不存在 Song ID " + songId);
+  const data = await localizeJackets(buildChartPreviewThemeData(song, difficultyId, ogkr));
+  console.log(`[1/2] 已定位 id${song.id} ${song.name} ${data.chart.difficulty}`);
+  const image = await renderChartPreviewTheme(data);
+  const outName = `音击谱面图_${safeFilePart(song.name)}_${data.chart.difficulty}_id${song.id}_${timestamp()}.jpg`;
+  if (job.streamOutput) {
+    console.log(`[2/2] ✓ 已输出（${Math.round(image.length / 1024)} KB）`);
+    console.log(`CHART_PREVIEW_OUTPUT_BASE64:${outName}:${image.toString("base64")}`);
+  } else {
+    const saveDir = job.saveDir || appDir;
+    fs.mkdirSync(saveDir, { recursive: true });
+    const outPath = path.join(saveDir, outName);
+    fs.writeFileSync(outPath, image);
+    console.log(`[2/2] ✓ 已保存: ${outPath}（${Math.round(image.length / 1024)} KB）`);
+    console.log(`CHART_PREVIEW_OUTPUT_FILE:${outPath}`);
+  }
+  console.log("CHART_PREVIEW_JOB_DONE");
+}
+
+async function renderChartPreviewTheme(data) {
+  const themeDir = ensureLocalThemeFiles();
+  const rendererDir = path.join(themeDir, "ongeki-chart", "renderer");
+  const htmlPath = path.join(rendererDir, "theme.html");
+  if (!fs.existsSync(htmlPath)) throw new Error("内置主题缺少 ongeki-chart/renderer/theme.html");
+  const dataPath = path.join(rendererDir, "preview-data.js");
+  fs.writeFileSync(dataPath, `window.__THEME_DATA__ = ${JSON.stringify(data)};\n`, "utf8");
+
+  let browser = null;
+  let cdp = null;
+  try {
+    browser = await launchEdge({ headless: true });
+    cdp = new CDP(browser.wsUrl);
+    await cdp.connect();
+    await cdp.send("Page.enable");
+    await cdp.send("Runtime.enable");
+    await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
+    await cdp.navigate(pathToFileURL(htmlPath).href);
+    await waitForLocalTheme(cdp, 120000);
+    // 图的尺寸取决于谱面长度，由主题排完版后报出来
+    const size = await cdp.evaluate(`window.__THEME_SIZE__ || null`);
+    const width = Math.min(4000, Math.max(800, Math.ceil(Number(size?.width) || 0)));
+    const height = Math.min(9000, Math.max(600, Math.ceil(Number(size?.height) || 0)));
+    console.log(`  正在渲染 ${width}×${height} 谱面图…`);
+    await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+    await sleep(150);
+    const shot = await cdp.send("Page.captureScreenshot", {
+      format: "jpeg",
+      quality: 90,
+      fromSurface: true,
+      captureBeyondViewport: true,
+      clip: { x: 0, y: 0, width, height, scale: 1 },
+    });
+    const buffer = Buffer.from(shot.data || "", "base64");
+    if (buffer.length < 1000) throw new Error("谱面图截图数据异常（文件过小）");
+    console.log(`  ✓ 谱面图渲染完成（${Math.round(buffer.length / 1024)} KB）`);
+    return buffer;
+  } finally {
+    cdp?.close();
+    if (browser) {
+      killBrowser(browser.proc);
+      await sleep(300);
+      try { fs.rmSync(browser.userDataDir, { recursive: true, force: true }); } catch {}
+    }
+    try { if (fs.existsSync(dataPath)) fs.rmSync(dataPath, { force: true }); } catch {}
+  }
+}
+
 async function renderConstantTableTheme(data) {
   const themeDir = ensureLocalThemeFiles();
   const rendererDir = path.join(themeDir, "constant-table", "renderer");
@@ -3744,7 +3856,8 @@ async function main() {
         abfbTheme.charts.some((chart) => !chart.isAllBreak || !chart.isFullBell) ||
         !abfbTheme.charts.some((chart) => chart.difficultyId === 10) ||
         abfbTheme.charts[0]?.difficultyId !== 10 || !abfbSortValid ||
-        level0Charts.length < 20 || !level0Charts.some((chart) => chart.difficultyId === 10) ||
+        // 愚人节限定白谱标为下线（286ffbf）之后在线的 LEVEL 0 只剩 19 张；这里只防「筛选整个坏掉」，不卡具体张数
+        level0Charts.length < 15 || !level0Charts.some((chart) => chart.difficultyId === 10) ||
         level0Charts.some((chart) => ["unavailable", "deleted", "removed"].includes(String(chart.song?.status || "").toLowerCase())) ||
         level14Charts.length < 150 || !level14Charts.some((chart) => completionIsBonusTrack(chart.song)) ||
         !level14Charts.some((chart) => chart.difficultyId === 2) ||
@@ -3820,6 +3933,15 @@ async function main() {
     }
   }
 
+  if (args.includes("--chart-preview-job-stdin")) {
+    try {
+      await runChartPreviewJobData(await readJsonFromStdin());
+      process.exit(0);
+    } catch (e) {
+      console.error("CHART_PREVIEW_JOB_ERROR: " + (e.message || e));
+      process.exit(1);
+    }
+  }
   if (args.includes("--constant-job-stdin")) {
     try { await runConstantTableJobData(await readJsonFromStdin()); process.exit(0); }
     catch(e) { console.error('CONSTANT_JOB_ERROR: '+e.message); process.exit(1); }
