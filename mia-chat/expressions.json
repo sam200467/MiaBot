@@ -837,6 +837,22 @@
    "requiresMatchingContext": true,
    "weight": 1,
    "inspection": "目视检查"
+  },
+  {
+   "id": "belly_laugh",
+   "previewNumber": 47,
+   "label": "捧腹大笑",
+   "file": "emojis/47_捧腹大笑.jpg",
+   "width": 600,
+   "height": 600,
+   "bytes": 63764,
+   "animated": false,
+   "emotions": ["happy", "playful"],
+   "usage": "拿着手机、捂着肚子笑到浑身发抖，眼泪都笑出来了：群友讲了好笑的事、发了离谱的梗图或段子，被戳中笑点时用，就是「笑死」「哈哈哈哈」。强度很高，普通的开心用不着它。**对方真的倒霉、难过或在抱怨（没打好、掉分）时别发，会变成嘲笑。**",
+   "autoEligible": true,
+   "requiresMatchingContext": true,
+   "weight": 1,
+   "inspection": "目视检查"
   }
  ]
 }
