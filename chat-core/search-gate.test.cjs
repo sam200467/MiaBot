@@ -190,13 +190,14 @@ test("explicit：闲聊零额外调用，回复模型也不再被要求抽 factQ
 
 test("explicit：明说要搜就按模型抽的检索词搜一次，资料进回复提示词", async () => {
   const model = fakeModel({ observe: obs({ target: "CHUNITHM 最新版本", fresh: true }), reply: { text: "查到啦，是 X-VERSE♪", emotion: "happy", scene: "explanation", expressionIds: [], sourceIds: ["S1"] } });
-  const web = fakeWeb();
+  const web = fakeWeb([{ title: "CHUNITHM 最新版本一览", url: "https://example.com/chunithm", chunks: [{ text: "CHUNITHM 的最新版本是 X-VERSE。" }], snippet: "CHUNITHM 最新版本" },
+    { title: "CHUNITHM X-VERSE 稼働", url: "https://example.com/xverse", chunks: [{ text: "CHUNITHM X-VERSE……" }], snippet: "CHUNITHM" }]);
   const result = await requestReply(settingsWith({ mode: "explicit" }), say("帮我搜一下 CHUNITHM 最新版本"), { fetchImpl: model.fetchImpl, webFetchImpl: web.webFetchImpl });
   assert.equal(model.calls.gate.length, 1);
   assert.equal(web.calls.length, 1);
   assert.equal(web.calls[0].body.text_query, "CHUNITHM 最新版本");
   assert.match(promptOf(model.calls.reply[0]), /【程序联网检索：程序替你查了「CHUNITHM 最新版本」/);
-  assert.equal(result.searchGate.searched.sourceCount, 1);
+  assert.equal(result.searchGate.searched.sourceCount, 2, "相关结果够两条就不补搜");
   assert.match(result.text, /example\.com\/chunithm/, "模型引用了 S1，链接由程序附上");
   assert.equal(result.searchState.lastTarget.target, "CHUNITHM 最新版本");
 });
@@ -307,8 +308,9 @@ test("搜回来的结果和对象一个词都不沾，就不算资料", async ()
   const model = fakeModel({ observe: obs({ target: "CHUNITHM 最新版本" }) });
   const web = fakeWeb([{ title: "宝宝黄疸 16.5 怎么办", url: "https://example.com/baby", chunks: [{ text: "黄疸……" }], snippet: "黄疸" }]);
   const result = await requestReply(settingsWith({ mode: "explicit" }), say("帮我搜一下 CHUNITHM 最新版本"), { fetchImpl: model.fetchImpl, webFetchImpl: web.webFetchImpl });
+  assert.equal(web.calls.length, 2, "一条都不相关：换日文写法补搜一次");
   assert.equal(result.searchGate.searched.sourceCount, 0);
-  assert.equal(result.sourceStats.retrieved, 1);
+  assert.equal(result.sourceStats.retrieved, 2);
   assert.match(promptOf(model.calls.reply[0]), /对不上，不能当资料用/);
 });
 
@@ -403,4 +405,69 @@ test("同一篇文章的两个地址只列一次，第二个位置留给别的�
   assert.equal(result.text, "日本版最新是《Mate》。\n\n参考资料：\nCHUNITHM\nhttps://zh.wikipedia.org/zh-hk/CHUNITHM\nCHUNITHM 官网\nhttps://chunithm.sega.jp/");
   assert.equal(result.sourceStats.cited, 2);
   assert.equal(result.sourceStats.displayed, 2);
+});
+
+// ── 2026-10-12：「ongeki部门历年kop决赛曲」只搜一次、拿回曲目列表页和假面骑士 ──────
+
+test("缩写对照：KOP 的全称算出处，首搜补上全称，补搜换日文写法并限定日文 wiki", () => {
+  const said = "去联网搜索一下，能查到ongeki部门历年kop决赛曲曲名吗";
+  assert.equal(gate.targetProblem("KING of Performai オンゲキ部門 決勝", said), "", "KOP 的全称不算编出来的名字");
+  assert.match(gate.targetProblem("KING of Performai 决赛", "最近有什么比赛"), /用户没提过/, "用户没说 KOP 时全称照样拦");
+  assert.equal(gate.expandAbbreviations("ongeki KOP 决赛曲 历年 曲名"), "ongeki KOP 决赛曲 历年 曲名 KING of Performai");
+  assert.equal(gate.expandAbbreviations("CHUNITHM 最新版本"), "CHUNITHM 最新版本", "没有缩写就原样");
+  assert.equal(gate.expandAbbreviations("kopi luwak 咖啡"), "kopi luwak 咖啡", "英文缩写要整词命中");
+  const retry = gate.retryQuery("ongeki KOP 决赛曲 历年 曲名");
+  assert.equal(retry.query, "オンゲキ KING of Performai 決勝 課題曲 歴代 楽曲");
+  assert.deepEqual(retry.sites, ["wikiwiki.jp", "gamerch.com", "ja.wikipedia.org"]);
+  assert.equal(gate.retryQuery("原神 开发公司"), null, "资料不在日文 wiki 上的对象不补搜");
+});
+
+test("相关性：对象有两个以上概念时至少沾两个；日文写法和中文检索词算同一个对象", () => {
+  const sources = [
+    { title: "仮面ライダー響 音撃", snippet: "Ongeki 鬼 太鼓" },
+    { title: "音击/曲目列表 - 萌娘百科", snippet: "KoP 2020决赛曲目" },
+    { title: "KING of Performai 2023 オンゲキ部門", snippet: "決勝 課題曲" },
+  ];
+  assert.deepEqual(gate.relevantSources(sources, "ongeki KOP 决赛曲 历年 曲名").map(s => s.title),
+    ["音击/曲目列表 - 萌娘百科", "KING of Performai 2023 オンゲキ部門"]);
+  assert.equal(gate.relevantSources([{ title: "CHUNITHM 最新版本一览" }], "CHUNITHM 最新版本").length, 1, "只有一个概念时沾一个就够");
+});
+
+test("明说要搜 KOP：相关结果不够就用日文写法补搜，两次的资料合在一起交给回复", async () => {
+  const model = fakeModel({ observe: obs({ target: "ongeki KOP 决赛曲 历年 曲名", unknownTerms: ["KOP"] }) });
+  const calls = [];
+  const webFetchImpl = async (url, options) => {
+    const body = JSON.parse(options.body);
+    calls.push(body);
+    const results = calls.length === 1
+      ? [{ title: "仮面ライダー響", url: "https://example.com/hibiki", chunks: [{ text: "音撃 Ongeki" }], snippet: "Ongeki" }]
+      : [{ title: "KING of Performai オンゲキ部門 歴代決勝課題曲", url: "https://wikiwiki.jp/kop", chunks: [{ text: "オンゲキ部門 決勝……" }], snippet: "KING of Performai" }];
+    return { ok: true, status: 200, json: async () => ({ search_results: results }) };
+  };
+  const result = await requestReply(settingsWith({ mode: "auto" }), say("去联网搜索一下，能查到ongeki部门历年kop决赛曲曲名吗"), { fetchImpl: model.fetchImpl, webFetchImpl });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].text_query, "ongeki KOP 决赛曲 历年 曲名 KING of Performai");
+  assert.equal(calls[1].text_query, "オンゲキ KING of Performai 決勝 課題曲 歴代 楽曲");
+  assert.deepEqual(calls[1].sites, ["wikiwiki.jp", "gamerch.com", "ja.wikipedia.org"]);
+  assert.equal(result.searchGate.searched.sourceCount, 1, "假面骑士被筛掉，只留 wiki 那条");
+  assert.match(promptOf(model.calls.reply[0]), /又用「オンゲキ KING of Performai 決勝 課題曲 歴代 楽曲」补搜了一次/);
+  assert.match(gate.describeGate(result.searchGate), /补搜「オンゲキ/);
+});
+
+test("接口报错不补搜：那是链路问题，换词也白搭", async () => {
+  const model = fakeModel({ observe: obs({ target: "ongeki KOP 决赛曲" }) });
+  let n = 0;
+  const webFetchImpl = async () => { n++; return { ok: false, status: 502, json: async () => ({}) }; };
+  await requestReply(settingsWith({ mode: "explicit" }), say("帮我搜一下 ongeki KOP 决赛曲"), { fetchImpl: model.fetchImpl, webFetchImpl });
+  assert.equal(n, 1);
+});
+
+test("回复里的 Markdown 加粗不发到 QQ", async () => {
+  const { stripMarkdown } = require("./chat.cjs");
+  assert.equal(stripMarkdown("而且**没有任何一份资料**列成年表"), "而且没有任何一份资料列成年表");
+  assert.equal(stripMarkdown("## 标题\n用 `KOP` 搜~~错~~了"), "标题\n用 KOP 搜错了");
+  assert.equal(stripMarkdown("*Hello, Mr. Monster* 和 a*b"), "*Hello, Mr. Monster* 和 a*b", "单个星号不动");
+  const model = fakeModel({ reply: "美亚查到了，**结论**是这样~" });
+  const result = await requestReply(settingsWith({ mode: "explicit" }), say("今天好累啊"), { fetchImpl: model.fetchImpl, webFetchImpl: fakeWeb().webFetchImpl });
+  assert.equal(result.text, "美亚查到了，结论是这样~");
 });
