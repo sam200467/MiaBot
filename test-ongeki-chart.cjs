@@ -149,7 +149,7 @@ test("SVG：各类物件都画出来，场外子弹裁掉，文字转义", () =>
   }
   assert.ok(!svg.includes("d-DNG"), "x=90 的子弹在显示范围外");
   assert.ok(!svg.includes("<x>"));
-  for (const kind of ["tap", "critical", "hold", "side", "flick", "bell", "bullet", "damage", "beam", "soflan"]) {
+  for (const kind of ["tap", "critical", "hold", "side", "flick", "bell", "bullet", "damage", "aimed", "beam", "soflan", "block", "floorless"]) {
     assert.match(C.legendSvg(kind), /^<svg[^>]*>.+<\/svg>$/);
   }
 });
@@ -295,7 +295,7 @@ test("地板消失：两墙一起跳到场外、左右反转的区间整栏铺�
   assert.deepEqual(C.floorlessRuns(sweep, 0, 70 * T), []);
 });
 
-test("子弹 / BELL 落点 = X + 调色板偏移的 1/8；瞄准玩家的调淡；隐藏轨道不画；倒退变速单独上色", () => {
+test("子弹 / BELL 落点 = X + 调色板偏移的 1/8；追踪弹按估计的玩家位置画；隐藏轨道不画；倒退变速单独上色", () => {
   const lines = [
     "[HEADER]", "TRESOLUTION\t1920",
     "[B_PALETTE]",
@@ -312,7 +312,8 @@ test("子弹 / BELL 落点 = X + 调色板偏移的 1/8；瞄准玩家的调淡�
   ];
   const model = C.parseOgkr(lines.join("\n"));
   // 偏移到判定线上只剩 1/8：-18 + 12/8、-18 - 6/8
-  assert.deepEqual(model.bullets.map((b) => [b.x, b.aimed]), [[-16.5, false], [-18.75, false], [10, true], [5, false]]);
+  // 追踪弹：附近一拍内没有音符、也没有墙 → 估计玩家在 0，再加偏移 4/8
+  assert.deepEqual(model.bullets.map((b) => [b.x, b.aimed]), [[-16.5, false], [-18.75, false], [0.5, true], [5, false]]);
   assert.deepEqual(model.bells.map((b) => [b.x, b.aimed]), [[0, false], [-0.75, false]]);
   assert.deepEqual(model.lanes.map((l) => [l.id, l.hidden]), [["1", true], ["2", false]]);
   const svg = C.renderSvg(model, C.layoutChart(model));
@@ -322,6 +323,24 @@ test("子弹 / BELL 落点 = X + 调色板偏移的 1/8；瞄准玩家的调淡�
   assert.match(svg, /class="sv sv-reverse"/);
   assert.match(svg, /class="sv sv-stop"/);
   assert.equal((C.legendSvg("soflan").match(/class="sv /g) || []).length, 4);
+});
+
+test("追踪弹的玩家位置估计：正在按的 HOLD > 一拍内最近的音符 > 两墙中间", () => {
+  const lines = [
+    "[HEADER]", "TRESOLUTION\t1920",
+    "[B_PALETTE]", "BPL\tP1\tUPS\t0\tPLR\t1.0\tN\tCIR\t0",
+    "[LANE]", "LCS\t1\t0\t0\t0", "LCE\t1\t4\t0\t0",
+    "WLS\t2\t0\t0\t-20", "WLE\t2\t4\t0\t-20", "WRS\t3\t0\t0\t10", "WRE\t3\t4\t0\t10",
+    "[BULLET]",
+    "BLT\tP1\t0\t960\t24\tNML",   // HOLD 0:480–1:0 进行中，HOLD 在 x=6
+    "BLT\tP1\t1\t1700\t24\tNML",  // 2:0 的 TAP（x=-8）在一拍内
+    "BLT\tP1\t3\t0\t24\tNML",     // 附近没东西 → 两墙中间 (-20+10)/2
+    "[NOTES]", "HLD\t1\t0\t480\t6\t0\t1\t0\t6\t0", "TAP\t1\t2\t0\t-8\t0",
+  ];
+  const model = C.parseOgkr(lines.join("\n"));
+  assert.deepEqual(model.bullets.map((b) => [b.x, b.estimated]), [[6, true], [-8, true], [-5, true]]);
+  const svg = C.renderSvg(model, C.layoutChart(model));
+  assert.equal((svg.match(/<g class="aimed">/g) || []).length, 3);
 });
 
 function tempTree(files) {

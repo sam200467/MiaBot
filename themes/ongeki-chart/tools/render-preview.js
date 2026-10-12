@@ -131,11 +131,14 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     }
     if (!state?.ready) throw new Error("等待谱面图主题渲染超时");
     const { width, height } = state.size;
-    await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+    // 和核心一样按最多 2 倍像素截图，单边不超过 16000
+    const scale = Math.min(2, 16000 / width, 16000 / height);
+    await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: scale, mobile: false });
     await sleep(100);
-    const shot = await send("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: true, clip: { x: 0, y: 0, width, height, scale: 1 } });
+    const jpeg = /\.jpe?g$/i.test(output);
+    const shot = await send("Page.captureScreenshot", { format: jpeg ? "jpeg" : "png", ...(jpeg ? { quality: 92 } : {}), fromSurface: true, captureBeyondViewport: true, clip: { x: 0, y: 0, width, height, scale: 1 } });
     fs.writeFileSync(output, Buffer.from(shot.data, "base64"));
-    console.log(`${output}（${width}×${height}）`);
+    console.log(`${output}（${Math.round(width * scale)}×${Math.round(height * scale)}，${Math.round(fs.statSync(output).size / 1024)} KB）`);
   } finally {
     try { socket?.close(); } catch {}
     child.kill();

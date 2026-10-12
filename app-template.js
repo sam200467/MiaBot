@@ -67,7 +67,7 @@ const BROWSER_CANDIDATES = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
 ];
-const VERSION = "4.2.0-chart-view";
+const VERSION = "4.2.1-chart-view";
 
 // 开发模式（node ongenki-exe.js 直跑）时用 cwd，exe 模式用 exe 所在目录；
 // GUI 会把核心解压到临时目录运行，用 ONGEKI_APP_DIR 指回 GUI 所在目录（配置文件放那里）
@@ -2786,6 +2786,10 @@ async function runConstantTableJobData(job){
 // 谱面图：谱面文件由调用方（mia-core）从本地游戏数据里读好，经 stdin 交进来；
 // 核心只补曲目信息和曲绘，解析、排版、绘制都在 ongeki-chart 主题里完成。
 const CHART_PREVIEW_MAX_BYTES = 4 * 1024 * 1024;
+// 出图：最多 2 倍像素；单边不超过 16000（浏览器截图上限 16384）；文件目标 4.5 MB（QQ 发送上限 8 MB）
+const CHART_IMAGE_MAX_SCALE = 2;
+const CHART_IMAGE_MAX_SIDE = 16000;
+const CHART_IMAGE_TARGET_BYTES = 4.5 * 1024 * 1024;
 
 function buildChartPreviewThemeData(song, difficultyId, ogkr) {
   const definition = chartInfoDefinition(difficultyId);
@@ -2870,19 +2874,30 @@ async function renderChartPreviewTheme(data) {
     const size = await cdp.evaluate(`window.__THEME_SIZE__ || null`);
     const width = Math.min(4000, Math.max(800, Math.ceil(Number(size?.width) || 0)));
     const height = Math.min(9000, Math.max(600, Math.ceil(Number(size?.height) || 0)));
-    console.log(`  正在渲染 ${width}×${height} 谱面图…`);
-    await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
-    await sleep(150);
-    const shot = await cdp.send("Page.captureScreenshot", {
-      format: "jpeg",
-      quality: 90,
-      fromSurface: true,
-      captureBeyondViewport: true,
-      clip: { x: 0, y: 0, width, height, scale: 1 },
-    });
-    const buffer = Buffer.from(shot.data || "", "base64");
-    if (buffer.length < 1000) throw new Error("谱面图截图数据异常（文件过小）");
-    console.log(`  ✓ 谱面图渲染完成（${Math.round(buffer.length / 1024)} KB）`);
+    // 高清：按 2 倍像素截图（单边不超过浏览器截图上限），文件控制在 CHART_IMAGE_TARGET_BYTES 左右；
+    // 超了先降 JPEG 质量，还超再降倍率
+    let scale = Math.min(CHART_IMAGE_MAX_SCALE, CHART_IMAGE_MAX_SIDE / width, CHART_IMAGE_MAX_SIDE / height);
+    let buffer = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      console.log(`  正在渲染 ${Math.round(width * scale)}×${Math.round(height * scale)} 谱面图…`);
+      await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: scale, mobile: false });
+      await sleep(200);
+      for (const quality of [92, 85, 78]) {
+        const shot = await cdp.send("Page.captureScreenshot", {
+          format: "jpeg",
+          quality,
+          fromSurface: true,
+          captureBeyondViewport: true,
+          clip: { x: 0, y: 0, width, height, scale: 1 },
+        });
+        buffer = Buffer.from(shot.data || "", "base64");
+        if (buffer.length <= CHART_IMAGE_TARGET_BYTES) break;
+      }
+      if (buffer.length <= CHART_IMAGE_TARGET_BYTES || scale <= 1) break;
+      scale = Math.max(1, scale * 0.8);
+    }
+    if (!buffer || buffer.length < 1000) throw new Error("谱面图截图数据异常（文件过小）");
+    console.log(`  ✓ 谱面图渲染完成（${Math.round(buffer.length / 1024)} KB，${scale.toFixed(2)} 倍）`);
     return buffer;
   } finally {
     cdp?.close();

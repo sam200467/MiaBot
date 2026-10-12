@@ -120,12 +120,12 @@
       // 带调色板的 BELL 像子弹一样飞，落点同样要加偏移
       bells: raw.bells.map((n) => {
         const palette = palettes.get(n.palette);
-        return { t: tick(n.u, n.g), x: n.x + (palette && !palette.aimed ? palette.offset * BULLET_OFFSET_AT_JUDGE : 0), aimed: !!palette?.aimed };
+        return { t: tick(n.u, n.g), x: n.x + (palette && !palette.aimed ? palette.offset * BULLET_OFFSET_AT_JUDGE : 0), aimed: !!palette?.aimed, aimOffset: palette?.offset || 0 };
       }).sort(byTick),
       bullets: raw.bullets.map((n) => {
         const palette = palettes.get(n.palette) || { shooter: "UPS", offset: 0, aimed: false, shape: "CIR", large: false };
         return {
-          t: tick(n.u, n.g), x: n.x + (palette.aimed ? 0 : palette.offset * BULLET_OFFSET_AT_JUDGE), aimed: palette.aimed,
+          t: tick(n.u, n.g), x: n.x + (palette.aimed ? 0 : palette.offset * BULLET_OFFSET_AT_JUDGE), aimed: palette.aimed, aimOffset: palette.offset,
           damage: n.damage, shape: palette.shape, large: palette.large,
         };
       }).sort(byTick),
@@ -139,6 +139,7 @@
       events: raw.events.map((e) => ({ t: tick(e.u, e.g), label: e.label })).sort(byTick),
     };
     if (!model.bpms.length || model.bpms[0].t > 0) model.bpms.unshift({ t: 0, bpm: header.bpm || model.bpms[0]?.bpm || 120 });
+    aimAtPlayer(model);
     model.lastTick = lastTick(model);
     model.stats = chartStats(model);
     model.durationSeconds = durationSeconds(model, model.lastTick);
@@ -160,6 +161,38 @@
     let first = Infinity;
     for (const list of [model.taps, model.holds, model.flicks, model.bells, model.bullets]) if (list.length && list[0].t < first) first = list[0].t;
     return Number.isFinite(first) ? first : 0;
+  }
+
+  // 追踪弹（目标 PLR）瞄准的是子弹出现时玩家所在的 X，谱面里没有。按「玩家这时多半在打的东西」估计：
+  // 正在按的 HOLD → 前后一拍内最近的 TAP / HOLD 头 / BELL → 两墙中间。估计出来的落点画成空心虚线
+  function aimAtPlayer(model) {
+    const aimed = [...model.bullets, ...model.bells].filter((n) => n.aimed);
+    if (!aimed.length) return;
+    const beat = model.header.tResolution / 4;
+    const field = (kind) => model.lanes.filter((lane) => lane.kind === kind).flatMap((lane) => lane.points).sort((a, b) => a.t - b.t);
+    const wl = field("WL"), wr = field("WR");
+    const notWall = (n) => n.kind !== "WL" && n.kind !== "WR";
+    const hints = [
+      ...model.taps.filter(notWall).map((n) => ({ t: n.t, x: n.x })),
+      ...model.holds.filter(notWall).map((n) => ({ t: n.t, x: n.x })),
+      ...model.bells.filter((n) => !n.aimed).map((n) => ({ t: n.t, x: n.x })),
+    ].sort((a, b) => a.t - b.t);
+    const holds = model.holds.filter(notWall).map((hold) => ({ hold, path: holdPath(hold, model.laneById.get(hold.lane)) }));
+    for (const n of aimed) {
+      let x = null;
+      const active = holds.filter(({ hold }) => hold.t <= n.t && hold.end >= n.t);
+      if (active.length) x = active.reduce((sum, { path }) => sum + interpolate(path, n.t), 0) / active.length;
+      if (x == null) {
+        let best = Infinity;
+        for (const h of hints) {
+          const d = Math.abs(h.t - n.t);
+          if (d <= beat && d < best) { best = d; x = h.x; }
+        }
+      }
+      if (x == null) x = wl.length && wr.length ? (interpolate(wl, n.t) + interpolate(wr, n.t)) / 2 : 0;
+      n.x = x + n.aimOffset * BULLET_OFFSET_AT_JUDGE;
+      n.estimated = true;
+    }
   }
 
   function lastTick(model) {
@@ -377,6 +410,10 @@
   };
 
   const FLOOR_LIMIT = 40;
+
+  // 激光的斜纹
+  const BEAM_HATCH = (id) => `<pattern id="${id}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">`
+    + `<rect width="6" height="6" fill="rgba(255, 70, 190, .12)"/><rect width="2.4" height="6" fill="rgba(255, 110, 210, .55)"/></pattern>`;
   // 调色板偏移在判定线上的实际效果：对着实机画面量，Event Horizon 里偏移 ±30 的 11 发到判定线时宽约 7–8 单位、
   // ±12 的一对间隔约 3 单位，都是偏移的 1/8 左右。格式说明写的是「瞄准点 = 目标 + 偏移」，但子弹在屏幕上方散开、
   // 往下收拢，按满偏移画会比游戏里宽得多
@@ -477,7 +514,7 @@
   function renderSvg(model, layout) {
     const o = layout.options;
     const parts = [];
-    const defs = [];
+    const defs = [BEAM_HATCH("beam-hatch")];
     for (const col of layout.columns) {
       defs.push(`<clipPath id="c${col.index}"><rect x="${f1(col.x + o.gutter)}" y="${f1(col.y)}" width="${f1(col.width)}" height="${f1(col.height)}" rx="6"/></clipPath>`);
       parts.push(renderColumn(model, layout, col));
@@ -525,15 +562,15 @@
       if (m.t >= from) body.push(`<line class="${m.minor ? "beat" : "bar"}" x1="${X(o.xMin)}" x2="${X(o.xMax)}" y1="${Y(m.t)}" y2="${Y(m.t)}"/>`);
     }
 
-    // 激光
+    // 激光：斜纹 + 两侧虚线边，和实心的 HOLD 带区分开（宽度是伤害判定宽度）
     for (const beam of model.beams) {
       const pts = clipPath(beam.points, from, to);
       if (pts.length < 2) continue;
       const half = beam.width / 2;
       const l = pts.map((pt) => `${X(pt.x - half)},${Y(pt.t)}`);
       const r = pts.slice().reverse().map((pt) => `${X(pt.x + half)},${Y(pt.t)}`);
-      body.push(`<polygon class="beam" points="${l.join(" ")} ${r.join(" ")}"/>`);
-      body.push(`<polyline class="beam-core" points="${pts.map((pt) => `${X(pt.x)},${Y(pt.t)}`).join(" ")}"/>`);
+      body.push(`<polygon class="beam" fill="url(#beam-hatch)" points="${l.join(" ")} ${r.join(" ")}"/>`);
+      body.push(`<polyline class="beam-edge" points="${l.join(" ")}"/><polyline class="beam-edge" points="${r.join(" ")}"/>`);
     }
 
     // 装饰轨道（CL）：演出用的彩色细线，不能打，画得比轨道还淡
@@ -608,7 +645,7 @@
       const a = Math.max(s.t, from), b = Math.min(s.end, to);
       if (b <= a) continue;
       const cls = s.speed < -0.001 ? "sv-reverse" : s.speed <= 0.001 ? "sv-stop" : s.speed < 1 ? "sv-slow" : "sv-fast";
-      out.push(`<rect class="sv ${cls}" x="${f1(left - 4.5)}" y="${Y(b)}" width="3" height="${f1(Y(a) - Y(b))}"/>`);
+      out.push(`<rect class="sv ${cls}" x="${f1(left - 5.5)}" y="${Y(b)}" width="5" height="${f1(Y(a) - Y(b))}"/>`);
     }
 
     // 左侧刻度：小节号、BPM、拍号、事件
@@ -633,7 +670,14 @@
       if (run.start < col.start || run.start >= col.end) continue;
       labels.push({ y: Number(Y(run.start)) - 11, text: run.inverted ? "反转" : "悬空", cls: "floorless-mark" });
     }
-    // 挨得太近的标签只留优先级高的（小节号 > BPM > 拍号 > 事件 > 悬空），连续变速时不会叠成一摞
+    // 变速倍率：标在变速开始处，优先级最低（变速很密的演出段只留放得下的）
+    for (const sv of model.soflans) {
+      if (sv.t < col.start || sv.t >= col.end || Math.abs(sv.speed - 1) < 0.001) continue;
+      const kind = sv.speed < -0.001 ? "reverse" : sv.speed <= 0.001 ? "stop" : sv.speed < 1 ? "slow" : "fast";
+      const text = kind === "stop" ? "停" : kind === "reverse" ? (Math.abs(sv.speed + 1) < 0.001 ? "倒" : `倒${trimNumber(-sv.speed)}`) : `×${trimNumber(sv.speed)}`;
+      labels.push({ y: Number(Y(sv.t)) - 11, text, cls: `sv-mark sv-mark-${kind}` });
+    }
+    // 挨得太近的标签只留优先级高的（小节号 > BPM > 拍号 > 事件 > 悬空 > 变速倍率），连续变速时不会叠成一摞
     const kept = [];
     for (const label of labels) {
       const y = Number(label.y);
@@ -783,8 +827,10 @@
       case "flick": inner = flickShape({ dir: -1 }, x - 12, x + 12, y + 5); break;
       case "bell": inner = bellShape(x, y); break;
       case "bullet": inner = bulletShape({ shape: "NDL", damage: "NML" }, x - 10, y + 7) + bulletShape({ shape: "CIR", damage: "NML" }, x, y + 1) + bulletShape({ shape: "SQR", damage: "NML" }, x + 10, y + 6); break;
+      case "aimed": inner = bulletShape({ shape: "NDL", damage: "DNG", aimed: true }, x - 7, y + 7) + bulletShape({ shape: "CIR", damage: "NML", aimed: true }, x + 7, y + 1); break;
       case "damage": inner = bulletShape({ shape: "CIR", damage: "NML" }, x - 10, y) + bulletShape({ shape: "CIR", damage: "STR" }, x, y) + bulletShape({ shape: "CIR", damage: "DNG" }, x + 10, y); break;
-      case "beam": inner = `<rect class="beam" x="${x - 6}" y="1" width="12" height="${H - 2}"/><line class="beam-core" x1="${x}" x2="${x}" y1="1" y2="${H - 1}"/>`; break;
+      case "beam": inner = `<defs>${BEAM_HATCH("beam-hatch-legend")}</defs><rect class="beam" fill="url(#beam-hatch-legend)" x="${x - 7}" y="1" width="14" height="${H - 2}"/>`
+        + `<line class="beam-edge" x1="${x - 7}" x2="${x - 7}" y1="1" y2="${H - 1}"/><line class="beam-edge" x1="${x + 7}" x2="${x + 7}" y1="1" y2="${H - 1}"/>`; break;
       case "block": inner = `<line class="wall k-WL" x1="${x}" x2="${x}" y1="1" y2="${H - 1}"/><line class="block" x1="${x}" x2="${x}" y1="4" y2="${H - 4}"/>`; break;
       // 两墙收拢后交叉：交叉那段地板消失，整片铺青色
       case "floorless": inner = `<rect class="col-bg" x="${x - 12}" y="0" width="24" height="${H}"/>`

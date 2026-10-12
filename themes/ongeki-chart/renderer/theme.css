@@ -244,15 +244,27 @@ h1 {
 .ring.d-STR { stroke: #9a52f0; }
 .ring.d-DNG { stroke: #ff8a2a; }
 
-.beam { fill: rgba(255, 92, 200, .2); stroke: none; }
-.beam-core { fill: none; stroke: rgba(255, 150, 225, .75); stroke-width: 1.2; }
+.beam { stroke: none; }
+.beam-edge { fill: none; stroke: rgba(255, 130, 220, .9); stroke-width: 1; stroke-dasharray: 4 2.5; }
 
 .sv { stroke: none; }
 .sv-slow { fill: #3cc8e6; }
 .sv-fast { fill: #ff9a3c; }
 .sv-stop { fill: #8a93a8; }
 .sv-reverse { fill: #ff4f6e; }
-.aimed { opacity: .45; }
+.sv-mark { font: 700 9px "Noto CJK", sans-serif; }
+.sv-mark-slow { fill: #3cc8e6; }
+.sv-mark-fast { fill: #ff9a3c; }
+.sv-mark-stop { fill: #8a93a8; }
+.sv-mark-reverse { fill: #ff4f6e; }
+.aimed { opacity: .9; }
+/* 追踪弹：落点是估计的，画成空心虚线 */
+.aimed .bullet, .aimed .bell { fill: none !important; stroke-dasharray: 2 1.5; stroke-width: 1.2; }
+.aimed .bullet.d-NML { stroke: #ff3fae; }
+.aimed .bullet.d-STR { stroke: #9a52f0; }
+.aimed .bullet.d-DNG { stroke: #ff8a2a; }
+.aimed .bell { stroke: #ffc93d; }
+.aimed .bullet-glow, .aimed .bell-core { display: none; }
 
 .measure-no { fill: #8b93a7; font: 700 11px "Noto CJK", sans-serif; }
 .rhythm { fill: #4d5568; font: 700 9.5px "Noto CJK", sans-serif; font-variant-numeric: tabular-nums; }

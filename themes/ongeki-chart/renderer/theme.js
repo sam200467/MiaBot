@@ -71,7 +71,7 @@
     ["tap", "TAP（红/绿/蓝）"], ["critical", "金框＝CRITICAL"], ["hold", "HOLD"],
     ["side", "SIDE"], ["flick", "FLICK"], ["bell", "BELL"],
     ["bullet", "子弹 针/圆/方"], ["damage", "粉（普通）紫（硬）橙（危险）"], ["beam", "激光"], ["soflan", "变速 慢/快/停/倒"],
-    ["block", "保护墙"], ["floorless", "地板消失（悬空）"],
+    ["aimed", "追踪弹（落点估计）"], ["block", "保护墙"], ["floorless", "地板消失（悬空）"],
   ];
   for (const [kind, label] of legend) {
     const item = el("li");
