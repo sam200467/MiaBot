@@ -115,8 +115,8 @@ Dismount-DiskImage -ImagePath (Resolve-Path "$g\HDD\SDDT_*.vhd").Path
 ```powershell
 npm ci
 npm run build:core
-node tools/build-core-update.cjs MiaBot-chart-view-update-20261011 --notes tools/core-update/notes/chart-view-20261011.txt --with-panel
-Compress-Archive -Path server-updates/MiaBot-chart-view-update-20261011 -DestinationPath server-updates/MiaBot-chart-view-update-20261011.zip
+node tools/build-core-update.cjs MiaBot-chart-view-update-20261012 --notes tools/core-update/notes/chart-view-20261012.txt --with-panel
+Compress-Archive -Path server-updates/MiaBot-chart-view-update-20261012 -DestinationPath server-updates/MiaBot-chart-view-update-20261012.zip
 ```
 
 `--notes` 是这次更新的说明（写进包里的「使用说明.txt」，安装与回退步骤自动附上）；`--with-panel` 附带 `Update-Panel.cmd`，把 /谱面图 加进 QQ 指令面板。
