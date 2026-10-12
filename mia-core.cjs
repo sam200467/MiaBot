@@ -427,6 +427,22 @@ function chartInfoSuggestionLines({ parsed, suggestions }, command = capabilityH
   ];
 }
 
+// 候选列表每一行对应哪首歌（哪张谱面），跟 lines 一一对应，给能做指令链接的宿主用（QQ 入口把曲名做成可点的）。
+// text 是这一行开头可以做成链接的那段（「id265　GEOMETRIC DANCE」），后面的谱师名照原样接上。
+// 不是曲目的行（说明、照抄就能用的命令）是 null 或 { literal: true }：后者整行就是一条命令。
+// 不认这个字段的宿主（梨绪、Discord）原样忽略。
+function songMatchLinks(matches) {
+  return matches.map((song) => ({ songId: song.id, lunatic: song.isLunatic === true,
+    text: `id${song.id}　${escapeText(song.name)}${song.isLunatic === true ? " [LUNATIC]" : ""}` }));
+}
+function chartInfoMatchLinks(matches) {
+  return matches.map(({ song, difficultyId, difficultyName }) => ({ songId: song.id, difficultyId,
+    text: `id${song.id}　${escapeText(song.name)}　[${difficultyName}]` }));
+}
+function chartInfoSuggestionLinks({ suggestions }) {
+  return suggestions?.length ? [null, ...suggestions.map(() => ({ literal: true }))] : [];
+}
+
 function songMatchLines(matches) {
   return matches.map((song) => {
     const lunaticMark = song.isLunatic === true ? " [LUNATIC]" : "";
@@ -1118,7 +1134,7 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
   if (spec.name === "song") {
     const matches = searchSongs(q);
     if (matches.length !== 1) {
-      return { kind: "lines", header: matches.length ? "找到多首曲目，请用完整 Song ID 明确选择：" : "没有找到曲目。", lines: songMatchLines(matches), footer: "" };
+      return { kind: "lines", header: matches.length ? "找到多首曲目，请用完整 Song ID 明确选择：" : "没有找到曲目。", lines: songMatchLines(matches), links: songMatchLinks(matches), footer: "" };
     }
     const song = matches[0];
     return {
@@ -1132,7 +1148,7 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
     const result = searchChartInfo(q);
     if (!result.parsed) return text(capabilityHints.chartInfoUsage);
     if (result.matches.length !== 1) {
-      return { kind: "lines", header: result.matches.length ? "找到多张谱面，请用完整 Song ID 明确选择：" : "没有找到符合要求的谱面。", lines: [...chartInfoMatchLines(result.matches), ...chartInfoSuggestionLines(result)], footer: "" };
+      return { kind: "lines", header: result.matches.length ? "找到多张谱面，请用完整 Song ID 明确选择：" : "没有找到符合要求的谱面。", lines: [...chartInfoMatchLines(result.matches), ...chartInfoSuggestionLines(result)], links: [...chartInfoMatchLinks(result.matches), ...chartInfoSuggestionLinks(result)], footer: "" };
     }
     const match = result.matches[0];
     return {
@@ -1148,7 +1164,7 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
     const result = searchChartView(q);
     if (!result.parsed) return text(pickHint(capabilityHints.chartViewUsage));
     if (result.matches.length !== 1) {
-      return { kind: "lines", header: result.matches.length ? "找到多张谱面，请用完整 Song ID 明确选择：" : "没有找到符合要求的谱面。", lines: [...chartInfoMatchLines(result.matches), ...chartInfoSuggestionLines(result, capabilityHints.chartViewCommand)], footer: "" };
+      return { kind: "lines", header: result.matches.length ? "找到多张谱面，请用完整 Song ID 明确选择：" : "没有找到符合要求的谱面。", lines: [...chartInfoMatchLines(result.matches), ...chartInfoSuggestionLines(result, capabilityHints.chartViewCommand)], links: [...chartInfoMatchLinks(result.matches), ...chartInfoSuggestionLinks(result)], footer: "" };
     }
     const match = result.matches[0];
     const file = index.find(match.song.id, match.difficultyId);
@@ -1218,11 +1234,11 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
     const store = coreCall("getAliasStore");
     if (spec.name === "whatis") {
       const matches = searchSongClues(q);
-      return { kind: "lines", header: matches.length ? "匹配到以下曲目：" : "没有找到曲目。", lines: songMatchLines(matches), footer: "" };
+      return { kind: "lines", header: matches.length ? "匹配到以下曲目：" : "没有找到曲目。", lines: songMatchLines(matches), links: songMatchLinks(matches), footer: "" };
     }
     const matches = searchSongs(q);
     if (matches.length !== 1) {
-      return { kind: "lines", header: matches.length ? "找到多首曲目，请用完整 Song ID 明确选择：" : "没有找到曲目。", lines: songMatchLines(matches), footer: "" };
+      return { kind: "lines", header: matches.length ? "找到多首曲目，请用完整 Song ID 明确选择：" : "没有找到曲目。", lines: songMatchLines(matches), links: songMatchLinks(matches), footer: "" };
     }
     const song = matches[0];
     const list = store.list(song.name, "ongeki");
@@ -1239,7 +1255,7 @@ async function resolveCapability(config, userId, name, query, onLine = () => {},
     if (!parsed) return text(capabilityHints.aliasUsage);
     const matches = searchSongs(parsed.query);
     if (matches.length !== 1) {
-      return { kind: "lines", header: matches.length ? "找到多首曲目，请用完整 Song ID 明确选择：" : "没有找到曲目。", lines: songMatchLines(matches), footer: "" };
+      return { kind: "lines", header: matches.length ? "找到多首曲目，请用完整 Song ID 明确选择：" : "没有找到曲目。", lines: songMatchLines(matches), links: songMatchLinks(matches), footer: "" };
     }
     const song = matches[0];
     const store = coreCall("getAliasStore");
@@ -1301,6 +1317,7 @@ module.exports = {
   configureFormatting,
   chartInfoMatchLines,
   songMatchLines,
+  songMatchLinks,
   splitLines,
   describeImage,
   // 能力（自然语言工具调用）

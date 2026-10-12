@@ -63,7 +63,27 @@ test("抬头写成大号标题：/搜索歌曲 第一块、有抬头的曲目列
     assert.equal(sent.length, 0);
     assert.match(md.at(-1).text, /^找到多首曲目/);
     assert.equal(md.at(-1).options.heading, true);
-    assert.equal(md.at(-1).markdown, md.at(-1).text.replace(/[*_]/g, (ch) => "\\" + ch), "正文转义 Markdown 符号");
+    assert.match(md.at(-1).markdown, /\n\n<qqbot-cmd-input text="\/单曲 id39" show="id39　Gate of Doom" reference="false" \/>　— /, "曲名可点，填 /单曲 和 ID");
+    assert.match(md.at(-1).markdown, /DECO\\\*27\n\n（点曲名会填好 \/单曲 和曲目 ID，回车即可）$/, "谱师名转义；最下面是提示");
+    assert.equal(md.at(-1).text, "找到多首曲目，请用完整 Song ID 明确选择：\n\nid39　Gate of Doom　— Masahiro “Godspeed” Aoki\n\nid213　39　— sasakure.UK x DECO*27",
+      "每首之间空一行，纯文本补发也一样");
+
+    // 谱面分析：难度已知，填好整条；是什么歌：难度要补，提示写在最下面
+    await commands.handleCommand(groupEvent(""), parseCommand("/谱面分析 tricky treat 紫"));
+    assert.match(md.at(-1).markdown, /<qqbot-cmd-input text="\/谱面分析 id961 紫" show="id961　Tricky Treat!!!　\[MASTER\]"/);
+    assert.match(md.at(-1).markdown, /（点曲名会填好这张谱面的 \/谱面分析，回车即可）$/);
+    await commands.handleCommand(groupEvent(""), parseCommand("/是什么歌 tri"));
+    assert.match(md.at(-1).markdown, /text="\/谱面分析 id265 "/);
+    assert.match(md.at(-1).markdown, /text="\/谱面分析 id8185 白"/, "白谱单独一条，填好白");
+    assert.match(md.at(-1).markdown, /再补一个难度字：绿\/黄\/红\/紫；带 \[LUNATIC\] 的已经填好白谱，回车即可）$/);
+    await commands.handleCommand(groupEvent(""), parseCommand("/添加别名 tricky 糖"));
+    assert.match(md.at(-1).markdown, /text="\/添加别名 id7142 糖"/, "别名照着这次要加的填上");
+    await commands.handleCommand(groupEvent(""), parseCommand("/谱面分析 id39 白"));
+    assert.match(md.at(-1).markdown, /\n<qqbot-cmd-input text="\/谱面分析 id8015 白" show="\/谱面分析 id8015 白" reference="false" \/>$/, "照抄的命令整行可点");
+
+    // 查别人的候选不做链接：点了填的指令不带 @，查的是点的人自己
+    await commands.runCapability(groupEvent(""), "song", "39", "", "FRIEND");
+    assert.doesNotMatch(md.at(-1).markdown, /qqbot-cmd-input/);
   } finally { restore(); }
   await run({}, bound, async ({ commands, sent }) => {
     await commands.handleCommand(groupEvent("/单曲 39"), parseCommand("/单曲 39"));
