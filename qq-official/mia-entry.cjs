@@ -549,17 +549,19 @@ function createMiaBot(config, deps = {}) {
         // 按钮发的是「第N页」，绑着发起人 —— 翻的是这个人自己存的查询，别人点了回「没有权限」。
         // 按钮或 Markdown 被拒时传输层退回原文。
         const pager = !file && message.__pager;
-        // 没有可点曲名的那种（只问条数、没查到……）路由不给 Markdown 版，有翻页时照旧把原文转义了发。
+        // 没有可点曲名的那种（只问条数、没查到……）路由不给 Markdown 版，就把原文转义了发。
+        // 查询结果开头那句一律写成大号标题（heading，见 official-transport.cjs 的 sendMarkdown），单页多页一个样。
+        const query = !file && Boolean(message.__preformatted);
         const linked = !file && message.__markdown?.text === text ? formatReply(message.__markdown.markdown, { preformatted: true }).text : "";
-        const markdown = linked || (pager ? songSearch.escapeMarkdown(cleaned) : "");
+        const markdown = linked || (pager || query ? songSearch.escapeMarkdown(cleaned) : "");
         const sent = pager
           // 挂着按钮时，结尾那句「回复「下一页」」换成指向按钮的说法；按钮被拒时发原文（markdownWithoutKeyboard）。
           // 曲名里的 Markdown 符号转义掉，见 song-search.cjs 的 escapeMarkdown；纯文本补发用原文。
           ? await transport.sendMarkdown(makeTarget(e), markdown.replace(PAGE_REPLY_HINT, "，点下面的按钮翻页吧。"), cleaned, e.msgId, e.refId, {
             keyboard: pagerKeyboard({ ...pager, owner: e.userId, jump: (page) => "第" + page + "页" }),
-            markdownWithoutKeyboard: markdown,
+            markdownWithoutKeyboard: markdown, heading: query,
           })
-          : markdown ? await transport.sendMarkdown(makeTarget(e), markdown, cleaned, e.msgId, e.refId)
+          : markdown ? await transport.sendMarkdown(makeTarget(e), markdown, cleaned, e.msgId, e.refId, { heading: query })
             : await send(e, cleaned, file);
         if (e.type === "group") remember(e.openid, settings.characterName, cleaned + (file ? "（图片）" : ""));
         return sent;

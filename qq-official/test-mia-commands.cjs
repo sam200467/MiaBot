@@ -49,6 +49,28 @@ test("搜索歌曲：接了 Markdown 发送器就发指令链接，纯文本作�
   } finally { restore(); }
 });
 
+test("抬头写成大号标题：/搜索歌曲 第一块、有抬头的曲目列表都带 heading，没接 Markdown 的照旧发纯文本", async () => {
+  const md = [];
+  const bound = { getBinding: async () => ({ playerName: "测试玩家", email: "a@b.c", password: "x" }) };
+  const restore = stub(bound);
+  try {
+    const { commands, sent } = setup({}, {
+      sendMarkdown: async (event, markdown, text, options) => { md.push({ markdown, text, options }); return { id: "md" }; },
+    });
+    await commands.handleCommand(groupEvent(""), parseCommand("/搜索歌曲 Perfect Shining"));
+    assert.equal(md.at(-1).options.heading, true, "单页结果也是大号标题");
+    await commands.handleCommand(groupEvent("/单曲 39"), parseCommand("/单曲 39"));
+    assert.equal(sent.length, 0);
+    assert.match(md.at(-1).text, /^找到多首曲目/);
+    assert.equal(md.at(-1).options.heading, true);
+    assert.equal(md.at(-1).markdown, md.at(-1).text.replace(/[*_]/g, (ch) => "\\" + ch), "正文转义 Markdown 符号");
+  } finally { restore(); }
+  await run({}, bound, async ({ commands, sent }) => {
+    await commands.handleCommand(groupEvent("/单曲 39"), parseCommand("/单曲 39"));
+    assert.match(sent.at(-1).text, /^找到多首曲目/, "没有 Markdown 发送器照旧发纯文本");
+  });
+});
+
 test("数字曲名：/单曲 打曲名片段就能出图；数字同时对上 ID 和曲名时两首都列出来，不替人挑", async () => {
   // 群里实测：/单曲 2112410 回「没有找到曲目」。原来整串数字只当 ID 找，《2112410403927243233368》（id665）
   // 打曲名永远查不到；《39》（id213）也一直被 ID 39 的《Gate of Doom》挡着。

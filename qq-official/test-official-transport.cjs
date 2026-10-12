@@ -553,6 +553,19 @@ test("requireMarkdown：Markdown 被拒或没开时抛出，不退成纯文本�
   await off.transport.stop(); await off.mock.stop();
 });
 
+test("heading：不带按钮、按钮被拒后的补发也把第一行写成 ###；不带 heading 的照原样", async () => {
+  const { mock, transport } = await connected();
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "查到啦\n筛选：a", "纯文本", "m1", null, { heading: true });
+  assert.equal(mock.state.sent.at(-1).body.markdown.content, "### 查到啦\n筛选：a");
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "查到啦\n筛选：a", "纯文本", "m2");
+  assert.equal(mock.state.sent.at(-1).body.markdown.content, "查到啦\n筛选：a");
+  mock.state.nextError = { status: 400, err_code: 40034999, message: "不允许发送按钮" };
+  await transport.sendMarkdown({ kind: "group", openid: "G1" }, "查到啦\n第 1/2 页", "纯文本", "m3", null,
+    { keyboard: { rows: [{ buttons: [{ id: "next" }] }] }, markdownWithoutKeyboard: "查到啦\n回复「下一页」", heading: true });
+  assert.equal(mock.state.sent.at(-1).body.markdown.content, "### 查到啦\n回复「下一页」");
+  await transport.stop(); await mock.stop();
+});
+
 test("带按钮的 Markdown：第一行已经是标题、引用、图片、指令链接的不再加 ###", async () => {
   const keyboard = { rows: [{ buttons: [{ id: "next", render_data: { label: "下一页", visited_label: "下一页", style: 1 }, action: { type: 1, data: "x", permission: { type: 2 } } }] }] };
   for (const [markdown, expected] of [

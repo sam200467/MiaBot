@@ -354,7 +354,9 @@ function createOfficial(host) {
   // 带按钮的 Markdown，第一块是普通段落时 QQ 会在消息顶上多空一行；第一行是标题或引用就不会（2026-10-11 用
   // probe-layout.cjs 实测：普通一行、粗体都空，# / ### / > 都不空；提比的成绩列表开头是标题，也不空）。
   // 所以带按钮发时把普通的第一行写成 ### 小标题（几种里字号最接近正文）。已经是标题、引用、图片、
-  // 指令链接开头的不动；不带按钮发（含按钮被拒后的补发）照原样。
+  // 指令链接开头的不动。
+  // options.heading：不带按钮也照这样写 —— 结果开头那句（「查到啦，给你整理在这里♪」）单页、多页、
+  // 按钮被拒后的补发都是同一个大号标题，不会时大时小。不带 heading 又没按钮的照原样。
   const headingFirstLine = (markdown) => {
     const text = String(markdown);
     return /^\s*$|^(?:#|>|!\[|<)/.test(text.split("\n", 1)[0]) ? text : "### " + text;
@@ -375,6 +377,7 @@ function createOfficial(host) {
       }
     }
     if (options.keyboard) markdown = options.markdownWithoutKeyboard ?? markdown;
+    if (options.heading) markdown = headingFirstLine(markdown);
     let result;
     try {
       result = await sendText(target, text, msgId, refId, markdown);

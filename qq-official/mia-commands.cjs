@@ -258,9 +258,14 @@ function createMiaCommands(options = {}) {
   // ── 发送 ──────────────────────────────────────────────────────────
   // 一律回原地（群里回群里、私聊回私聊）。官方平台不让主动开私聊，
   // 所以没有梨绪那套「优先私聊、失败退回群里」的降级链。
+  // 有抬头的列表（「找到多首曲目，请用完整 Song ID 明确选择：」）第一块用 Markdown 发，抬头写成大号标题，
+  // 跟查询结果一个样；正文转义掉 Markdown 符号，发不成 Markdown 时传输层用原文补发。没抬头、后面的块照旧发纯文本。
   async function sendLines(event, header, lines, footer = "") {
     const chunks = core.splitLines(header, lines, footer, LINES_LIMIT);
-    for (const chunk of chunks) await send(event, chunk);
+    for (const [i, chunk] of chunks.entries()) {
+      if (i === 0 && header && sendMarkdown) await sendMarkdown(event, songSearch.escapeMarkdown(chunk), chunk, { heading: true });
+      else await send(event, chunk);
+    }
   }
 
   // 分页出图（/等级）发完图之后补一条翻页消息：图片消息挂不了按钮（按钮只能跟 Markdown），所以另发一条。
@@ -463,9 +468,13 @@ function createMiaCommands(options = {}) {
       // 曲名和白谱做成指令链接（点一下填好 /谱面分析）。没接 Markdown 发送器的宿主照旧发纯文本。
       if (!sendMarkdown) return sendLines(event, "", songSearch.reply(query).split("\n"));
       // 最后一块多页时带翻页按钮（chunk.keyboard），按钮被拒时传输层改发 markdownWithoutKeyboard。
-      for (const chunk of songSearch.replyChunks(query, LINES_LIMIT)) {
-        await sendMarkdown(event, chunk.markdown, chunk.text,
-          chunk.keyboard ? { keyboard: chunk.keyboard, markdownWithoutKeyboard: chunk.markdownWithoutKeyboard } : undefined);
+      // 第一块开头那句（「查到 N 首：」）写成大号标题（heading），后面接着发的块开头是曲目，不加。
+      const chunks = songSearch.replyChunks(query, LINES_LIMIT);
+      for (const [i, chunk] of chunks.entries()) {
+        await sendMarkdown(event, chunk.markdown, chunk.text, {
+          heading: i === 0,
+          ...(chunk.keyboard ? { keyboard: chunk.keyboard, markdownWithoutKeyboard: chunk.markdownWithoutKeyboard } : {}),
+        });
       }
       return;
     }
