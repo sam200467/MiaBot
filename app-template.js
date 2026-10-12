@@ -67,7 +67,7 @@ const BROWSER_CANDIDATES = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
 ];
-const VERSION = "4.2.1-chart-view";
+const VERSION = "4.2.2-chart-view";
 
 // 开发模式（node ongenki-exe.js 直跑）时用 cwd，exe 模式用 exe 所在目录；
 // GUI 会把核心解压到临时目录运行，用 ONGEKI_APP_DIR 指回 GUI 所在目录（配置文件放那里）
@@ -293,14 +293,24 @@ async function launchEdge({ headless }) {
   if (headless) args.unshift("--headless=new");
   const proc = spawn(browserPath, args, { stdio: "ignore", windowsHide: headless });
 
+  // 浏览器把调试端口写进 DevToolsActivePort。Windows 上文件刚出现时浏览器可能还没写完、还锁着它，
+  // 这时读会报 EBUSY / EPERM，或者读到空内容 —— 读不到有效端口就等一下再读，直到超时
   const portPath = path.join(userDataDir, "DevToolsActivePort");
   const deadline = Date.now() + 30000;
-  while (!fs.existsSync(portPath) && Date.now() < deadline) await sleep(300);
-  if (!fs.existsSync(portPath)) {
+  let port = NaN;
+  while (Date.now() < deadline) {
+    try {
+      port = parseInt(fs.readFileSync(portPath, "utf8").split("\n")[0].trim(), 10);
+      if (port > 0) break;
+    } catch (error) {
+      if (!["ENOENT", "EBUSY", "EPERM", "EACCES"].includes(error?.code)) { killBrowser(proc); throw error; }
+    }
+    await sleep(300);
+  }
+  if (!(port > 0)) {
     killBrowser(proc);
     throw new Error("浏览器启动失败（未找到调试端口）");
   }
-  const port = parseInt(fs.readFileSync(portPath, "utf8").split("\n")[0].trim(), 10);
 
   let target = null;
   for (let i = 0; i < 20 && !target; i++) {
@@ -310,7 +320,7 @@ async function launchEdge({ headless }) {
       target = list.find((t) => t.type === "page");
     } catch {}
   }
-  if (!target) throw new Error("无法获取浏览器页面目标");
+  if (!target) { killBrowser(proc); throw new Error("无法获取浏览器页面目标"); }
   return { proc, wsUrl: target.webSocketDebuggerUrl, userDataDir };
 }
 

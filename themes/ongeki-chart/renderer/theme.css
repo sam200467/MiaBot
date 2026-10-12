@@ -232,6 +232,13 @@ h1 {
 
 .bell { fill: #ffc93d; stroke: #6b4700; stroke-width: 1; }
 .bell-core { fill: #fff6cf; stroke: none; }
+/* 压在音符上的 BELL：同样大小的空心金圈，音符从中间透出来 */
+.bell-ring { fill: none; stroke: #ffc93d; stroke-width: 1.6; filter: drop-shadow(0 0 1px rgba(0, 0, 0, .9)); }
+/* 压在音符上的子弹：伤害颜色、同样大小的空心圈 */
+.bullet-ring { fill: none !important; stroke-width: 1.6; filter: drop-shadow(0 0 1px rgba(0, 0, 0, .9)); }
+.bullet-ring.d-NML { stroke: #ff3fae; }
+.bullet-ring.d-STR { stroke: #9a52f0; }
+.bullet-ring.d-DNG { stroke: #ff8a2a; }
 
 /* 子弹：形状对应调色板（针形/圆环/方形），颜色对应伤害（普通/硬/危险） */
 .bullet { stroke: rgba(255, 255, 255, .8); stroke-width: .7; stroke-linejoin: round; }
