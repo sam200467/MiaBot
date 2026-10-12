@@ -153,12 +153,14 @@ test("长谱面放宽每行栏数，行数不超过目标", () => {
 test("SVG：各类物件都画出来，场外子弹裁掉，文字转义", () => {
   const model = C.parseOgkr(SAMPLE.replace("CREATOR\tTester", "CREATOR\t<x>"));
   const svg = C.renderSvg(model, C.layoutChart(model));
-  for (const cls of ["tap k-L", "tap crit k-C", "side k-WL", "hold-body k-C", "hold-body side k-WR", "flick", "flick crit", "bell", "bullet d-NML", "wall k-WL", "rail k-C", "sv sv-slow", "measure-no", "bpm-mark"]) {
+  for (const cls of ["tap k-L", "tap crit k-C", "side k-WL", "hold-body k-C", "hold-body side k-WR", "flick", "flick crit", "bell", "wall k-WL", "rail k-C", "sv sv-slow", "measure-no", "bpm-mark"]) {
     assert.ok(svg.includes(`class="${cls}"`), "缺少 " + cls);
   }
+  // 样例里这发普通子弹正好压在 1:0 的 CTP 上，画成套住音符的虚线圈
+  assert.ok(svg.includes('class="bullet-ring d-NML"'), "缺少压在音符上的子弹圈");
   assert.ok(!svg.includes("d-DNG"), "x=90 的子弹在显示范围外");
   assert.ok(!svg.includes("<x>"));
-  for (const kind of ["tap", "critical", "hold", "side", "flick", "bell", "bullet", "damage", "aimed", "beam", "soflan", "block", "floorless"]) {
+  for (const kind of ["tap", "critical", "hold", "side", "flick", "bell", "bullet", "damage", "aimed", "onnote", "beam", "soflan", "block", "floorless"]) {
     assert.match(C.legendSvg(kind), /^<svg[^>]*>.+<\/svg>$/);
   }
 });
@@ -362,6 +364,23 @@ test("针形子弹按飞来的方向倾斜：从中间射出的朝外斜，竖�
   const angles = [...svg.matchAll(/<g transform="rotate\(([-\d.]+) /g)].map((m) => Number(m[1]));
   assert.equal(angles.length, 2, "竖直落下的那发不包 rotate");
   assert.ok(angles.some((a) => a < -10) && angles.some((a) => a > 10), "左右两发朝相反方向倾斜");
+});
+
+test("BELL / 子弹压在音符上时改成套住音符的空心圈，不盖住音符", () => {
+  const lines = ["[HEADER]", "TRESOLUTION\t1920",
+    "[B_PALETTE]", "BPL\tC\tUPS\t0\tFIX\t1.0\tN\tCIR\t0",
+    "[LANE]", "LCS\t1\t0\t0\t0", "LCE\t1\t2\t0\t0",
+    "[BULLET]", "BLT\tC\t0\t960\t0\tDNG", "BLT\tC\t0\t960\t20\tNML",
+    "[BELL]", "BEL\t0\t960\t0\t--", "BEL\t0\t1440\t6\t--",
+    "[NOTES]", "TAP\t1\t0\t960\t0\t0"];
+  const model = C.parseOgkr(lines.join("\n"));
+  const svg = C.renderSvg(model, C.layoutChart(model));
+  assert.equal((svg.match(/class="bell-ring"/g) || []).length, 1, "压在 TAP 上的铃铛画成金圈");
+  assert.equal((svg.match(/<circle class="bell" /g) || []).length, 1, "不在音符上的铃铛照常画");
+  assert.match(svg, /class="bullet-ring d-DNG" [^>]*r="11"/, "同一音符上铃铛和子弹都有时，子弹圈在外");
+  assert.equal((svg.match(/class="bullet d-NML ring"/g) || []).length, 1, "不在音符上的子弹照常画");
+  // 圈画在音符之后，音符本身不被盖住
+  assert.ok(svg.indexOf('class="bell-ring"') > svg.indexOf('class="tap k-C"'));
 });
 
 function tempTree(files) {
