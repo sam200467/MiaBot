@@ -258,9 +258,84 @@ function createMiaCommands(options = {}) {
   // ── 发送 ──────────────────────────────────────────────────────────
   // 一律回原地（群里回群里、私聊回私聊）。官方平台不让主动开私聊，
   // 所以没有梨绪那套「优先私聊、失败退回群里」的降级链。
-  async function sendLines(event, header, lines, footer = "") {
+  // 有抬头的列表（「找到多首曲目，请用完整 Song ID 明确选择：」）第一块用 Markdown 发，抬头写成大号标题，
+  // 跟查询结果一个样；正文转义掉 Markdown 符号，发不成 Markdown 时传输层用原文补发。没抬头、后面的块照旧发纯文本。
+  // options.links（core 的候选列表带的，跟 lines 一一对应）有曲目时走 sendCandidates：曲名做成指令链接。
+  async function sendLines(event, header, lines, footer = "", options = {}) {
+    if (sendMarkdown && options.links && await sendCandidates(event, header, lines, footer, options)) return;
     const chunks = core.splitLines(header, lines, footer, LINES_LIMIT);
-    for (const chunk of chunks) await send(event, chunk);
+    for (const [i, chunk] of chunks.entries()) {
+      if (i === 0 && header && sendMarkdown) await sendMarkdown(event, songSearch.escapeMarkdown(chunk), chunk, { heading: true });
+      else await send(event, chunk);
+    }
+  }
+
+  // 候选列表（/单曲 tri 翻出好几首、/谱面分析 没对上……）的曲名做成指令链接，跟 /搜索歌曲 一样：
+  // 点一下把下一步的指令填进输入框。各功能填的不一样（见 candidateCommand）：
+  //   /单曲、/查看别名      → 「/单曲 id265」，回车即可
+  //   /谱面分析、/谱面图    → 带上这张谱面的难度字，回车即可
+  //   /添加别名、/删除别名  → 曲目 ID 后面接上这次要加（删）的别名，回车即可
+  //   /是什么歌            → 跟 /搜索歌曲 一样填 /谱面分析 和 ID，难度在最下面那行提示里让人补
+  // 填 ID 不填曲名：曲名本身就对得上好几首（「Tricky Treat!!!」有本曲和三首ソロver.），填曲名点了还是这张列表。
+  // 每首之间空一行，跟 /搜索歌曲 一样；纯文本补发也空。一条链接都做不出来（返回 false）就照旧发。
+  const DIFFICULTY_WORDS = { 0: "绿", 1: "黄", 2: "红", 3: "紫", 10: "白" };
+  function candidateCommand(name, link, alias) {
+    const id = "id" + link.songId;
+    if (name === "song" || name === "aliases") return { command: `/${COMMANDS[name]} ${id}`, complete: true };
+    if ((name === "chartinfo" || name === "chartview") && DIFFICULTY_WORDS[link.difficultyId]) {
+      return { command: `/${COMMANDS[name]} ${id} ${DIFFICULTY_WORDS[link.difficultyId]}`, complete: true };
+    }
+    if ((name === "aliasadd" || name === "aliasdelete") && alias) return { command: `/${COMMANDS[name]} ${id} ${alias}`, complete: true };
+    if (name === "whatis") return link.lunatic ? { command: `/${COMMANDS.chartinfo} ${id} 白`, complete: true } : { command: `/${COMMANDS.chartinfo} ${id} `, complete: false };
+    return null;
+  }
+  function candidateHint(name, commands) {
+    if (!commands.length) return "";
+    if (commands.every((c) => !c.complete)) return `（点曲名会填入 /${COMMANDS.chartinfo} 和曲目 ID，再补一个难度字：绿/黄/红/紫）`;
+    if (!commands.every((c) => c.complete)) return `（点曲名会填入 /${COMMANDS.chartinfo} 和曲目 ID，再补一个难度字：绿/黄/红/紫；带 [LUNATIC] 的已经填好白谱，回车即可）`;
+    if (name === "chartinfo" || name === "chartview") return `（点曲名会填好这张谱面的 /${COMMANDS[name]}，回车即可）`;
+    if (name === "aliasadd" || name === "aliasdelete") return `（点曲名会填好 /${COMMANDS[name]}、曲目 ID 和这个别名，回车即可）`;
+    return `（点曲名会填好 /${COMMANDS[name]} 和曲目 ID，回车即可）`;
+  }
+  async function sendCandidates(event, header, lines, footer, { links, name, alias = "" }) {
+    const commands = [];
+    let literal = false;
+    // 每行拆成 Markdown 那份（曲名是链接）和纯文本那份；曲目各自一段，其余连着的行（说明、照抄的命令）合成一段。
+    const blocks = [];
+    lines.forEach((line, i) => {
+      const link = links[i];
+      let parts = [line];
+      if (link?.literal && songSearch.linkable(line, line)) { parts = [{ text: line, command: line }]; literal = true; }
+      else if (link && String(line).startsWith(link.text)) {
+        const target = candidateCommand(name, link, alias);
+        if (target && songSearch.linkable(link.text, target.command)) {
+          commands.push(target);
+          parts = [{ text: link.text, command: target.command }, line.slice(link.text.length)];
+        }
+      }
+      const entry = { markdown: songSearch.markdownLine(parts), text: String(line) };
+      if (link && !link.literal) blocks.push([entry]);
+      else if (blocks.length && blocks.at(-1).group) blocks.at(-1).push(entry);
+      else blocks.push(Object.assign([entry], { group: true }));
+    });
+    // 照抄的命令那行本身就是指令，一看就知道点了填什么，不另加提示。
+    if (!commands.length && !literal) return false;
+    if (footer) blocks.push([{ markdown: songSearch.escapeMarkdown(footer), text: footer }]);
+    const hint = candidateHint(name, commands);
+    const join = (block, key) => block.map((entry) => entry[key]).join("\n");
+    const chunks = [];
+    let current = header ? [[{ markdown: songSearch.escapeMarkdown(header), text: header }]] : [];
+    const size = (group) => group.map((block) => join(block, "text")).join("\n\n").length;
+    for (const block of blocks) {
+      if (current.length && size([...current, block]) > LINES_LIMIT) { chunks.push(current); current = []; }
+      current.push(block);
+    }
+    if (current.length) chunks.push(current);
+    for (const [i, chunk] of chunks.entries()) {
+      const markdown = chunk.map((block) => join(block, "markdown")).join("\n\n") + (i === chunks.length - 1 && hint ? "\n\n" + hint : "");
+      await sendMarkdown(event, markdown, chunk.map((block) => join(block, "text")).join("\n\n"), { heading: i === 0 && Boolean(header) });
+    }
+    return true;
   }
 
   // 分页出图（/等级）发完图之后补一条翻页消息：图片消息挂不了按钮（按钮只能跟 Markdown），所以另发一条。
@@ -310,14 +385,17 @@ function createMiaCommands(options = {}) {
     }
   }
 
-  async function dispatch(event, plan, chatLine = "", { forOther = false } = {}) {
+  async function dispatch(event, plan, chatLine = "", { forOther = false, name = "", query = "" } = {}) {
     if (plan.kind === "notice") return send(event, plan.text);
     // 闲聊触发 /帮助 时，模型的角色化开场和长清单之间留一行；直接 /帮助 则不在
     // 消息开头塞空行。其他短结果仍只换一行，免得每条都显得松散。
     const isHelpText = plan.kind === "text" && plan.text === helpText;
     const lead = chatLine ? chatLine + (isHelpText ? "\n\n" : "\n") : "";
     if (plan.kind === "text") return send(event, lead + plan.text);
-    if (plan.kind === "lines") return sendLines(event, lead + plan.header, plan.lines, plan.footer);
+    // 查别人（/单曲 tri @某人）的候选不做链接：点了填的指令不带 @，查的是点的人自己。
+    if (plan.kind === "lines") return sendLines(event, lead + plan.header, plan.lines, plan.footer, forOther ? {} : {
+      links: plan.links, name, alias: name === "aliasadd" ? core.parseAliasWriteInput(query)?.alias : "",
+    });
     if (plan.kind !== "image") throw new Error("未知的能力结果类型：" + plan.kind);
 
     const job = startImageJob(event, plan);
@@ -463,9 +541,13 @@ function createMiaCommands(options = {}) {
       // 曲名和白谱做成指令链接（点一下填好 /谱面分析）。没接 Markdown 发送器的宿主照旧发纯文本。
       if (!sendMarkdown) return sendLines(event, "", songSearch.reply(query).split("\n"));
       // 最后一块多页时带翻页按钮（chunk.keyboard），按钮被拒时传输层改发 markdownWithoutKeyboard。
-      for (const chunk of songSearch.replyChunks(query, LINES_LIMIT)) {
-        await sendMarkdown(event, chunk.markdown, chunk.text,
-          chunk.keyboard ? { keyboard: chunk.keyboard, markdownWithoutKeyboard: chunk.markdownWithoutKeyboard } : undefined);
+      // 第一块开头那句（「查到 N 首：」）写成大号标题（heading），后面接着发的块开头是曲目，不加。
+      const chunks = songSearch.replyChunks(query, LINES_LIMIT);
+      for (const [i, chunk] of chunks.entries()) {
+        await sendMarkdown(event, chunk.markdown, chunk.text, {
+          heading: i === 0,
+          ...(chunk.keyboard ? { keyboard: chunk.keyboard, markdownWithoutKeyboard: chunk.markdownWithoutKeyboard } : {}),
+        });
       }
       return;
     }
@@ -479,7 +561,7 @@ function createMiaCommands(options = {}) {
     const plan = await core.resolveCapability(
       config, String(event.userId), name, query,
       (line) => log(core.safeError(line)), target);
-    return dispatch(event, plan, chatLine, { forOther: Boolean(target) });
+    return dispatch(event, plan, chatLine, { forOther: Boolean(target), name, query });
   }
 
   // ── 绑定会话 ──────────────────────────────────────────────────────
@@ -661,7 +743,7 @@ function createMiaCommands(options = {}) {
       const matches = core.searchSongClues(input);
       return sendLines(event,
         matches.length ? "喵哼哼，找到下面这些歌：" : "唔，美亚没翻到这首歌。",
-        core.songMatchLines(matches));
+        core.songMatchLines(matches), "", { links: core.songMatchLinks(matches), name });
     }
 
     let query = input, alias = "";
@@ -675,7 +757,7 @@ function createMiaCommands(options = {}) {
     if (matches.length !== 1) {
       return sendLines(event,
         matches.length ? "一下翻出来好几首呢——用完整 Song ID 指给美亚看吧：" : "唔，美亚翻了一圈也没找到这首歌。",
-        core.songMatchLines(matches));
+        core.songMatchLines(matches), "", { links: core.songMatchLinks(matches), name, alias });
     }
     const song = matches[0], store = core.getAliasStore();
     if (name === "aliases") {

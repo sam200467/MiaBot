@@ -1248,4 +1248,29 @@ test("公共查询的翻页按钮：绑发起人；本人点了按存的查询�
   } finally { await bot.stop(); await mock.stop(); }
 });
 
+test("公共查询：单页结果、只问条数的结果，开头那句跟多页一样是大号标题", async () => {
+  let query = { filters: [{ field: "title", op: "contains", value: "Perfect Shining" }], select: ["title"] };
+  const fetchImpl = async (_, options) => {
+    const body = JSON.parse(options.body);
+    const decision = body.messages[0].content.includes("MIA_SEMANTIC_ROUTER_V1")
+      ? { route: "query", query }
+      : { text: "喵", scene: "ordinary", expressionIds: [] };
+    return { ok: true, text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(decision) } }] }) };
+  };
+  const { mock, bot } = await setup({}, { botDeps: { fetchImpl } });
+  bot.settings.c.limits.userCooldownSeconds = 0;
+  try {
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "Perfect Shining有哪些" }));
+    const single = mock.state.sent.at(-1).body;
+    assert.equal(single.msg_type, 2);
+    assert.equal(single.keyboard, undefined, "单页没有按钮");
+    assert.match(single.markdown.content, /^### 查到啦，给你整理在这里♪\n筛选：/);
+    query = { ...query, mode: "count" };
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "Perfect Shining有几首" }));
+    const count = mock.state.sent.at(-1).body;
+    assert.equal(count.msg_type, 2, "没有可点曲名的也用 Markdown 发");
+    assert.match(count.markdown.content, /^### 查到啦，给你整理在这里♪\n/);
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
 function readContextTexts(bot) { return bot.readContext(GROUP, false); }

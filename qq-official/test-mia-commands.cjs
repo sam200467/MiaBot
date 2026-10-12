@@ -49,6 +49,48 @@ test("搜索歌曲：接了 Markdown 发送器就发指令链接，纯文本作�
   } finally { restore(); }
 });
 
+test("抬头写成大号标题：/搜索歌曲 第一块、有抬头的曲目列表都带 heading，没接 Markdown 的照旧发纯文本", async () => {
+  const md = [];
+  const bound = { getBinding: async () => ({ playerName: "测试玩家", email: "a@b.c", password: "x" }) };
+  const restore = stub(bound);
+  try {
+    const { commands, sent } = setup({}, {
+      sendMarkdown: async (event, markdown, text, options) => { md.push({ markdown, text, options }); return { id: "md" }; },
+    });
+    await commands.handleCommand(groupEvent(""), parseCommand("/搜索歌曲 Perfect Shining"));
+    assert.equal(md.at(-1).options.heading, true, "单页结果也是大号标题");
+    await commands.handleCommand(groupEvent("/单曲 39"), parseCommand("/单曲 39"));
+    assert.equal(sent.length, 0);
+    assert.match(md.at(-1).text, /^找到多首曲目/);
+    assert.equal(md.at(-1).options.heading, true);
+    assert.match(md.at(-1).markdown, /\n\n<qqbot-cmd-input text="\/单曲 id39" show="id39　Gate of Doom" reference="false" \/>　— /, "曲名可点，填 /单曲 和 ID");
+    assert.match(md.at(-1).markdown, /DECO\\\*27\n\n（点曲名会填好 \/单曲 和曲目 ID，回车即可）$/, "谱师名转义；最下面是提示");
+    assert.equal(md.at(-1).text, "找到多首曲目，请用完整 Song ID 明确选择：\n\nid39　Gate of Doom　— Masahiro “Godspeed” Aoki\n\nid213　39　— sasakure.UK x DECO*27",
+      "每首之间空一行，纯文本补发也一样");
+
+    // 谱面分析：难度已知，填好整条；是什么歌：难度要补，提示写在最下面
+    await commands.handleCommand(groupEvent(""), parseCommand("/谱面分析 tricky treat 紫"));
+    assert.match(md.at(-1).markdown, /<qqbot-cmd-input text="\/谱面分析 id961 紫" show="id961　Tricky Treat!!!　\[MASTER\]"/);
+    assert.match(md.at(-1).markdown, /（点曲名会填好这张谱面的 \/谱面分析，回车即可）$/);
+    await commands.handleCommand(groupEvent(""), parseCommand("/是什么歌 tri"));
+    assert.match(md.at(-1).markdown, /text="\/谱面分析 id265 "/);
+    assert.match(md.at(-1).markdown, /text="\/谱面分析 id8185 白"/, "白谱单独一条，填好白");
+    assert.match(md.at(-1).markdown, /再补一个难度字：绿\/黄\/红\/紫；带 \[LUNATIC\] 的已经填好白谱，回车即可）$/);
+    await commands.handleCommand(groupEvent(""), parseCommand("/添加别名 tricky 糖"));
+    assert.match(md.at(-1).markdown, /text="\/添加别名 id7142 糖"/, "别名照着这次要加的填上");
+    await commands.handleCommand(groupEvent(""), parseCommand("/谱面分析 id39 白"));
+    assert.match(md.at(-1).markdown, /\n<qqbot-cmd-input text="\/谱面分析 id8015 白" show="\/谱面分析 id8015 白" reference="false" \/>$/, "照抄的命令整行可点");
+
+    // 查别人的候选不做链接：点了填的指令不带 @，查的是点的人自己
+    await commands.runCapability(groupEvent(""), "song", "39", "", "FRIEND");
+    assert.doesNotMatch(md.at(-1).markdown, /qqbot-cmd-input/);
+  } finally { restore(); }
+  await run({}, bound, async ({ commands, sent }) => {
+    await commands.handleCommand(groupEvent("/单曲 39"), parseCommand("/单曲 39"));
+    assert.match(sent.at(-1).text, /^找到多首曲目/, "没有 Markdown 发送器照旧发纯文本");
+  });
+});
+
 test("数字曲名：/单曲 打曲名片段就能出图；数字同时对上 ID 和曲名时两首都列出来，不替人挑", async () => {
   // 群里实测：/单曲 2112410 回「没有找到曲目」。原来整串数字只当 ID 找，《2112410403927243233368》（id665）
   // 打曲名永远查不到；《39》（id213）也一直被 ID 39 的《Gate of Doom》挡着。
