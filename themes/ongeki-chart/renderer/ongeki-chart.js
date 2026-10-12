@@ -631,13 +631,13 @@
     const notes = [...inRange(model.taps, from, to), ...heads].sort((a, b) => a.t - b.t);
     const runs = flickRuns(inRange(model.flicks, from, to));
     // 和音符压在一起的 BELL / 子弹（同一拍、同一位置，游戏里挂在音符正上方）：俯视会和音符互相遮挡，
-    // 改成套在音符外面的空心圈，画在音符之后；其余照常画，画在音符之前
+    // 改成同样大小的空心圈，画在音符之后，音符从圈里透出来；其余照常画，画在音符之前
     const onNote = (bell) => {
       const bx = Number(X(bell.x)), by = Number(Y(bell.t));
       return notes.some((n) => Math.abs(Number(Y(n.t)) - by) < 6 && Math.abs(Number(X(n.x)) - bx) < 10)
         || runs.some((r) => Math.abs(Number(Y(r.t)) - by) < 6 && bell.x >= r.x1 - FLICK_HALF_UNITS - 2 && bell.x <= r.x2 + FLICK_HALF_UNITS + 2);
     };
-    // 子弹放在音符之下，避免盖住音符；压在音符上的（同一拍、同一位置）改成套在音符外面的虚线圈，免得被音符盖住看漏
+    // 子弹放在音符之下，避免盖住音符；压在音符上的（同一拍、同一位置）改成空心圈画在音符之后，免得被音符盖住看漏
     const ringedBullets = [];
     for (const b of inRange(model.bullets, from, to)) {
       if (b.x < o.xMin - 1 || b.x > o.xMax + 1) continue;
@@ -658,11 +658,10 @@
     for (const run of runs) {
       body.push(flickShape(run, X(run.x1 - FLICK_HALF_UNITS), X(run.x2 + FLICK_HALF_UNITS), Y(run.t)));
     }
-    for (const n of ringed) body.push(`<circle class="bell-ring" cx="${X(n.x)}" cy="${Y(n.t)}" r="8.5"/>`);
-    // 同一个音符上同时有铃铛和子弹时，子弹圈套在铃铛圈外面
+    // 圈的大小和原来的 BELL（半径 4.5）、圆形子弹（半径 3.3，大号 ×1.4）一样，不放大；同一处两者都有时铃铛圈在外、子弹圈在里
+    for (const n of ringed) body.push(`<circle class="bell-ring" cx="${X(n.x)}" cy="${Y(n.t)}" r="4.5"/>`);
     for (const b of ringedBullets) {
-      const outer = ringed.some((n) => n.t === b.t && Math.abs(n.x - b.x) < 4);
-      body.push(`<circle class="bullet-ring d-${COLORS.bullet[b.damage] ? b.damage : "NML"}${b.aimed ? " aimed" : ""}" cx="${X(b.x)}" cy="${Y(b.t)}" r="${outer ? 11 : 8.5}"/>`);
+      body.push(`<circle class="bullet-ring d-${COLORS.bullet[b.damage] ? b.damage : "NML"}${b.aimed ? " aimed" : ""}" cx="${X(b.x)}" cy="${Y(b.t)}" r="${f1(4.4 * 0.75 * (b.large ? 1.4 : 1))}"/>`);
     }
 
     // 首尾重叠区：盖一层半透明，提示这是前后栏的内容
@@ -865,8 +864,8 @@
       case "bell": inner = bellShape(x, y); break;
       case "bullet": inner = bulletShape({ shape: "NDL", damage: "NML" }, x - 10, y + 7) + bulletShape({ shape: "CIR", damage: "NML" }, x, y + 1) + bulletShape({ shape: "SQR", damage: "NML" }, x + 10, y + 6); break;
       case "aimed": inner = bulletShape({ shape: "NDL", damage: "DNG", aimed: true }, x - 7, y + 7) + bulletShape({ shape: "CIR", damage: "NML", aimed: true }, x + 7, y + 1); break;
-      case "onnote": inner = tapShape({ kind: "C" }, x - 8, y) + `<circle class="bell-ring" cx="${x - 8}" cy="${y}" r="7"/>`
-        + tapShape({ kind: "R" }, x + 9, y) + `<circle class="bullet-ring d-NML" cx="${x + 9}" cy="${y}" r="7"/>`; break;
+      case "onnote": inner = tapShape({ kind: "C" }, x - 8, y) + `<circle class="bell-ring" cx="${x - 8}" cy="${y}" r="4.5"/>`
+        + tapShape({ kind: "R" }, x + 9, y) + `<circle class="bullet-ring d-NML" cx="${x + 9}" cy="${y}" r="3.3"/>`; break;
       case "damage": inner = bulletShape({ shape: "CIR", damage: "NML" }, x - 10, y) + bulletShape({ shape: "CIR", damage: "STR" }, x, y) + bulletShape({ shape: "CIR", damage: "DNG" }, x + 10, y); break;
       case "beam": inner = `<defs>${BEAM_HATCH("beam-hatch-legend")}</defs><rect class="beam" fill="url(#beam-hatch-legend)" x="${x - 7}" y="1" width="14" height="${H - 2}"/>`
         + `<line class="beam-edge" x1="${x - 7}" x2="${x - 7}" y1="1" y2="${H - 1}"/><line class="beam-edge" x1="${x + 7}" x2="${x + 7}" y1="1" y2="${H - 1}"/>`; break;

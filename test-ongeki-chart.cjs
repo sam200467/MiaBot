@@ -366,7 +366,7 @@ test("针形子弹按飞来的方向倾斜：从中间射出的朝外斜，竖�
   assert.ok(angles.some((a) => a < -10) && angles.some((a) => a > 10), "左右两发朝相反方向倾斜");
 });
 
-test("BELL / 子弹压在音符上时改成套住音符的空心圈，不盖住音符", () => {
+test("BELL / 子弹压在音符上时改成同样大小的空心圈，不盖住音符", () => {
   const lines = ["[HEADER]", "TRESOLUTION\t1920",
     "[B_PALETTE]", "BPL\tC\tUPS\t0\tFIX\t1.0\tN\tCIR\t0",
     "[LANE]", "LCS\t1\t0\t0\t0", "LCE\t1\t2\t0\t0",
@@ -377,7 +377,9 @@ test("BELL / 子弹压在音符上时改成套住音符的空心圈，不盖住�
   const svg = C.renderSvg(model, C.layoutChart(model));
   assert.equal((svg.match(/class="bell-ring"/g) || []).length, 1, "压在 TAP 上的铃铛画成金圈");
   assert.equal((svg.match(/<circle class="bell" /g) || []).length, 1, "不在音符上的铃铛照常画");
-  assert.match(svg, /class="bullet-ring d-DNG" [^>]*r="11"/, "同一音符上铃铛和子弹都有时，子弹圈在外");
+  // 圈和原来的铃铛、圆形子弹一样大，不放大
+  assert.match(svg, /class="bell-ring" [^>]*r="4.5"/);
+  assert.match(svg, /class="bullet-ring d-DNG" [^>]*r="3.3"/);
   assert.equal((svg.match(/class="bullet d-NML ring"/g) || []).length, 1, "不在音符上的子弹照常画");
   // 圈画在音符之后，音符本身不被盖住
   assert.ok(svg.indexOf('class="bell-ring"') > svg.indexOf('class="tap k-C"'));
