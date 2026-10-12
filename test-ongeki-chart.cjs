@@ -110,6 +110,15 @@ test("小节：拍号变化切小节，演出用的极短小节不占小节号",
   assert.equal(after.len, 1920);
 });
 
+test("小节：连成一段的演出短拍号（1/8、1/16）按每 4 拍并成一小节编号", () => {
+  // Apollo：50:0 起 1/8 拍号一直到 53:960 回到 4/4；参考站在这里按 unit 编号
+  const lines = ["[HEADER]", "TRESOLUTION\t1920", "[COMPOSITION]", "MET\t2\t0\t1\t8", "MET\t4\t960\t4\t4",
+    "MET\t6\t0\t1\t16", "MET\t6\t960\t4\t4", "[NOTES]", "TAP\t0\t0\t0\t0\t0", "TAP\t0\t9\t0\t0\t0"];
+  const model = C.parseOgkr(lines.join("\n"));
+  const numbered = C.measuresOf(model, model.lastTick + 1).filter((m) => m.no).map((m) => [m.no, m.t / 1920]);
+  assert.deepEqual(numbered.slice(0, 9), [[1, 0], [2, 1], [3, 2], [4, 3], [5, 4], [6, 4.5], [7, 5.5], [8, 6], [9, 6.5]]);
+});
+
 test("分栏：每栏不超过容量，首尾相接、不漏不重", () => {
   const model = C.parseOgkr(SAMPLE);
   const layout = C.layoutChart(model, { columnMeasures: 2 });
@@ -341,6 +350,18 @@ test("追踪弹的玩家位置估计：正在按的 HOLD > 一拍内最近的音
   assert.deepEqual(model.bullets.map((b) => [b.x, b.estimated]), [[6, true], [-8, true], [-5, true]]);
   const svg = C.renderSvg(model, C.layoutChart(model));
   assert.equal((svg.match(/<g class="aimed">/g) || []).length, 3);
+});
+
+test("针形子弹按飞来的方向倾斜：从中间射出的朝外斜，竖直落下的不转", () => {
+  const lines = ["[HEADER]", "TRESOLUTION\t1920",
+    "[B_PALETTE]", "BPL\tC1\tCEN\t0\tFIX\t1.0\tN\tNDL\t0", "BPL\tU1\tUPS\t0\tFIX\t1.0\tN\tNDL\t0",
+    "[BULLET]", "BLT\tC1\t0\t960\t20\tNML", "BLT\tC1\t0\t960\t-20\tNML", "BLT\tU1\t0\t960\t5\tNML",
+    "[NOTES]", "TAP\t0\t0\t0\t0\t0"];
+  const model = C.parseOgkr(lines.join("\n"));
+  const svg = C.renderSvg(model, C.layoutChart(model));
+  const angles = [...svg.matchAll(/<g transform="rotate\(([-\d.]+) /g)].map((m) => Number(m[1]));
+  assert.equal(angles.length, 2, "竖直落下的那发不包 rotate");
+  assert.ok(angles.some((a) => a < -10) && angles.some((a) => a > 10), "左右两发朝相反方向倾斜");
 });
 
 function tempTree(files) {

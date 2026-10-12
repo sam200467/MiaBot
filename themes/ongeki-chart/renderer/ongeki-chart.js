@@ -124,8 +124,11 @@
       }).sort(byTick),
       bullets: raw.bullets.map((n) => {
         const palette = palettes.get(n.palette) || { shooter: "UPS", offset: 0, aimed: false, shape: "CIR", large: false };
+        // 飞来的方向：从中间射出（CEN）的从 x=0 斜着飞过来；成组散开的（UPS + 偏移）从上方散开处往下收拢；跟着敌人射的不知道从哪来
+        const origin = palette.shooter === "CEN" ? 0 : palette.shooter === "ENE" ? null : n.x + palette.offset;
         return {
           t: tick(n.u, n.g), x: n.x + (palette.aimed ? 0 : palette.offset * BULLET_OFFSET_AT_JUDGE), aimed: palette.aimed, aimOffset: palette.offset,
+          origin: palette.aimed ? null : origin,
           damage: n.damage, shape: palette.shape, large: palette.large,
         };
       }).sort(byTick),
@@ -247,12 +250,21 @@
       list.push({ index: list.length, t, len, n, d });
       t += len;
     }
-    // 短于半拍的小节是演出用的（拍号 1/32 之类），只画淡线，不占小节号
-    let no = 0;
-    for (const m of list) {
-      m.minor = m.len < TR / 8;
-      if (!m.minor) m.no = ++no;
+    // 短于一拍的小节是演出用的（拍号 1/8、1/16、1/32 之类）。连成一段时按每 4 拍（一个 unit）并成一小节编号，
+    // 和常见谱面站一致；并出来不足一拍的零头（比如夹在 4/4 中间的一个 1/32）只画淡线，不占小节号
+    const tiny = (m) => m && m.len < TR / 4;
+    for (let i = 0; i < list.length; i++) {
+      const m = list[i];
+      m.tiny = tiny(m);
+      if (!m.tiny) { m.minor = false; continue; }
+      const startsChunk = !tiny(list[i - 1]) || m.t % TR === 0;
+      if (!startsChunk) { m.minor = true; continue; }
+      let end = m.t + m.len;
+      for (let j = i + 1; j < list.length && tiny(list[j]) && list[j].t % TR !== 0; j++) end = list[j].t + list[j].len;
+      m.minor = end - m.t < TR / 4;
     }
+    let no = 0;
+    for (const m of list) if (!m.minor) m.no = ++no;
     return list;
   }
 
@@ -261,7 +273,7 @@
     const marks = [];
     let [n, d] = model.header.meter;
     for (const m of measures) {
-      if (m.minor || (m.n === n && m.d === d)) continue;
+      if (m.tiny || (m.n === n && m.d === d)) continue;
       [n, d] = [m.n, m.d];
       marks.push({ t: m.t, n, d });
     }
@@ -557,9 +569,12 @@
     for (const m of layout.measures) {
       if (m.t > to) break;
       if (m.t + m.len < from) continue;
-      const beat = m.minor ? Infinity : TR / m.d;
+      const beat = m.tiny ? Infinity : TR / m.d;
       for (let t = m.t + beat; t < m.t + m.len - 1; t += beat) if (t >= from && t <= to) body.push(`<line class="beat" x1="${X(o.xMin)}" x2="${X(o.xMax)}" y1="${Y(t)}" y2="${Y(t)}"/>`);
-      if (m.t >= from) body.push(`<line class="${m.minor ? "beat" : "bar"}" x1="${X(o.xMin)}" x2="${X(o.xMax)}" y1="${Y(m.t)}" y2="${Y(m.t)}"/>`);
+      // 演出用的极短小节：编了号的画小节线；没编号的只在落在拍上时画一道拍线，免得 1/16 拍号画成一片横线
+      if (m.t < from) continue;
+      if (!m.minor) body.push(`<line class="bar" x1="${X(o.xMin)}" x2="${X(o.xMax)}" y1="${Y(m.t)}" y2="${Y(m.t)}"/>`);
+      else if (m.t % (TR / 4) === 0) body.push(`<line class="beat" x1="${X(o.xMin)}" x2="${X(o.xMax)}" y1="${Y(m.t)}" y2="${Y(m.t)}"/>`);
     }
 
     // 激光：斜纹 + 两侧虚线边，和实心的 HOLD 带区分开（宽度是伤害判定宽度）
@@ -614,7 +629,10 @@
     // 子弹放在最下层的音符之下，避免盖住音符
     for (const b of inRange(model.bullets, from, to)) {
       if (b.x < o.xMin - 1 || b.x > o.xMax + 1) continue;
-      body.push(bulletShape(b, X(b.x), Y(b.t)));
+      // 针形按飞来的方向倾斜：假设一拍前还在发射点那一侧，量出斜度
+      const tilt = b.shape === "NDL" && b.origin != null
+        ? -Math.atan2((b.x - b.origin) * o.unitPx, TR / 4 * layout.pxPerTick) * 180 / Math.PI : 0;
+      body.push(bulletShape(b, X(b.x), Y(b.t), tilt));
     }
 
     const heads = [];
@@ -783,8 +801,9 @@
     return out.join("");
   }
 
-  function bulletShape(b, x, y) {
-    if (b.aimed) return `<g class="aimed">${bulletShape({ ...b, aimed: false }, x, y)}</g>`;
+  function bulletShape(b, x, y, tilt = 0) {
+    if (b.aimed) return `<g class="aimed">${bulletShape({ ...b, aimed: false }, x, y, tilt)}</g>`;
+    if (Math.abs(tilt) >= 3) return `<g transform="rotate(${f1(tilt)} ${x} ${y})">${bulletShape(b, x, y)}</g>`;
     // 弹幕常常很密，整体按 0.75 缩小，免得相邻的叠成一片
     const s = (b.large ? 1.4 : 1) * 0.75;
     const cls = `bullet d-${COLORS.bullet[b.damage] ? b.damage : "NML"}`;
