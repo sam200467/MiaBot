@@ -160,19 +160,58 @@ function repeatCount(current, context) {
 // 写成「原神 开发公司」，那是合理的检索写法，不该被当成编出来的对象拦下。长的写在前面，
 // 不然「开发商」会被「开发」先吃掉，剩个「商」字。
 const MODIFIERS = /什么时候|是什么|是啥|什么|什麼|梗|出处|出處|意思|含义|含義|来源|來源|最新作|最新|最近|近期|现在|現在|目前|现状|近况|动态|状态|状况|情况|版本|更新|活动|活動|新闻|新聞|消息|攻略|官网|官網|官方|介绍|介紹|资料|資料|信息|情报|情報|时间|時間|日期|发售|發售|上线|上線|哪里|哪个|哪個|是谁|谁|多少|价格|價格|下载|下載|规则|規則|玩法|新作|第几代|几代|叫什么|名字|名称|作品|开发商|开发公司|开发|发行商|发行|公司|厂商|制作|作者|作曲|曲师|画师|出自|游戏|曲子|歌曲|原因|为什么|高度|多高|怎么|如何|方法|入门|教程|谱面|譜面|曲目|手元|运指|運指|评价|評価|感想|推荐|推薦|おすすめ|好玩|有趣|热门|熱門|人气|人氣|meaning|origin|latest|news|wiki|update|official|release|version|event|game|songs?|music|chart|review/gi;
-// 游戏的几种写法互相算出处：用户说「中二」，检索词写「CHUNITHM」不算编。
-const GAME_NAMES = [
-  ["chunithm", "中二", "中二节奏", "チュウニズム"],
-  ["ongeki", "音击", "音擊", "オンゲキ"],
-  ["maimai", "舞萌", "マイマイ"],
-  ["arcaea", "韵律源点"],
-  ["phigros", "菲格罗斯"],
-  ["taiko", "太鼓达人", "太鼓の達人"],
+// 同一个东西的几种写法：互相算出处，相关性筛选里也算同一个对象。
+// 游戏名之外收圈内缩写（KOP），这类词判断模型自己也常不认识（2026-10-12 线上实测
+// 「ongeki部门历年kop决赛曲」：判断调用把 KOP 列进了不认识的词，检索词只能照抄原话）。
+//   · jp：补搜时换成的日文／官方写法——音击、中二、舞萌的资料主要在日文 wiki 上；
+//   · full：首搜时追加在缩写后面的全称，搜索引擎不一定认得缩写；
+//   · wiki：补搜时限定到日文攻略 wiki。
+// 加词就在这里加一行；只收写法稳定、不会和普通词撞的。
+const SEARCH_GROUPS = [
+  { names: ["chunithm", "中二", "中二节奏", "チュウニズム"], jp: "CHUNITHM", wiki: true },
+  { names: ["ongeki", "音击", "音擊", "オンゲキ"], jp: "オンゲキ", wiki: true },
+  { names: ["maimai", "舞萌", "マイマイ"], jp: "maimai", wiki: true },
+  { names: ["arcaea", "韵律源点"] },
+  { names: ["phigros", "菲格罗斯"] },
+  { names: ["taiko", "太鼓达人", "太鼓の達人"] },
+  { names: ["king of performai", "kop", "キングオブパフォーマイ"], jp: "KING of Performai", full: "KING of Performai", wiki: true },
 ];
+const WIKI_SITES = ["wikiwiki.jp", "gamerch.com", "ja.wikipedia.org"];
+// 补搜时的中文→日文常用词。只收音游资料里常见、对应关系确定的词，长的写在前面。
+const ZH_JA = [
+  ["决赛曲", "決勝 課題曲"], ["课题曲", "課題曲"], ["决赛", "決勝"], ["预选", "予選"], ["冠军", "優勝"], ["大赛", "大会"], ["比赛", "大会"],
+  ["历年", "歴代"], ["历代", "歴代"], ["部门", "部門"], ["曲名", "楽曲"], ["曲目", "楽曲"], ["收录", "収録"], ["谱面", "譜面"],
+  ["版本", "バージョン"], ["活动", "イベント"], ["更新", "アップデート"], ["段位", "段位"], ["定数", "定数"], ["手元", "手元"], ["攻略", "攻略"],
+];
+const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const nameRe = name => /^[a-z0-9 ]+$/i.test(name) ? "(?<![a-z0-9])" + escapeRe(name).replace(/ /g, "\\s*") + "(?![a-z0-9])" : escapeRe(name);
+function groupsIn(text) {
+  const t = String(text ?? "").normalize("NFKC");
+  return SEARCH_GROUPS.filter(g => g.names.some(n => new RegExp(nameRe(n), "i").test(t)));
+}
 function expandNames(hay) {
   let out = hay;
-  for (const names of GAME_NAMES) if (names.some(n => hay.includes(squash(n)))) out += names.map(squash).join("");
+  for (const g of SEARCH_GROUPS) if (g.names.some(n => hay.includes(squash(n)))) out += g.names.map(squash).join("");
   return out;
+}
+// 首搜：缩写后面补上全称（「ongeki KOP 决赛曲」→ 再加「KING of Performai」）。
+function expandAbbreviations(target) {
+  const t = String(target ?? "").trim();
+  const extra = groupsIn(t).filter(g => g.full && !squash(t).includes(squash(g.full))).map(g => g.full);
+  return extra.length ? t + " " + extra.join(" ") : t;
+}
+// 补搜：游戏名、缩写、常用词换成日文写法，并限定到日文攻略 wiki。只给音击／中二／舞萌这类
+// 资料在日文 wiki 上的对象做；别的话题换成日文只会更偏，返回 null 就不补搜。
+function retryQuery(target) {
+  const t = String(target ?? "").normalize("NFKC").trim();
+  if (!groupsIn(t).some(g => g.wiki)) return null;
+  const pairs = [...SEARCH_GROUPS.flatMap(g => g.jp ? g.names.map(n => [n, g.jp]) : []), ...ZH_JA].sort((a, b) => b[0].length - a[0].length);
+  const lookup = new Map(pairs.map(([from, to]) => [from.toLowerCase().replace(/\s+/g, " "), to]));
+  const re = new RegExp(pairs.map(([from]) => nameRe(from)).join("|"), "gi");
+  const swapped = t.replace(re, m => " " + (lookup.get(m.toLowerCase().replace(/\s+/g, " ")) ?? m) + " ");
+  const seen = new Set();
+  const query = swapped.split(/\s+/).filter(w => w && !seen.has(w.toLowerCase()) && seen.add(w.toLowerCase())).join(" ");
+  return { query, sites: WIKI_SITES };
 }
 function coreUnits(target) { return units(String(target ?? "").replace(MODIFIERS, " ")); }
 // 「今年／去年／最近」在检索词里会变成具体年份——那是从用户原话推出来的，算出处。
@@ -205,13 +244,24 @@ function targetProblem(target, haystack) {
   const missingChars = han.filter(char => !hay.includes(char));
   return missingChars.length * 2 <= han.length ? "" : "检索词里有用户没提过的内容（" + missingChars.slice(0, 6).join("") + "）";
 }
-// 搜回来的结果至少要提到对象里的一个单位，不然就是答非所问（「宝宝黄疸 16.5」那一类）。
+// 搜回来的结果要提到对象，不然就是答非所问（「宝宝黄疸 16.5」那一类）。对象拆成几个
+// 「概念」：一个写法组（游戏名、缩写，任一写法都算）或者剩下的一个内容单位。有两个以上
+// 概念时至少要沾两个——只沾一个太松：2026-10-12 搜「ongeki KOP 决赛曲」，假面骑士响鬼
+// 的「音撃」词条只因为提到 Ongeki 就混进了资料。日文结果靠写法组对得上中文检索词。
 function relevantSources(sources, target) {
-  const core = coreUnits(target).filter(u => u.length >= 2);
-  if (!core.length) return Array.isArray(sources) ? sources : [];
-  return (Array.isArray(sources) ? sources : []).filter(s => {
+  const list = Array.isArray(sources) ? sources : [];
+  let rest = String(target ?? "").normalize("NFKC");
+  const concepts = [];
+  for (const g of groupsIn(rest)) {
+    concepts.push(g.names.map(squash));
+    for (const n of g.names) rest = rest.replace(new RegExp(nameRe(n), "gi"), " ");
+  }
+  for (const u of coreUnits(rest)) if (u.length >= 2) concepts.push([u]);
+  if (!concepts.length) return list;
+  const need = Math.min(2, concepts.length);
+  return list.filter(s => {
     const hay = squash([s.title, s.snippet, s.content].join(" "));
-    return core.some(u => hay.includes(u));
+    return concepts.filter(c => c.some(n => hay.includes(n))).length >= need;
   });
 }
 
@@ -408,7 +458,7 @@ function describeGate(info) {
     o ? o.act + "/" + o.about + (o.fresh ? "/时效" : "") + (o.confident === false ? "/没把握" : "") : info.error ? "判断失败：" + info.error : "未调用判断",
     d.action + "：" + d.reason + (d.target ? "「" + d.target + "」" : "")];
   if (d.would) parts.push("自动档会" + d.would.action + "：" + d.would.reason + (d.would.target ? "「" + d.would.target + "」" : ""));
-  if (info.searched) parts.push("搜到相关 " + info.searched.sourceCount + " 条" + (info.searched.error ? "（" + info.searched.error + "）" : ""));
+  if (info.searched) parts.push((info.searched.retried ? "补搜「" + info.searched.retried + "」，" : "") + "搜到相关 " + info.searched.sourceCount + " 条" + (info.searched.error ? "（" + info.searched.error + "）" : ""));
   if (info.offered) parts.push("已提议，等用户答应");
   if (o?.unknownTerms?.length) parts.push("不认识：" + o.unknownTerms.join("、"));
   if (info.ms) parts.push(info.ms + "ms");
@@ -452,6 +502,6 @@ function gateRule(state) {
 module.exports = {
   GATE_MARKER, MODES, ACTS, ABOUTS, EVIDENCE_PREFIX,
   gateSettings, explicitRequest, affirmative, vetoReason, splitConversation, repeatCount,
-  targetProblem, yearWords, relevantSources, gateRules, gateInput, validateObservation, classify,
+  targetProblem, yearWords, relevantSources, expandAbbreviations, retryQuery, gateRules, gateInput, validateObservation, classify,
   autoDecision, decide, prepareGate, describeGate, offerPresent, unsure, gateRule,
 };
