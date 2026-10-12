@@ -2406,6 +2406,9 @@ const LEVEL_SCORE_COLUMNS = 7;
 const LEVEL_SCORE_ROWS_PER_PAGE = 10;
 const LEVEL_SCORE_PAGE_SIZE = LEVEL_SCORE_COLUMNS * LEVEL_SCORE_ROWS_PER_PAGE;
 const LEVEL_SCORE_CANVAS_WIDTH = 1440;
+// 成绩长图按 2 倍像素、JPEG 质量 95 输出，文件上限约 4MB（放大看不糊，又不至于发不出去）
+const LEVEL_SCORE_IMAGE_MAX_SCALE = 2;
+const LEVEL_SCORE_IMAGE_TARGET_BYTES = 4 * 1024 * 1024;
 
 function normalizeLevelScoreLabel(raw) {
   const label = String(raw ?? "")
@@ -2996,16 +2999,29 @@ async function renderLevelScoreTheme(data) {
     });
     await cdp.navigate(pathToFileURL(htmlPath).href);
     await waitForLocalTheme(cdp, 120000);
-    const shot = await cdp.send("Page.captureScreenshot", {
-      format: "jpeg",
-      quality: 90,
-      fromSurface: true,
-      captureBeyondViewport: false,
-      clip: { x: 0, y: 0, width, height, scale: 1 },
-    });
-    const buffer = Buffer.from(shot.data || "", "base64");
-    if (buffer.length < 100000) throw new Error("等级成绩长图截图数据异常（文件过小）");
-    console.log(`  ✓ 等级成绩长图渲染完成（${Math.round(buffer.length / 1024)} KB）`);
+    // 高清：按 2 倍像素截图，文件控制在 LEVEL_SCORE_IMAGE_TARGET_BYTES 左右；
+    // 超了先降 JPEG 质量，还超再降倍率
+    let scale = Math.min(LEVEL_SCORE_IMAGE_MAX_SCALE, CHART_IMAGE_MAX_SIDE / width, CHART_IMAGE_MAX_SIDE / height);
+    let buffer = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: scale, mobile: false });
+      await sleep(200);
+      for (const quality of [95, 90, 85]) {
+        const shot = await cdp.send("Page.captureScreenshot", {
+          format: "jpeg",
+          quality,
+          fromSurface: true,
+          captureBeyondViewport: false,
+          clip: { x: 0, y: 0, width, height, scale: 1 },
+        });
+        buffer = Buffer.from(shot.data || "", "base64");
+        if (buffer.length <= LEVEL_SCORE_IMAGE_TARGET_BYTES) break;
+      }
+      if (buffer.length <= LEVEL_SCORE_IMAGE_TARGET_BYTES || scale <= 1) break;
+      scale = Math.max(1, scale * 0.85);
+    }
+    if (!buffer || buffer.length < 100000) throw new Error("等级成绩长图截图数据异常（文件过小）");
+    console.log(`  ✓ 等级成绩长图渲染完成（${Math.round(buffer.length / 1024)} KB，${Math.round(width * scale)}×${Math.round(height * scale)}）`);
     return buffer;
   } finally {
     cdp?.close();
