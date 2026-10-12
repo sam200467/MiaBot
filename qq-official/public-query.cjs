@@ -11,6 +11,7 @@ const songSearch = require("./song-search.cjs");
 const { botChartId, catalogCoverage, currentCatalogSongs } = require("./song-id.cjs");
 const { randomInt } = require("node:crypto");
 const { Converter } = require("opencc-js");
+const { PLATE_CHOICES } = require("../mia-core.cjs");
 const characters = loadCharacters(path.join(__dirname, "../chat-core"));
 const textKey = value => String(value ?? "").normalize("NFKC").toLowerCase().trim();
 // One key for 彩華/彩华, 美亜/美亚, 梨緒/梨绪, 咲姫/咲姬. OpenCC's jp→cn table
@@ -94,7 +95,7 @@ const fields = {
   title: { label: "歌名", type: "text", note: "prefix=开头，contains=包含，eq=完整歌名；search 才允许别名/ID/拼写候选；charset=曲名的字全是某类字符（digits 数字/latin 英文字母/greek 希腊字母/kana 假名/han 汉字/symbol 没有字母数字、整条是符号，空格和标点不算），比如「全是数字的歌」用 charset digits；用户描述一个符号或希腊字母的读法（倒A、omega）用 search" },
   artist: { label: "艺术家署名", type: "text" },
   genre: { label: "分类", type: "text" },
-  version: { label: "收录版本", type: "text" },
+  version: { label: "收录版本", type: "text", note: "可以直接写版本牌子名（辉击、闪击、赤击……）或版本名（bright、R.E.D. PLUS），程序会换成对应版本；问某个牌子收了哪些歌用 eq" },
   release: { label: "收录日期", type: "date", note: "YYYY-MM-DD；没有记录就未知" },
   bpm: { label: "BPM", type: "number" },
   deleted: { label: "已删除", type: "boolean" },
@@ -148,6 +149,17 @@ const SCHEMA = {
   rules: "用户问歌曲的 id/ID 时选 botId（分表用短 ID），只有明确问官方曲目 ID 才选 officialId。filters 全部为 AND，in 的数组为 OR；每条谱面必须同时满足所有条件，不能拿红谱的等级配紫谱的定数。selection决定筛选后怎么选：随机/随便/任意选N项用random+count=N，前N项用first+count=N，列全部用all且不填count。换一批/排除刚才的用excludePrevious=true。排序后取前几项才是first；随机从完整候选池不放回抽取，不是第一分页。count模式统计全部候选，不与抽样混用。只支持上述字段，不支持的条件不能丢弃，应具体说明或追问。歌曲计数去重，谱面计数不去重。新查询page=1；翻页沿用完整条件和同一批抽样。空结果不放宽条件。",
 };
 
+// 收录版本的写法很乱：曲库里同一个版本有「オンゲキ R.E.D. PLUS」「RED Plus」两种，bright 也有不带前缀的。
+// 比较时去掉 オンゲキ/ONGEKI 前缀、空格和点，大小写不分，这几种写法就成了同一个键。
+const versionKey = value => String(value ?? "").normalize("NFKC").toLowerCase().replace(/^(?:オンゲキ|ongeki)/, "").replace(/[\s.]/g, "") || "ongeki";
+// 群友说的多半是牌子名（「辉击这个牌子对应哪个版本」），曲库里只有版本名，原来按「收录版本＝辉击」筛必然 0 首。
+// 牌子表跟 /牌子 共用 mia-core 的 PLATE_CHOICES；繁简、日文写法（輝撃）都认，尾巴上的「牌子」「版本」不算。
+function plateByName(value) {
+  const key = foldHan(value).replace(/\s+/g, "").replace(/(?:的)?(?:牌子|牌|版本)$/, "");
+  return key ? PLATE_CHOICES.find(p => [p.nameZhHans, p.nameJa].some(name => foldHan(name) === key)) ?? null : null;
+}
+const plateForVersion = value => PLATE_CHOICES.find(p => versionKey(p.version) === versionKey(value)) ?? null;
+
 class QueryError extends Error {
   constructor(message) { super(message); this.name = "QueryError"; }
 }
@@ -168,6 +180,7 @@ function scalar(field, value) {
   } else {
     if (typeof value !== "string" || !value.trim() || value.length > 120) reject(`${spec.label}需要有效文字`);
     value = value.normalize("NFKC").trim();
+    if (field === "version") value = plateByName(value)?.version ?? value;
     if (spec.type === "enum" && !spec.values.includes(value)) reject(`${spec.label}必须是 ${spec.values.join("/")}`);
     if (spec.type === "level" && !/^(?:[1-9]|1[0-5])\+?$/.test(value)) reject("显示等级用 13 或 13+ 这样的写法，不能混成定数");
     if (spec.type === "date" && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value)) reject("日期需要 YYYY-MM-DD");
@@ -313,7 +326,7 @@ function compare(value, filter) {
   if (filter.op === "in") return filter.value.some(v => compare(value, { ...filter, op: "eq", value: v }));
   if (Array.isArray(value)) return filter.op === "ne" ? value.every(v => compare(v, filter)) : value.some(v => compare(v, filter));
   const type = fields[filter.field].type;
-  const key = v => type === "level" ? levelValue(v) : ["number", "boolean", "duration"].includes(type) ? v : textKey(v);
+  const key = v => type === "level" ? levelValue(v) : ["number", "boolean", "duration"].includes(type) ? v : filter.field === "version" ? versionKey(v) : textKey(v);
   const a = key(value), b = key(filter.value);
   switch (filter.op) {
     case "eq": return a === b; case "ne": return a !== b;
@@ -392,7 +405,10 @@ function executeQuery(input, { preview = false, selectionKeys, excludeKeys = [],
 }
 const opLabels = { eq: "＝", ne: "≠", gt: "＞", gte: "≥", lt: "＜", lte: "≤", contains: "包含", prefix: "开头是", suffix: "结尾是", search: "线索", in: "属于", charset: "全是" };
 const show = value => Array.isArray(value) ? value.join("、") || "未知" : !known(value) ? "未知" : typeof value === "boolean" ? value ? "是" : "否" : String(value);
-const showField = (field, value) => fields[field].type === "duration" ? Array.isArray(value) ? value.map(clock).join("、") : known(value) ? clock(value) : "未知" : show(value);
+// 收录版本后面注上牌子名：「收录版本＝ONGEKI bright（辉击）」，问牌子的人一眼看到对应哪个版本。
+const withPlate = value => { const plate = known(value) && plateForVersion(value); return plate ? `${value}（${plate.nameZhHans}）` : show(value); };
+const showField = (field, value) => fields[field].type === "duration" ? Array.isArray(value) ? value.map(clock).join("、") : known(value) ? clock(value) : "未知"
+  : field === "version" ? Array.isArray(value) ? value.map(withPlate).join("、") : withPlate(value) : show(value);
 function describeQuery(query) {
   return query.filters.length ? query.filters.map(f => `${fields[f.field].label}${opLabels[f.op]}${f.op === "charset" ? CHARSET_LABELS[f.value] : showField(f.field, f.value)}`).join("；") : "全部曲目";
 }

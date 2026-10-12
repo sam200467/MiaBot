@@ -435,3 +435,18 @@ test("时长与删除日期：按 m:ss 或秒数筛，显示成 m:ss；问到时
   assert.match(queryMismatch(plain, "Departure这首歌多长"), /duration/);
   assert.ok(!queryMismatch(validateQuery({ filters: [filter("title", "eq", "Departure")], select: ["title", "deletedDate", "duration"] }), "Departure什么时候删的，时长多少"));
 });
+
+test("收录版本认牌子名：辉击＝bright，几种版本写法算同一个版本", () => {
+  // 群里实测「辉击这个牌子里 14 及以上的歌」回 0 首：曲库只有版本名，没有牌子名。
+  const query = [filter("version", "eq", "辉击"), filter("level", "gte", "14")];
+  const plate = all({ filters: query });
+  assert.ok(plate.length > 0, "牌子名要换成对应版本");
+  for (const name of ["輝撃", "辉击牌子", "bright", "オンゲキ bright"]) {
+    assert.equal(run([filter("version", "eq", name), filter("level", "gte", "14")]).total, plate.length, name);
+  }
+  assert.ok(!plate.some(e => e.rows.some(r => /memory/i.test(r.version))), "bright 不能混进 bright MEMORY");
+  assert.match(formatResult(run(query)), /^筛选：收录版本＝ONGEKI bright（辉击）；显示等级≥14$/m);
+  // 「RED Plus」和「オンゲキ R.E.D. PLUS」是同一个版本。
+  const red = all({ filters: [filter("version", "eq", "皇击")] });
+  assert.ok(red.some(e => e.rows[0].version === "RED Plus") && red.some(e => e.rows[0].version === "オンゲキ R.E.D. PLUS"));
+});
