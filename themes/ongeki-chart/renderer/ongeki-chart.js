@@ -825,7 +825,8 @@
 
   // aimed：瞄准玩家的（落点取决于玩家当时的位置），画在出现位置上并调淡
   function bellShape(x, y, aimed = false) {
-    const shape = `<circle class="bell" cx="${x}" cy="${y}" r="3.6"/><circle class="bell-core" cx="${x}" cy="${y}" r="1.3"/>`;
+    // 和圆形子弹（外径约 4.3）差不多大：金色部分到 4.0，外面一圈深色描边
+    const shape = `<circle class="bell" cx="${x}" cy="${y}" r="4.5"/><circle class="bell-core" cx="${x}" cy="${y}" r="1.6"/>`;
     return aimed ? `<g class="aimed">${shape}</g>` : shape;
   }
 
