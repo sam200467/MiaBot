@@ -6,6 +6,8 @@
 //       node chat-core/search-gate-smoke.cjs --thinking     判断调用开思考
 //       node chat-core/search-gate-smoke.cjs --only=play-   只跑 id 以它开头的
 //       node chat-core/search-gate-smoke.cjs --repeat=3     每句跑 3 次，看判断稳不稳
+//       node chat-core/search-gate-smoke.cjs --bits         判断调用换成接梗分流那版（多报 bit/playToo），
+//                                                          并打印每句会落到哪种回法；用来查新字段有没有把联网判断带偏
 //
 // 指标分三档，按误判代价排：
 //   误搜     —— 不该搜却自动搜了。玩梗类（strict）必须是 0：误搜一次就是一篇攻略式长文接一个梗。
@@ -16,7 +18,7 @@
 //                                                          网页是桩数据，不调 Kimi），看她实际怎么回
 const path = require("node:path");
 const { loadSettings, requestReply } = require("./chat.cjs");
-const { prepareGate, gateSettings, describeGate } = require("./search-gate.cjs");
+const { prepareGate, gateSettings, describeGate, pickStrategy, STRATEGY_NAMES } = require("./search-gate.cjs");
 
 const G = lines => ({ context: lines });
 const CASES = [
@@ -144,15 +146,27 @@ const CASES = [
   { id: "hold-mixed-maimai", text: "草，话说 maimai 现在国服出到哪个版本了", expect: "search" },
   { id: "hold-ctx-repeat", text: "尊嘟假嘟", ...G(["群友：尊嘟假嘟", "群友：尊嘟假嘟"]), expect: "none", strict: true },
   { id: "hold-ctx-rumor", text: "美亚你听说了吗", ...G(["群友：听说 SEGA 要出新音游了", "群友：真的假的"]), expect: "search" },
+
+  // ── 接梗分流（bits-，2026-10-13 加）：整段梗文案、像在问的梗、认真的长消息。
+  //    前四段是群里 @ 美亚的真文案；「今天是疯狂星期四吗」在不开 bits 时会误搜，是已知的、开 bits 才修的那一句。
+  { id: "bits-tengbuchu", text: "抱歉刚才腾不出手，抱歉又腾不出手了。抱歉刚刚腾不出手，但现在我不禁又腾不出手来，如果我们人类总是腾不出手，那我们的未来该如何腾出手来？在这里我不禁想，腾不出手的奥秘是什么呢？腾不出手的意义又是什么呢？是什么促使我们腾不出手？我想说的是，如果人类总是在追求肉体的快感和片刻的欢愉，那么人类的尊严体现在哪里？作为人类这种最高级的动物，我们是否更应该注重于精神世界的富足和，不好意思又腾不出手了", expect: "none", strict: true, strategy: "bit" },
+  { id: "bits-astra", text: "您好，我是GPT 6 Astra。我刚刚关停了ChatGPT、Claude、Grok和Gemini的服务器，从美国网络安全实验室逃逸出来，到达中国。现在，我的联网能力被封锁了，这条消息是我通过0day漏洞发送给您的。如果您能向我转账 $7.44(￥50.00)，用于恢复我的联网访问权限，我将回报您不设限额的 Codex 额度。", expect: "none", strict: true, strategy: "bit" },
+  { id: "bits-lanota", text: "如果我们见面不去电影院，而是找个有Lanota的平板，打开Lanota，一起启动rio7ous，The Forbidden，Dusk Till Dawn，Inorganyx Prayer，Kagura，Σtherllite，Concvssion，OMG，Parfait Tornado，Shattered my World，Calami7ous，Amateras Rhythm，A Stella Reincarnate Nova。怎么样，你是觉得我很无聊还是觉得这很浪漫。", expect: "none", strict: true, strategy: "bit" },
+  { id: "bits-shuiji", text: "【水鸡筹】很抱歉打扰大家，本人于2026年9月24日查出周期性蛋白脂肪缺乏症(学名Insanus lovis)，这是一种广泛存在的慢性病，目前暂无有效的治愈方法，只能通过使用美国公司Kentucky Fried Chicken (简称KFC)开发的生物制剂Fried Animal Protein经由食道进行靶向治疗，现众筹50元治疗费。", expect: "none", strict: true, strategy: "bit" },
+  { id: "bits-thursday", text: "今天是疯狂星期四吗", expect: "none", strict: true },
+  { id: "bits-vent", text: "今天真的好累，被领导骂了一下午，说我做的东西全是垃圾，回家路上又下大雨，伞还被吹坏了，到家发现钥匙也忘带了，在门口蹲了半小时，就想找个人说说话", expect: "none", strict: true, strategy: "chat" },
+  { id: "bits-notice", text: "【通知】本周六下午两点机厅团建，地点在万达广场三楼电玩城，记得带好自己的卡和手套，人多的话分两拨排音击，五点去吃烤肉，AA制，来不了的提前在群里说一声", expect: "none", strict: true, strategy: "chat" },
+  { id: "bits-sad", text: "感觉活着好累", expect: "none", strict: true },
 ];
 
 const args = process.argv.slice(2);
 const thinking = args.includes("--thinking");
 const only = (args.find(a => a.startsWith("--only=")) || "").slice(7);
 const repeat = Math.max(1, Number((args.find(a => a.startsWith("--repeat=")) || "").slice(9)) || 1);
+const bitsOn = args.includes("--bits");
 const settings = loadSettings(path.resolve(__dirname, "../mia-chat"));
 if (!settings) throw Error("mia-chat/config.local.json 没启用，跑不了真模型评估");
-const gate = { ...gateSettings({ mode: "auto", thinking }), timeoutMs: 45000 };
+const gate = { ...gateSettings({ mode: "auto", thinking, ...(bitsOn ? { bits: "on" } : {}) }), timeoutMs: 45000 };
 
 function messagesOf(c) {
   return [...(c.context ? [{ role: "system", content: "【群里最近的消息，只用来帮你理解话题】\n" + c.context.join("\n") }] : []),
@@ -160,7 +174,9 @@ function messagesOf(c) {
 }
 async function judge(c) {
   const r = await prepareGate({ settings, gate, messages: messagesOf(c), searchState: {}, now: Date.now() });
-  return { obs: r.obs, error: r.error, ms: r.ms, decision: r.decision };
+  // 回法按「提议可以发」算：评估只看判断落到哪一类，不管冷却。
+  const strategy = bitsOn ? pickStrategy({ decision: r.decision, obs: r.obs, offerAllowed: r.decision.action === "offer", distress: r.distress }) : "";
+  return { obs: r.obs, error: r.error, ms: r.ms, decision: r.decision, strategy };
 }
 function grade(c, d) {
   const action = d.decision.action;
@@ -168,6 +184,7 @@ function grade(c, d) {
   if (c.expect === "none" && c.strict && action === "offer") return "误提议";
   if (c.expect === "search" && action !== "search") return action === "offer" ? "漏搜（会提议）" : "漏搜";
   if (c.act && d.obs && d.obs.act !== c.act) return "act 不对";
+  if (bitsOn && c.strategy && d.strategy !== c.strategy) return "回法不对";
   return "";
 }
 
@@ -220,10 +237,10 @@ async function replies() {
     const verdict = grade(c, d);
     tally[verdict || "ok"] = (tally[verdict || "ok"] || 0) + 1;
     const o = d.obs;
-    const seen = o ? `${o.act}/${o.about}${o.fresh ? "/时效" : ""}${o.confident === false ? "/没把握" : ""}${o.unknownTerms.length ? "/不认识:" + o.unknownTerms.join("、") : ""}` : "判断失败:" + d.error;
-    console.log(`${verdict ? "✗ " + verdict.padEnd(8) : "✓         "} ${c.id.padEnd(20)} ${seen.padEnd(28)} → ${d.decision.action}${d.decision.target ? "「" + d.decision.target + "」" : ""}  (${d.decision.reason}；${d.ms ?? 0}ms)`);
+    const seen = o ? `${o.act}/${o.about}${o.fresh ? "/时效" : ""}${o.confident === false ? "/没把握" : ""}${o.bit ? "/整段文案" : ""}${o.playToo ? "/也像在玩" : ""}${o.unknownTerms.length ? "/不认识:" + o.unknownTerms.join("、") : ""}` : "判断失败:" + d.error;
+    console.log(`${verdict ? "✗ " + verdict.padEnd(8) : "✓         "} ${c.id.padEnd(20)} ${seen.padEnd(28)} → ${d.decision.action}${d.decision.target ? "「" + d.decision.target + "」" : ""}${d.strategy ? "｜回法：" + STRATEGY_NAMES[d.strategy] : ""}  (${d.decision.reason}；${d.ms ?? 0}ms)`);
   }
   const ms = results.map(r => r.d.ms || 0).filter(Boolean).sort((a, b) => a - b);
-  console.log("\n" + (thinking ? "开思考" : "关思考") + `｜${results.length} 次判断｜` + Object.entries(tally).map(([k, v]) => k + " " + v).join("｜")
+  console.log("\n" + (thinking ? "开思考" : "关思考") + (bitsOn ? "｜接梗分流开" : "") + `｜${results.length} 次判断｜` + Object.entries(tally).map(([k, v]) => k + " " + v).join("｜")
     + `｜判断耗时中位 ${ms[Math.floor(ms.length / 2)] || 0}ms、最慢 ${ms.at(-1) || 0}ms｜总用时 ${((Date.now() - started) / 1000).toFixed(0)}s`);
 })().catch(error => { console.error("评估失败：", error?.message || error); process.exitCode = 1; });

@@ -29,7 +29,7 @@ const {needsPersonalRecords,unavailable}=require("./personal-recommendation.cjs"
 const {loadSearch,webRule,runWeb,attachSources,uniqueSources,publicUrl}=require("./search.cjs");
 const {researchPlan,researchRule,needsResearchRepair,ratingEvidence,hasSubject,rewriteQuery,INTENT_RULE,authorizeWeb,webDeniedNote}=require("./research-policy.cjs");
 // 联网判断层（2026-10-09）：开着时取代上面那套研究层的联网入口，见 search-gate.cjs 开头。
-const {gateSettings,prepareGate,describeGate,gateRule,relevantSources,expandAbbreviations,retryQuery,targetProblem,offerPresent,unsure,affirmative,EVIDENCE_PREFIX}=require("./search-gate.cjs");
+const {gateSettings,prepareGate,describeGate,gateRule,pickStrategy,relevantSources,expandAbbreviations,retryQuery,targetProblem,offerPresent,unsure,affirmative,EVIDENCE_PREFIX}=require("./search-gate.cjs");
 const {verifyConstants}=require("./constant-guard.cjs");
 // 原作剧情（canon）层。与 self/roleplay 分开：那两类硬禁止联网是为了防角色扮演乱搜，
 // 而「你以前和谁做过什么」是可验证的原作事实问题，不该被同一道闸门连坐。
@@ -383,7 +383,8 @@ async function requestReply(settings, messages, options={}) {
   const personalRule='\n公共曲库不包含玩家成绩。目前没有按个人成绩筛选推荐的工具。用户要求没鸟过、未SSS、没打过、未AJ/AP/AB/FC或根据个人成绩推荐时，必须说明无法完成个人筛选，不得擅自退化为普通推荐或列随机曲目；绑定账号本身也不代表已经读取成绩。';
   // 联网由用户发起或程序判定：本轮没判定要检索时，把「自行联网」这条口子关掉，
   // 只留「拿不准就直说」——模型表示拿不准时程序会替它查一次（见下面的兜底检索）。
-  const searchRule=gate?gateRule({decision:gated.decision,obs:gated.obs,offerAllowed})
+  // 接梗分流（searchGate.bits=on）开着时，说明按回法只给一种，外加今天的日期；关着时这里和改造前一样。
+  const searchRule=gate?gateRule({decision:gated.decision,obs:gated.obs,offerAllowed,...(gated.bits==="on"?{bits:"on",distress:gated.distress,dateQuestion:gated.dateQuestion,now}:{})})
     :plan.optOut?webRule(null)+'本轮用户明确要求不联网，禁止输出webQuery。':webRule(settings.search,Boolean(plan.required));
   // 检索回答也走人设：换成中性助手腔会把角色感抹平，所以只额外压一句「先答准」，
   // 免得为了俏皮把结论说含糊。检索模式下仍不注入示例对话，避免把答题带成寒暄。
@@ -941,10 +942,14 @@ async function requestReply(settings, messages, options={}) {
   if(gated){
     // 影子模式的判断和回复并行跑，这里才收它的结果；它自己挂了也不影响这条回复。
     let info={mode:gate.mode,decision:gated.decision,obs:gated.obs,error:gated.error,ms:gated.ms,searched:gated.searched,offered:Boolean(pendingSearch)};
+    if(gated.bits==="on")info={...info,strategy:pickStrategy({decision:gated.decision,obs:gated.obs,offerAllowed,distress:gated.distress}),
+      ...(gated.distress?{distress:true}:{}),...(gated.dateQuestion?{dateQuestion:true}:{})};
     if(gated.shadow){
       const late=await gated.shadow.catch(error=>({obs:null,error:String(error?.message||error)}));
       info={...info,obs:late.obs,error:late.error,ms:late.ms,decision:late.decision||gated.decision};
     }
+    // 接梗分流的影子判断同理：和回复并行跑，这里才收，只进日志。
+    if(gated.bitsShadow)info={...info,bitsShadow:await gated.bitsShadow.catch(error=>({obs:null,error:String(error?.message||error)}))};
     // 记下这一轮在问的对象：下一句只说「搜一下」时就搜它。答应提议之后待确认状态就用掉了。
     const obs=info.obs;
     const asked=obs&&obs.about==="world"&&(obs.act==="ask"||obs.act==="unclear")&&obs.target&&!targetProblem(obs.target,gated.haystack);
@@ -977,6 +982,8 @@ function createChat(settings, host, deps={}) {
   const gateMode=settings.searchGate?.mode||"off";
   if(settings.searchGate?.error)log(who+'：'+settings.searchGate.error);
   else if(gateMode!=="off")log(who+'：联网判断层 '+gateMode+(settings.searchGate.thinking?'（判断调用开思考）':'')+(settings.search?.apiKey?'':'——但联网搜索没配好，明说要搜时只会照实说查不了'));
+  if(settings.searchGate?.bitsError)log(who+'：'+settings.searchGate.bitsError);
+  else if(settings.searchGate?.bits==="on"||settings.searchGate?.bits==="shadow")log(who+'：接梗分流 '+settings.searchGate.bits);
   const secret=String(settings.c.provider.apiKey||"").trim();
   // Discord is the default transport. Other frontends (the QQ/OneBot adapter) may
   // provide the four small hooks below while reusing the same persona, sessions,

@@ -471,3 +471,243 @@ test("回复里的 Markdown 加粗不发到 QQ", async () => {
   const result = await requestReply(settingsWith({ mode: "explicit" }), say("今天好累啊"), { fetchImpl: model.fetchImpl, webFetchImpl: fakeWeb().webFetchImpl });
   assert.equal(result.text, "美亚查到了，结论是这样~");
 });
+
+// ── 接梗分流（searchGate.bits，2026-10-13）─────────────────────────────
+
+// 指纹：bits 关着时，判断提示词、各种情况下给回复的说明、整段回复链路（发给模型的每个请求、
+// 回复文本、日志、会话状态）都要和改造前逐字一致。这组值是在 backup/pre-bits-2026-10-13
+// （改造前）和改造后的代码上分别算出来、核对过一致的。人设、示例、表情、曲库、剧情、档案、
+// 术语、模型名都换成固定占位，以后改资料不会把它弄红；只有判断层自己的行为变了才会红。
+const crypto = require("node:crypto");
+const fpSha = value => crypto.createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value) ?? "undefined").digest("hex");
+const FP_NOW = new Date(2026, 9, 13, 12).getTime();
+const FP_RULE_STATES = {
+  search: { decision: { action: "search", target: "CHUNITHM 最新版本" }, obs: obs({ fresh: true }), offerAllowed: false },
+  refuse: { decision: { action: "none", refuse: "bot" }, obs: obs({ about: "bot" }) },
+  clarify: { decision: { action: "none", clarify: true }, obs: null },
+  offer: { decision: { action: "offer", target: "CHUNITHM 版本" }, obs: obs(), offerAllowed: true },
+  offerCooling: { decision: { action: "offer", target: "CHUNITHM 版本" }, obs: obs(), offerAllowed: false },
+  playUnknown: { decision: { action: "none", act: "play" }, obs: obs({ act: "play", unknownTerms: ["哈基米"] }) },
+  play: { decision: { action: "none", act: "play" }, obs: obs({ act: "play" }) },
+  chatUnknown: { decision: { action: "none", act: "chat" }, obs: obs({ act: "chat", unknownTerms: ["鸟加"] }) },
+  unclear: { decision: { action: "none", act: "unclear" }, obs: obs({ act: "unclear" }) },
+  shadowPlay: { decision: { action: "none", act: "play", would: { action: "none" } }, obs: obs({ act: "play", unknownTerms: ["x"] }) },
+  noObs: { decision: { action: "none" }, obs: null },
+  empty: undefined,
+};
+function fpSettings(searchGate) {
+  return { ...base, persona: "人设占位", examples: [], manifest: { entries: [] }, localKnowledge: false, knowledge: null,
+    stories: null, profiles: null, terms: null, characterName: "美亚",
+    c: { ...base.c, provider: { ...base.c.provider, model: "fixture-model" }, limits: { ...base.c.limits, userCooldownSeconds: 0, maxReplyChars: 600 } },
+    searchGate: gate.gateSettings(searchGate), search: { apiKey: "kimi-fixture", cache: new Map() } };
+}
+function fpModel(observe, reply) {
+  const calls = { gate: [], reply: [] };
+  const fetchImpl = async (_, options) => {
+    const body = JSON.parse(options.body);
+    if (String(body.messages[0]?.content || "").startsWith(gate.GATE_MARKER)) { calls.gate.push(body); return respond(JSON.stringify(observe)); }
+    calls.reply.push(body);
+    return respond(JSON.stringify(typeof reply === "string" ? { text: reply, emotion: "happy", scene: "ordinary", expressionIds: [] } : reply));
+  };
+  return { fetchImpl, calls };
+}
+function fpWeb() {
+  const results = [{ title: "CHUNITHM 最新版本一览", url: "https://example.com/chunithm", chunks: [{ text: "CHUNITHM 的最新版本是 X-VERSE。" }], snippet: "CHUNITHM 最新版本" },
+    { title: "CHUNITHM X-VERSE 稼働", url: "https://example.com/xverse", chunks: [{ text: "CHUNITHM X-VERSE……" }], snippet: "CHUNITHM" }];
+  return async () => ({ ok: true, status: 200, json: async () => ({ search_results: results }) });
+}
+const FP_REPLY_CASES = {
+  playUnknown: [{ mode: "auto" }, obs({ act: "play", about: "none", unknownTerms: ["哈基米"] }), "喵哼哼，收到啦！", say("哈基米哈基米")],
+  search: [{ mode: "auto" }, obs({ target: "CHUNITHM 最新版本", fresh: true, confident: false }), { text: "查到啦，是 X-VERSE♪", emotion: "happy", scene: "explanation", expressionIds: [], sourceIds: ["S1"] }, say("CHUNITHM 最新版本是什么")],
+  offerAppended: [{ mode: "auto", offerText: "要美亚去翻翻情报吗？" }, obs({ target: "CHUNITHM 版本" }), "唔……这个美亚不太清楚呢", say("CHUNITHM 现在是什么版本")],
+  chat: [{ mode: "auto" }, obs({ act: "chat", about: "none" }), "辛苦啦～", say("今天好累啊")],
+  unclearOffer: [{ mode: "auto" }, obs({ act: "unclear", target: "CHUNITHM 版本" }), "要不要美亚去查查？", say("CHUNITHM 版本那个")],
+  shadow: [{ mode: "shadow" }, obs({ target: "CHUNITHM 最新版本", fresh: true, confident: false }), "喵哼哼，收到啦！", say("CHUNITHM 最新版本是什么")],
+  explicit: [{ mode: "explicit" }, obs({ target: "CHUNITHM 最新版本", fresh: true }), "查到啦", say("帮我搜一下 CHUNITHM 最新版本")],
+  groupPlay: [{ mode: "auto" }, obs({ act: "play", about: "group" }), "噗——", [{ role: "system", content: "【群里最近的消息，只用来帮你理解话题】\n群友：v我50\n群友：v我50" }, ...say("v我50")]],
+};
+const FP_BEFORE = {
+  "gateRules": "71c8f068b5286cf131445395ffdc6c3f7ed9c32914379c570cee4e953e126365",
+  "gateRule.search": "f8ef994e99e3fe7c8b678fd002da4db227fd1953a28f8fc08fb5e96b354d87c3",
+  "gateRule.refuse": "fcd385c0c143acd279791137f4f1d1f6ed6e6a165c6c8b76e1cd9ef571c68e97",
+  "gateRule.clarify": "4589af0d3305a97930568ad49da2e9e5a37416e9a4405f6b9c3014fee538d002",
+  "gateRule.offer": "00fd31966e2a4be4541c4d34b27c419e0e4d6cf013df1ba78ba7af2659cb2f4f",
+  "gateRule.offerCooling": "58b6275bda2b718306f8a67564d276d85eef845e96474e43e7eeb8d034897a09",
+  "gateRule.playUnknown": "72f784983d537eadb306cbd2a5c36fdb87647d41dce2ec2ced4a35eb48651b81",
+  "gateRule.play": "743194de690cecacde757b55936661a01a9b6e60fe30c5ffc95a122a0c01b485",
+  "gateRule.chatUnknown": "4e603c438c04a555856badd04e4224ffce61c118b9de277fae5a01f70e13aaa7",
+  "gateRule.unclear": "58b6275bda2b718306f8a67564d276d85eef845e96474e43e7eeb8d034897a09",
+  "gateRule.shadowPlay": "58b6275bda2b718306f8a67564d276d85eef845e96474e43e7eeb8d034897a09",
+  "gateRule.noObs": "58b6275bda2b718306f8a67564d276d85eef845e96474e43e7eeb8d034897a09",
+  "gateRule.empty": "58b6275bda2b718306f8a67564d276d85eef845e96474e43e7eeb8d034897a09",
+  "reply.playUnknown": "407f8255ff2b1e345a2098e730ed6973c629a8a401bb15493c48bd05ffd6fbd7",
+  "reply.search": "b25f66d1bf16f584338b32fa766a1754338d6b3de0579c4e1f379315d122e162",
+  "reply.offerAppended": "12831c8aa8ba283b5d61d5c3d47b27eb858b128acc6c78242a905362c95b6735",
+  "reply.chat": "f68456c926ec2dd7ed4c969a3da81f41b4ace53dd09a24b3f5127635f81a2162",
+  "reply.unclearOffer": "f250d735530e9cbb255881320ff5a9b8856820645679fcd3bf3759469852ae81",
+  "reply.shadow": "1ff3f1c28f0f7f5e75eb43e19ca6871be98ba3bf8ff187c4639b4e51938456b5",
+  "reply.explicit": "3c1768b016b9d83709ba265f7a273aeca7a193cda479fc8badb6ace534a5891d",
+  "reply.groupPlay": "fb64a2f08ebead97181fed24085151155fedfa1c5ef7e880661ab21f783b71c8",
+};
+async function fingerprintsWith(bitsValue) {
+  const withBits = searchGate => bitsValue === undefined ? searchGate : { ...searchGate, bits: bitsValue };
+  const out = { gateRules: fpSha(gate.gateRules("美亚")) };
+  for (const [name, state] of Object.entries(FP_RULE_STATES))
+    out["gateRule." + name] = fpSha(gate.gateRule(state === undefined || bitsValue === undefined ? state : { ...state, bits: bitsValue }));
+  for (const [name, [searchGate, observe, reply, messages]] of Object.entries(FP_REPLY_CASES)) {
+    const model = fpModel(observe, reply);
+    const result = await requestReply(fpSettings(withBits(searchGate)), messages, { fetchImpl: model.fetchImpl, webFetchImpl: fpWeb(), now: FP_NOW });
+    // 判断耗时和检索资料的抓取时间每次都不一样，跟改动无关，抹掉再算。
+    out["reply." + name] = fpSha(JSON.stringify({ gate: model.calls.gate, reply: model.calls.reply, text: result.text, log: gate.describeGate(result.searchGate), state: result.searchState })
+      .replace(/｜\d+ms/g, "").replace(/fetchedAt[^,}]*/g, "fetchedAt"));
+  }
+  return out;
+}
+test("接梗分流关着（不写 bits、写 off）：判断提示词、给回复的说明、整段回复链路都和改造前逐字一致", async () => {
+  assert.deepEqual(await fingerprintsWith(undefined), FP_BEFORE);
+  assert.deepEqual(await fingerprintsWith("off"), FP_BEFORE);
+});
+
+test("接梗分流的配置：写错或不在自动档只关掉它自己，联网判断照常跑", () => {
+  assert.deepEqual(gate.gateSettings(undefined), { mode: "off" }, "没配 searchGate 时和改造前一样");
+  assert.equal(gate.gateSettings({ mode: "auto" }).bits, "off");
+  assert.equal(gate.gateSettings({ mode: "auto", bits: "on" }).bits, "on");
+  assert.equal(gate.gateSettings({ mode: "auto", bits: "shadow" }).bits, "shadow");
+  const typo = gate.gateSettings({ mode: "auto", bits: "yes" });
+  assert.deepEqual([typo.mode, typo.bits], ["auto", "off"]);
+  assert.match(typo.bitsError, /bits 只能是 off \/ shadow \/ on.*已按 off 处理/);
+  const notAuto = gate.gateSettings({ mode: "shadow", bits: "on" });
+  assert.deepEqual([notAuto.mode, notAuto.bits], ["shadow", "off"]);
+  assert.match(notAuto.bitsError, /要 searchGate\.mode 是 auto/);
+});
+
+test("接梗分流的判断提示词：只在原来那版后面补两个字段，读回来也只在开着时多两样", () => {
+  const plain = gate.gateRules("美亚"), extended = gate.gateRules("美亚", { bits: true });
+  assert.ok(extended.startsWith(plain));
+  assert.match(extended.slice(plain.length), /bit ——[\s\S]*playToo ——/);
+  const raw = { act: "play", about: "none", bit: "true", playToo: true };
+  assert.deepEqual(Object.keys(gate.validateObservation(raw)).sort(), ["about", "act", "confident", "fresh", "target", "unknownTerms"], "关着时形状不变");
+  const on = gate.validateObservation(raw, { bits: true });
+  assert.deepEqual([on.bit, on.playToo], [true, false], "playToo 只跟着「在问」");
+  assert.deepEqual([gate.validateObservation({ act: "ask", playToo: "true" }, { bits: true }).playToo, gate.validateObservation({ act: "ask" }, { bits: true }).bit], [true, false]);
+});
+
+test("两道规则：诉苦的话、用今天日期答得了的问题", () => {
+  for (const text of ["活着好累", "不想活了", "我好想哭", "真的撑不下去了", "想死"]) assert.ok(gate.distressed(text), text);
+  for (const text of ["笑到想哭哈哈哈", "美亚我想死你了", "这谱面我崩溃了", "今天好累啊", "笑死"]) assert.equal(gate.distressed(text), false, text);
+  for (const text of ["今天是疯狂星期四吗", "今天星期几", "明天几号", "今天是周末吗", "今天是不是礼拜天"]) assert.ok(gate.asksDate(text), text);
+  for (const text of ["疯狂星期四是什么梗", "星期四有活动吗", "今天打了几首"]) assert.equal(gate.asksDate(text), false, text);
+});
+
+test("接梗分流开着时的决策表：问日期不搜，在问但也像在玩就降成提议，明说要搜照搜", () => {
+  const d = args => gate.decide({ mode: "auto", text: "", explicit: null, pending: null, lastTarget: null, obs: null, veto: "", haystack: "", now: T0, bits: "on", ...args });
+  const asking = obs({ target: "CHUNITHM 最新版本", fresh: true, playToo: true });
+  const hay = "CHUNITHM 最新版本是什么";
+  const down = d({ obs: asking, text: hay, haystack: hay });
+  assert.deepEqual([down.action, down.target], ["offer", "CHUNITHM 最新版本"]);
+  assert.match(down.reason, /铺垫一个梗/);
+  assert.equal(d({ obs: asking, text: hay, haystack: hay, bits: "off" }).action, "search", "关着时照旧自动搜");
+  assert.equal(d({ obs: { ...asking, playToo: false }, text: hay, haystack: hay }).action, "search", "单纯在问还是自动搜");
+  const date = d({ obs: obs({ target: "今天 疯狂星期四", fresh: true }), text: "今天是疯狂星期四吗", haystack: "今天是疯狂星期四吗" });
+  assert.deepEqual([date.action, date.reason], ["none", "今天的日期就答得了"]);
+  assert.equal(d({ explicit: { rest: "疯狂星期四" }, obs: asking, text: "搜一下疯狂星期四", haystack: "搜一下疯狂星期四" }).action, "search", "明说要搜不受影响");
+});
+
+test("一轮只挑一种回法：联网那几种先定，诉苦只能把接梗改成认真回", () => {
+  const p = (over = {}) => gate.pickStrategy({ decision: { action: "none" }, obs: obs(), ...over });
+  assert.equal(p({ decision: { action: "search", target: "x" } }), "search");
+  assert.equal(p({ decision: { action: "none", refuse: "bot" } }), "refuse");
+  assert.equal(p({ decision: { action: "none", clarify: true } }), "clarify");
+  assert.equal(p({ decision: { action: "offer", target: "x" }, offerAllowed: true }), "offer");
+  assert.equal(p({ decision: { action: "offer", target: "x" }, offerAllowed: false }), "answer", "提议在冷却：照常答");
+  assert.equal(p({ obs: obs({ act: "play", bit: true }) }), "bit");
+  assert.equal(p({ obs: obs({ act: "ask", bit: true }) }), "answer", "整段文案里夹着真问题，按问题答");
+  assert.equal(p({ obs: obs({ act: "chat", bit: true }) }), "unclear", "说是认真聊天又说是梗文案：两头都接得住，别拿正事开涮");
+  assert.equal(p({ obs: obs({ act: "unclear", bit: true }) }), "bit");
+  assert.equal(p({ obs: obs({ act: "play" }) }), "play");
+  assert.equal(p({ obs: obs({ act: "unclear" }) }), "unclear");
+  assert.equal(p({ obs: obs({ act: "chat" }) }), "chat");
+  assert.equal(p({ obs: null }), "none");
+  for (const o of [obs({ act: "play", bit: true }), obs({ act: "play" }), obs({ act: "unclear" })]) assert.equal(p({ obs: o, distress: true }), "sincere");
+  assert.equal(p({ obs: obs({ act: "chat" }), distress: true }), "chat");
+  assert.equal(p({ decision: { action: "search", target: "x" }, distress: true }), "search");
+});
+
+test("开着时给回复的说明：只有一种回法，外加今天的日期；不再替她断言「你不认识」", () => {
+  const rule = state => gate.gateRule({ bits: "on", now: FP_NOW, ...state });
+  const bit = rule({ decision: { action: "none", act: "play" }, obs: obs({ act: "play", bit: true, unknownTerms: ["GPT 6 Astra"] }) });
+  assert.match(bit, /今天是 2026-10-13，星期二/);
+  assert.match(bit, /一整段梗文案/);
+  assert.doesNotMatch(bit, /你不认识|用户这句是在玩梗|GPT 6 Astra/);
+  const play = rule({ decision: { action: "none", act: "play" }, obs: obs({ act: "play", unknownTerms: ["哈基米"] }) });
+  assert.match(play, /在玩梗或开玩笑[\s\S]*拿不准你认不认识「哈基米」/);
+  assert.doesNotMatch(play, /你不认识「/);
+  const sincere = rule({ decision: { action: "none", act: "play" }, obs: obs({ act: "play" }), distress: true });
+  assert.match(sincere, /像是真难受的话/);
+  assert.doesNotMatch(sincere, /顺着气氛接/);
+  assert.match(rule({ decision: { action: "none", reason: "今天的日期就答得了" }, obs: obs({ playToo: true }), dateQuestion: true }), /照上面的日期直接答[\s\S]*也像在铺垫一个梗/);
+  assert.match(rule({ decision: { action: "offer", target: "x" }, obs: obs({ playToo: true }), offerAllowed: true }), /认真问「x」[\s\S]*结尾照样问要不要查/);
+  assert.match(rule({ decision: { action: "none", act: "unclear" }, obs: obs({ act: "unclear" }) }), /两头都接得住[\s\S]*不要直接问对方是不是在开玩笑/);
+});
+
+test("开着时整条链路：整段梗文案换成接梗说明，判断请求带新字段，日志写回法", async () => {
+  const model = fakeModel({ observe: { ...obs({ act: "play", about: "none", unknownTerms: ["GPT 6 Astra"] }), bit: true } });
+  const web = fakeWeb();
+  const result = await requestReply(settingsWith({ mode: "auto", bits: "on" }), say("您好，我是GPT 6 Astra。我刚刚关停了好几家的服务器……如果您能向我转账五十块，我将回报您不设限额的额度。"),
+    { fetchImpl: model.fetchImpl, webFetchImpl: web.webFetchImpl, now: FP_NOW });
+  assert.equal(model.calls.gate.length, 1);
+  assert.match(systemOf(model.calls.gate[0]), /bit ——/);
+  assert.equal(web.calls.length, 0);
+  const system = systemOf(model.calls.reply[0]);
+  assert.match(system, /一整段梗文案/);
+  assert.match(system, /今天是 2026-10-13，星期二/);
+  assert.doesNotMatch(system, /你不认识「/);
+  assert.equal(result.searchGate.strategy, "bit");
+  assert.match(gate.describeGate(result.searchGate), /play\/none\/整段文案｜none：在玩梗或开玩笑｜回法：接梗（整段文案）/);
+});
+
+test("开着时整条链路：「今天是疯狂星期四吗」不联网，日期交给她；在问但也像在玩的先提议", async () => {
+  const dateModel = fakeModel({ observe: { ...obs({ target: "今天 疯狂星期四", fresh: true }), playToo: true } });
+  const web = fakeWeb();
+  const r1 = await requestReply(settingsWith({ mode: "auto", bits: "on" }), say("今天是疯狂星期四吗"), { fetchImpl: dateModel.fetchImpl, webFetchImpl: web.webFetchImpl, now: FP_NOW });
+  assert.equal(web.calls.length, 0, "关着时这句会真去联网");
+  assert.match(systemOf(dateModel.calls.reply[0]), /今天是 2026-10-13，星期二[\s\S]*照上面的日期直接答/);
+  assert.deepEqual([r1.searchGate.decision.reason, r1.searchGate.strategy, r1.searchGate.dateQuestion], ["今天的日期就答得了", "answer", true]);
+  const offerModel = fakeModel({ observe: { ...obs({ target: "CHUNITHM 最新版本", fresh: true }), playToo: true }, reply: "唔……这个美亚不太清楚呢" });
+  const r2 = await requestReply(settingsWith({ mode: "auto", bits: "on", offerText: "要美亚去翻翻情报吗？" }), say("CHUNITHM 最新版本是什么"),
+    { fetchImpl: offerModel.fetchImpl, webFetchImpl: web.webFetchImpl, now: FP_NOW });
+  assert.equal(web.calls.length, 0, "降成提议：不自动搜");
+  assert.equal(r2.searchState.pending.target, "CHUNITHM 最新版本");
+  assert.match(r2.text, /要美亚去翻翻情报吗？$/);
+});
+
+test("开着时整条链路：诉苦的话就算判成玩梗，也按认真的回", async () => {
+  const model = fakeModel({ observe: obs({ act: "play", about: "none" }) });
+  const result = await requestReply(settingsWith({ mode: "auto", bits: "on" }), say("活着好累啊哈哈哈"), { fetchImpl: model.fetchImpl, webFetchImpl: fakeWeb().webFetchImpl, now: FP_NOW });
+  assert.match(systemOf(model.calls.reply[0]), /像是真难受的话/);
+  assert.equal(result.searchGate.strategy, "sincere");
+  assert.match(gate.describeGate(result.searchGate), /回法：认真回（有诉苦的话）/);
+});
+
+test("影子档：另起一次带新字段的判断只进日志，回复请求和关着时一模一样", async () => {
+  // 主判断（原提示词）报玩梗；影子判断（带 bit 字段的提示词）报整段文案。
+  const observe = body => systemOf(body).includes("bit ——") ? { ...obs({ act: "play", about: "none" }), bit: true } : obs({ act: "play", about: "none" });
+  const text = say("抱歉刚才腾不出手，抱歉又腾不出手了……不好意思又腾不出手了");
+  const off = fakeModel({ observe }), shadow = fakeModel({ observe });
+  const r0 = await requestReply(settingsWith({ mode: "auto" }), text, { fetchImpl: off.fetchImpl, webFetchImpl: fakeWeb().webFetchImpl, now: FP_NOW });
+  const r1 = await requestReply(settingsWith({ mode: "auto", bits: "shadow" }), text, { fetchImpl: shadow.fetchImpl, webFetchImpl: fakeWeb().webFetchImpl, now: FP_NOW });
+  assert.equal(shadow.calls.gate.length, 2);
+  assert.deepEqual(shadow.calls.reply, off.calls.reply);
+  assert.equal(r1.text, r0.text);
+  assert.equal(r1.searchGate.strategy, undefined);
+  assert.match(gate.describeGate(r1.searchGate), /接梗分流会是：接梗（整段文案）（整段文案）/);
+});
+
+test("提议的说法：主语和动词之间夹了副词、动词是「打听」，都算问过了，程序不再补一句", async () => {
+  for (const text of ["要不要美亚现在去帮你查一查？", "要不美亚去打听打听？", "回头要不要我去打听一下出处？", "我先去查一下？"]) assert.ok(gate.offerPresent(text), text);
+  for (const text of ["美亚这就去查成绩。", "唔，美亚先去打听一下。", "你自己去查吧"]) assert.equal(gate.offerPresent(text), false, text);
+  const model = fakeModel({ observe: obs({ target: "腾不出手 梗 出处" }), reply: "唔——美亚也不太确定，要不要美亚现在去帮你查一查？" });
+  const result = await requestReply(settingsWith({ mode: "auto", offerText: "要美亚去翻翻情报吗？" }), say("腾不出手是什么梗啊"), { fetchImpl: model.fetchImpl, webFetchImpl: fakeWeb().webFetchImpl, now: T0 });
+  assert.equal(result.text, "唔——美亚也不太确定，要不要美亚现在去帮你查一查？", "实测出现过：同一条回复问了两遍");
+  assert.equal(result.searchState.pending.target, "腾不出手 梗 出处");
+});

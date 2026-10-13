@@ -8,7 +8,8 @@
   "searchGate": {
     "mode": "off",
     "thinking": false,
-    "offerText": "要美亚去翻翻情报吗？回我一句「要」就行♪"
+    "offerText": "要美亚去翻翻情报吗？回我一句「要」就行♪",
+    "bits": "off"
   },
   "factLayerDir": "../chat-core",
   "provider": {
