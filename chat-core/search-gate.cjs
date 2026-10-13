@@ -452,8 +452,15 @@ function bitsDecision(auto, { obs, text }) {
   if (auto.action === "search" && obs?.playToo) return { ...auto, action: "offer", reason: "在问，但也像在铺垫一个梗：先答再提议，不自动搜" };
   return auto;
 }
+// 机器人自己的功能（宿主给的词，比如梗库开着时的「入典」「典来」）：怎么用写在给回复模型的能力说明里，
+// 网上搜回来的只会是这个词别的意思。判断调用不知道这些功能——2026-10-13 真模型抽查，「怎么把一段话入典呀」
+// 3 次里有 1 次判成「在问不认识的东西」要去搜。自动搜和提议都撤掉；明说要搜、答应提议不受影响。
+function ownFeatureDecision(auto, ownFeature) {
+  if (!ownFeature || (auto.action !== "search" && auto.action !== "offer")) return auto;
+  return { ...auto, action: "none", reason: "问的是机器人自己的功能（" + ownFeature + "）" };
+}
 // 整张表。顺序要紧：说了不要联网 > 答应提议 > 明说要搜 > 按档位。
-function decide({ mode, text, explicit, pending, lastTarget, obs, veto, haystack, now, knowledge, bits = "off" }) {
+function decide({ mode, text, explicit, pending, lastTarget, obs, veto, haystack, now, knowledge, bits = "off", ownFeature = "" }) {
   if (OPT_OUT.test(String(text ?? ""))) return { action: "none", reason: "用户说了不要联网" };
   if (pending && pending.expiresAt > now && affirmative(text))
     return { action: "search", target: pending.target, act: "ask", about: "world", reason: pending.shared ? "群友答应了美亚对别人的提议" : "用户答应了之前的提议", confirmed: true };
@@ -466,7 +473,7 @@ function decide({ mode, text, explicit, pending, lastTarget, obs, veto, haystack
     return { action: "search", target, act: "ask", about: "world", reason: "用户明说要搜" };
   }
   if (mode === "explicit" || mode === "off") return { action: "none", reason: "只在用户明说时联网" };
-  const auto = autoDecision({ veto, obs, haystack, knowledge, text });
+  const auto = ownFeatureDecision(autoDecision({ veto, obs, haystack, knowledge, text }), ownFeature);
   if (mode === "shadow") return { action: "none", act: auto.act, about: auto.about, reason: "影子模式只记录", would: auto };
   return bits === "on" ? bitsDecision(auto, { obs, text }) : auto;
 }
@@ -498,9 +505,11 @@ function pickStrategy({ decision: d = {}, obs, offerAllowed = false, distress = 
 // 引擎里那套来源编号和请求上限，由 chat.cjs 去做。
 // searchState 是会话里存的三样：pending（待确认的提议）、lastTarget（上一轮在问的对象，
 // 给「搜一下」这种没带对象的请求用）、lastOfferAt（提议冷却）。
-async function prepareGate({ settings, gate, messages, searchState = {}, now = Date.now(), fetchImpl, signal, dispatcher }) {
+// ownFeatures：宿主给的「机器人自己的功能」那几个词（见 ownFeatureDecision），不给就跟没有这一条时一样。
+async function prepareGate({ settings, gate, messages, searchState = {}, now = Date.now(), fetchImpl, signal, dispatcher, ownFeatures = [] }) {
   const conv = splitConversation(messages);
   const text = conv.current;
+  const ownFeature = ownFeatures.find(word => word && text.includes(word)) || "";
   const live = item => (item && item.expiresAt > now ? item : null);
   const pending = live(searchState.pending), lastTarget = live(searchState.lastTarget);
   const explicit = explicitRequest(text);
@@ -518,18 +527,18 @@ async function prepareGate({ settings, gate, messages, searchState = {}, now = D
   const base = { conv, haystack, veto, explicit: Boolean(explicit) };
   // 影子模式不等它：判断和回复并行，回复照常生成，结尾再收它的结果记日志。
   if (needObs && gate.mode === "shadow" && !explicit) {
-    const shadow = run().then(r => ({ ...r, decision: decide({ mode: "shadow", text, explicit, pending, lastTarget, obs: r.obs, veto, haystack, now, knowledge: settings.knowledge }) }));
+    const shadow = run().then(r => ({ ...r, decision: decide({ mode: "shadow", text, explicit, pending, lastTarget, obs: r.obs, veto, haystack, now, knowledge: settings.knowledge, ownFeature }) }));
     return { ...base, decision: { action: "none", reason: "影子模式只记录" }, shadow };
   }
   const judged = needObs ? await run(bits === "on") : { obs: null };
-  const decision = decide({ mode: gate.mode, text, explicit, pending, lastTarget, obs: judged.obs, veto, haystack, now, knowledge: settings.knowledge, bits });
+  const decision = decide({ mode: gate.mode, text, explicit, pending, lastTarget, obs: judged.obs, veto, haystack, now, knowledge: settings.knowledge, bits, ownFeature });
   const out = { ...base, decision, obs: judged.obs, error: judged.error, ms: judged.ms };
   if (bits === "on") return { ...out, bits, distress: distressed(text), dateQuestion: asksDate(text) };
   if (bits === "shadow" && needObs) {
     // 影子：另起一次带新字段的判断，和回复并行；它的结论只进日志，这一轮的联网和回复说明都不变。
     const distress = distressed(text);
     out.bitsShadow = run(true).then(r => {
-      const d = decide({ mode: gate.mode, text, explicit, pending, lastTarget, obs: r.obs, veto, haystack, now, knowledge: settings.knowledge, bits: "on" });
+      const d = decide({ mode: gate.mode, text, explicit, pending, lastTarget, obs: r.obs, veto, haystack, now, knowledge: settings.knowledge, bits: "on", ownFeature });
       return { obs: r.obs, error: r.error, ms: r.ms, decision: d, strategy: pickStrategy({ decision: d, obs: r.obs, offerAllowed: d.action === "offer", distress }) };
     });
   }

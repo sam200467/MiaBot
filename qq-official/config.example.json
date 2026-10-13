@@ -20,6 +20,9 @@
   "_读引用": "回复（引用）某条消息再 @ 美亚时，要不要把被引用那条的文字和图片交给她。read=读：被引用的图跟直接发给她的图走同一条路，下载下来给模型看（连同本条自己的图最多 4 张、单张 8 MB，只收 HTTPS），文字作为「本条引用了这条」交给模型；off=不读（缺省），跟以前一样只看 @ 她的那条本身。开着时 mia.log 会多一行「引用消息结构」，只有字段名和附件种类，不含正文和图片地址。⚠ 被引用的图可能是别的群友发的，开了之后它也会像直接发的图一样送到聊天模型那边。",
   "quotedMessage": "off",
 
+  "_梗库": "mode=on 时开 /入典、/典来：群友 @ 美亚发「/入典 原文」（或者回复那条消息再发 /入典）把文案收进典里；发 /典来 随机抽一篇原样贴出来，不经过模型，一个字不加。审核人入的直接生效；别人入的先进待审，审核人私聊美亚用 /待审典、/看典 12、/过典 12、/删典 12 处理。reviewers 是审核人的 openid 数组，不写就用 aliasDeleteOpenids。群里入的只在那个群抽得到，私聊入的只在私聊抽得到。cooldownSeconds：同一个群两次 /典来 之间隔几秒（默认 10）；maxChars：一篇最多几个字（默认 1500）。数据在 workDir/meme-library.json，只在本机。默认 off。",
+  "memes": { "mode": "off" },
+
   "_指令": "corePath 和 vaultHelperPath 必须指向已构建的程序，否则启动时报错。相对路径按 qq-official/ 解析。ongeki-core.exe 由 npm run build:core 生成，mia-vault.exe 由根目录 mia-vault.cs 编译；二进制不随源码仓库分发。vaultPath 是绑定数据的存储位置，首次运行时创建。",
   "corePath": "../ongeki-core.exe",
   "vaultHelperPath": "../mia-vault.exe",

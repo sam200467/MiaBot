@@ -21,6 +21,7 @@ const { pagerKeyboard, parseOwnedData } = require("./pager-buttons.cjs");
 const { MIA_TEMPLATES: T, miaHelp } = require("./mia-voice.cjs");
 const { createAssetBrowser } = require("./asset-browser.cjs");
 const { chatLogSettings, createChatLog, turnRecord } = require("./chat-log.cjs");
+const { memeSettings, createMemeLibrary, MEME_ABILITY, MEME_ROUTER_NOTE, MEME_WORDS } = require("./meme-library.cjs");
 
 const HERE = __dirname;
 const ROOT = path.resolve(HERE, "..");
@@ -294,6 +295,12 @@ function createMiaBot(config, deps = {}) {
   const quoteConfig = quotedMessageSetting(config.quotedMessage);
   const readQuoted = quoteConfig.mode === "read";
 
+  // ── 梗库（默认关）：/入典 收文案，/典来 原样抽一篇（见 meme-library.cjs）────────
+  // 群友入的先由审核人在私聊里审；审核人不另配就是 aliasDeleteOpenids 那几位。
+  // 入典、审典都是指令，所以要指令层开着才建。关着时 memes 一直是 null：指令、聊天、/帮助 都跟改造前一样。
+  const memeConfig = memeSettings(config.memes, { aliasDeleteOpenids: config.aliasDeleteOpenids });
+  let memes = null;
+
   // 联网由 chat-core 的判断层决定（mia-chat 配置里的 searchGate，默认 off）。
   // 聊天的能力说明和 /帮助 清单都跟着它走。
   const webSearchOn = Boolean(settings.searchGate && settings.searchGate.mode !== "off");
@@ -346,17 +353,27 @@ function createMiaBot(config, deps = {}) {
   let commands = null;
   if (commandsEnabled) {
     const senders = makeCommandSenders(transport, log);
+    const memesOn = memeConfig.mode === "on";
     commands = createMiaCommands({
       config, transport, log,
       send: senders.send, sendMarkdown: senders.sendMarkdown, sendImage: senders.sendImage,
       // 分页的成绩图要跟翻页按钮合成一条 Markdown 时，图放在素材检索网页的临时地址上（pagedImageInMarkdown 开着才用）
       publishImage: assetBrowser ? (buffer) => assetBrowser.publishImage(buffer) : null,
       // 清单末尾那几行只写开着的功能，免得说她做不到的事
-      helpText: miaHelp({ webSearch: webSearchOn, quotedMessage: readQuoted, privateChat: allowPrivate }),
+      helpText: miaHelp({ webSearch: webSearchOn, quotedMessage: readQuoted, privateChat: allowPrivate, memes: memesOn }),
       ...(deps.now ? { now: deps.now } : {}),
       ...(deps.random ? { random: deps.random } : {}),
       ...(deps.messageKey ? { messageKey: deps.messageKey } : {}),
     });
+    // 典来的那篇走指令层的发送器：原样发，不像聊天那样把空行折掉。
+    if (memesOn) {
+      memes = createMemeLibrary({
+        settings: memeConfig, send: senders.send, log,
+        file: path.join(config.workDir || path.join(HERE, "data"), "meme-library.json"),
+        ...(deps.now ? { now: deps.now } : {}),
+        ...(deps.random ? { random: deps.random } : {}),
+      });
+    }
   }
 
   // 群上下文缓冲：只有平台推 GROUP_MESSAGE_CREATE（群主开了「接收所有消息」）时才有内容，
@@ -408,6 +425,7 @@ function createMiaBot(config, deps = {}) {
           + "是不是掉线了、队列排了多少时才调用，打招呼和寒暄时绝对不要调用）。"
           + "结果和图片由程序发送，你只写一句引出话，**绝不自己报数字或曲名结论**。"
           + "删除别名需要用户用 /删除别名 指令，而且只有指定账号能用。"
+          + (memes ? MEME_ABILITY : "")
           + "当前消息直接附带的 PNG/JPEG/GIF/WebP 图片会随本轮请求提供给你，可以正常识别、描述和评价；"
           + (readQuoted ? "用户回复（引用）的那条消息里的图片，程序取到原图时也会一起提供给你；取不到原图的仍然看不到，不能猜测。"
             : "没有附带原图数据的引用图片仍然看不到，不能猜测。")
@@ -448,6 +466,8 @@ function createMiaBot(config, deps = {}) {
           specs: commands ? [...core.CAPABILITY_SPECS, songSearch.SEARCH_SPEC] : [],
           targets: (message.__event?.mentionedOpenids || []).map(String).filter(id => id !== botOpenid),
           validateAction: (action, userText) => (action.name === "calculate" && commands?.calculateRoutingProblem(action.query, userText)) || "",
+          // 梗库开着时告诉路由「入典」「典来」不是工具，交给聊天（见 meme-library.cjs 的 MEME_ROUTER_NOTE）
+          ...(memes ? { notes: MEME_ROUTER_NOTE } : {}),
           ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
         }).then((result) => {
           if (result?.pager) message.__pager = result.pager;
@@ -457,6 +477,8 @@ function createMiaBot(config, deps = {}) {
           return result;
         }),
       images: (message) => message.__media?.images || [],
+      // 梗库开着时：提到「入典」「典来」的句子联网判断不自动搜（怎么用写在能力说明里）
+      ...(memes ? { ownFeatures: MEME_WORDS } : {}),
       ...(commands ? {
         actions: [...core.CAPABILITY_SPECS, songSearch.SEARCH_SPEC],
         runAction: async (action, message, result) => {
@@ -687,6 +709,23 @@ function createMiaBot(config, deps = {}) {
         if (name) command = { name, rest: bare[2].trim() };
       }
 
+      // 梗库的几条指令（开着才有）。原文从 text 取，不用上面 parseCommand 的结果：那边做过 NFKC，
+      // 「，！？」会变成「,!?」——入典要一字不差。被回复的那条直接读 event.quote，不看读引用开没开：
+      // 那个开关管的是交不交给模型，入典不经过模型。
+      const memeCommand = memes && !buttonPageTurn ? memes.match(text, { direct: isDirect }) : null;
+      if (memeCommand) {
+        if (!commandAllowedInGroup(event, eventName)) {
+          log("群里没 @ 美亚，指令不执行");
+          return;
+        }
+        log("收到指令 " + memeCommand.label + "（" + event.type + " user=" + String(event.userId).slice(0, 12) + "…）");
+        mark("MIA_BUSY:正在处理指令…");
+        try { await memes.handle(event, memeCommand); }
+        catch (error) { log("⚠ 指令处理失败：" + core.safeError(error)); }
+        finally { mark("MIA_BUSY:0"); }
+        return;
+      }
+
       if (command) {
         // 群里光有前缀不够：全量模式下别的 bot 打的 /help 也会送到这儿。
         if (!commandAllowedInGroup(event, eventName)) {
@@ -763,7 +802,7 @@ function createMiaBot(config, deps = {}) {
   }
 
   return {
-    chat, transport, settings, allowGroups, readContext, commands, chatLog, readQuoted,
+    chat, transport, settings, allowGroups, readContext, commands, chatLog, readQuoted, memes,
     handleEvent,
     mentionsSelf, pickTarget, commandAllowedInGroup,
     async start() {
@@ -807,6 +846,17 @@ function createMiaBot(config, deps = {}) {
       }
       if (quoteConfig.error) log("⚠ " + quoteConfig.error);
       if (readQuoted) log("读引用：开｜回复某条消息再 @ 美亚时，被引用那条的文字和图片会交给模型");
+      if (memeConfig.error) log("⚠ " + memeConfig.error);
+      if (memeConfig.mode === "on" && !memes) log("⚠ 梗库要指令层开着才能用，这一轮先按关闭处理");
+      if (memes) {
+        const opened = memes.start();
+        if (!opened.ok) log("⚠ " + opened.error);
+        else {
+          log("梗库：开｜/入典 /典来｜审核人 " + memeConfig.reviewers.size + " 位（" + memeConfig.reviewersFrom + "）" +
+            "｜典里 " + opened.approved + " 篇、待审 " + opened.pending + " 篇｜" + memes.file);
+          if (!memeConfig.reviewers.size) log("⚠ 梗库没有审核人：群友入的典会一直等审核。在 memes.reviewers 里填审核人的 openid（不填就用 aliasDeleteOpenids）。");
+        }
+      }
       if (commands && botOpenid) {
         log("提示：配置里还留着 botOpenid —— 它已经用不上了（实测 mention 的 id 跟 READY 的 botId 不是一套 id 空间）。现在靠平台给的 is_you 判，可以删掉这个键。");
       }

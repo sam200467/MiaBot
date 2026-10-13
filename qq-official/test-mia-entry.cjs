@@ -118,7 +118,7 @@ async function setup(configOverrides = {}, deps = {}) {
   });
   await bot.start();
   assert.ok(await mock.waitFor(() => bot.transport.state.connected), "应当连上 mock 网关");
-  return { mock, bot, model };
+  return { mock, bot, model, tmp };
 }
 
 const groupEvent = (over = {}) => ({
@@ -1274,3 +1274,106 @@ test("公共查询：单页结果、只问条数的结果，开头那句跟多�
 });
 
 function readContextTexts(bot) { return bot.readContext(GROUP, false); }
+
+// ── 梗库（memes，默认关）：/入典、/典来，群友入的先由审核人私聊审 ─────────────
+// 单元测试在 test-meme-library.cjs；这里只测走完整 QQ 入口的两件事：关着跟改造前一样，开着能从入典走到抽出来。
+const { MIA_TEMPLATES: VOICE, miaHelp } = require("./mia-voice.cjs");
+const MEME_TEXT = "【水鸡筹】很抱歉打扰大家……\n\n现众筹50元治疗费！（V我50）";
+
+test("梗库默认关：/入典 还是不认识的指令，私聊裸发「典来」照旧去聊天；不建文件、不打日志，/帮助 和能力说明都不提", async () => {
+  const logs = [];
+  const { mock, bot, model, tmp } = await setup({}, { botDeps: { log: (line) => logs.push(line) } });
+  bot.settings.c.limits.userCooldownSeconds = 0;
+  try {
+    assert.equal(bot.memes, null);
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "/入典 " + MEME_TEXT }));
+    assert.ok(await mock.waitFor(() => mock.state.sent.length === 1));
+    assert.equal(lastText(mock), VOICE.unknownCommand);
+    await bot.handleEvent("C2C_MESSAGE_CREATE", c2cEvent({ content: "典来" }));
+    assert.ok(await mock.waitFor(() => mock.state.sent.length === 2));
+    assert.equal(model.calls.length, 1, "裸发「典来」进了聊天");
+    assert.doesNotMatch(systemText(model.calls[0].body), /入典|典来/);
+    assert.doesNotMatch(model.routeCalls[0].messages[0].content, /入典|典来/, "路由提示词也不提");
+    assert.equal(bot.commands.helpText, miaHelp({ privateChat: true }));
+    assert.ok(!fs.existsSync(path.join(tmp, "meme-library.json")));
+    assert.ok(!logs.some((line) => /梗库/.test(line)), logs.join("\n"));
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+test("梗库开着：群友 @ 美亚入典进待审，审核人私聊过典，群里 /典来 原样贴出来；回复入典不看读引用开没开", async () => {
+  const logs = [];
+  const { mock, bot, model, tmp } = await setup({ memes: { mode: "on" }, aliasDeleteOpenids: ["ADMIN"] }, { botDeps: { log: (line) => logs.push(line) } });
+  try {
+    assert.ok(logs.some((line) => /^梗库：开｜\/入典 \/典来｜审核人 1 位（aliasDeleteOpenids）｜典里 0 篇、待审 0 篇｜/.test(line)), logs.join("\n"));
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "/入典 " + MEME_TEXT }));
+    assert.ok(await mock.waitFor(() => mock.state.sent.length === 1));
+    assert.equal(lastText(mock), VOICE.memePending(1));
+
+    // 群里没 @ 美亚的不执行；私聊里不是审核人的不能过典
+    await bot.handleEvent("GROUP_MESSAGE_CREATE", groupEvent({ content: "/典来" }));
+    assert.equal(mock.state.sent.length, 1);
+    await bot.handleEvent("C2C_MESSAGE_CREATE", c2cEvent({ content: "过典 1" }));
+    assert.equal(lastText(mock), VOICE.memeReviewDenied);
+    await bot.handleEvent("C2C_MESSAGE_CREATE", c2cEvent({ content: "过典 1", author: { user_openid: "ADMIN" } }));
+    assert.equal(lastText(mock), VOICE.memeApproved("#1"));
+
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "/典来", author: { member_openid: "U9" } }));
+    const drawn = mock.state.sent.at(-1).body;
+    assert.equal(drawn.msg_type, 0, "纯文本发，不走 Markdown");
+    assert.equal(drawn.content, MEME_TEXT, "原样贴出来，一个字不加");
+
+    // 回复某条消息再 @ 美亚发 /入典（读引用没开也照样收：那个开关管的是交不交给模型）
+    assert.equal(bot.readQuoted, false);
+    const quoted = "开挂不支持。每个人都是从新手时期过来的，开挂的人永远不会成功。";
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({
+      content: "/入典", message_type: 103,
+      message_scene: { source: "default", ext: ["ref_msg_idx=REFIDX_meme=="] },
+      msg_elements: [{ msg_idx: "REFIDX_meme==", content: quoted, author: { id: "U3", member_openid: "U3" }, attachments: [] }],
+    }));
+    assert.equal(lastText(mock), VOICE.memePending(2));
+    assert.equal(bot.memes.store.get(2).text, quoted);
+
+    assert.equal(model.calls.length + model.routeCalls.length, 0, "入典、审典、典来全程不经过模型");
+    assert.match(bot.commands.helpText, /\/入典 <文案>[^\n]*\n\/典来　随机抽一篇典，原样贴出来/);
+    assert.ok(fs.existsSync(path.join(tmp, "meme-library.json")));
+
+    // 有人 @ 她问怎么入典：能力说明里写着这两条指令归程序管，她不会替人入典
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "美亚，怎么把一段话入典呀" }));
+    assert.ok(await mock.waitFor(() => model.calls.length === 1));
+    assert.match(systemText(model.calls[0].body), /发 \/典来 由程序随机抽一篇原样贴出来。这两件事只能用指令办/);
+    assert.match(model.routeCalls.at(-1).messages[0].content, /提到入典、典来的句子一律 route=chat/, "路由知道这两个词不是工具、也不是加别名");
+  } finally { await bot.stop(); await mock.stop(); }
+});
+
+// 2026-10-13 真模型抽查：「怎么把一段话入典呀」3 次里有 1 次被联网判断当成不认识的词要去搜。
+// 梗库开着时入口把「入典」「典来」当成美亚自己的功能交给判断层，提到它们的句子不自动搜；关着时照旧。
+test("梗库开着：提到入典的句子联网判断不自动搜；关着时同一句照旧会搜", async () => {
+  const { gateSettings } = require("../chat-core/search-gate.cjs");
+  const fetchImpl = async (_, options) => {
+    const system = String(JSON.parse(options.body).messages[0].content);
+    const content = system.includes("MIA_SEMANTIC_ROUTER_V1") ? { route: "chat" }
+      : system.startsWith("MIA_SEARCH_GATE_V1") ? { act: "ask", about: "world", target: "怎么把一段话入典", fresh: false, confident: false, unknownTerms: ["入典"] }
+      : { text: "发 /入典 加上原文就好～", emotion: "happy", scene: "ordinary", expressionIds: [] };
+    return { ok: true, status: 200, text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }) };
+  };
+  for (const memesOn of [true, false]) {
+    const logs = [], web = [];
+    const webFetchImpl = async (url, options) => { web.push(JSON.parse(options.body).text_query); return { ok: true, status: 200, json: async () => ({ search_results: [] }) }; };
+    const { mock, bot } = await setup(memesOn ? { memes: { mode: "on" }, aliasDeleteOpenids: ["ADMIN"] } : {}, { botDeps: { fetchImpl, webFetchImpl, log: (line) => logs.push(line) } });
+    // 服务器上联网判断开在 auto、搜索配好了；本机配置没写，这里照服务器补上
+    bot.settings.searchGate = gateSettings({ mode: "auto" });
+    bot.settings.search = { apiKey: "kimi-fixture", cache: new Map() };
+    try {
+      await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "怎么把一段话入典呀" }));
+      assert.ok(await mock.waitFor(() => mock.state.sent.length === 1));
+      const done = logs.find((line) => line.includes("聊天完成")) || "";
+      if (memesOn) {
+        assert.deepEqual(web, []);
+        assert.match(done, /联网判断（auto｜ask\/world\/没把握｜none：问的是机器人自己的功能（入典）/, logs.join("\n"));
+      } else {
+        assert.equal(web.length, 1, "关着时这句照旧会去搜（改造前就是这样）");
+        assert.match(done, /search：在问不认识的东西/);
+      }
+    } finally { await bot.stop(); await mock.stop(); }
+  }
+});

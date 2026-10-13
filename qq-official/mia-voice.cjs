@@ -22,11 +22,12 @@
 //
 // 按「要不要绑定」分组：新来的人头一个想知道的就是不绑能用什么。
 // 末尾有三行跟着开关走，由 mia-entry 按启动时的配置决定放不放 —— 开关关着时那行
-// 就不出现，清单不能说她做不到的事。缺省值跟三个配置项的缺省一致：
+// 就不出现，清单不能说她做不到的事。缺省值跟几个配置项的缺省一致：
 //   webSearch      mia-chat 的 searchGate 不是 off（「搜一下 …」这种明说，explicit / shadow / auto 都会去查）
 //   quotedMessage  qq-official 的 quotedMessage 是 read
 //   privateChat    qq-official 的 allowPrivateChat 没关
-function miaHelp({ webSearch = false, quotedMessage = false, privateChat = true } = {}) {
+//   memes          qq-official 的 memes.mode 是 on（/入典、/典来 两行放在「不用绑定的」末尾）
+function miaHelp({ webSearch = false, quotedMessage = false, privateChat = true, memes = false } = {}) {
   return [
     "美亚的小道具 · 指令一览♪",
     "",
@@ -50,6 +51,10 @@ function miaHelp({ webSearch = false, quotedMessage = false, privateChat = true 
     "/查看别名 <曲目>　这首歌都有哪些叫法",
     "/添加别名 <曲目> <别名>　比如 /添加别名 id870 八爪鱼",
     "/删除别名 <曲目> <别名>　这件道具只认指定的人",
+    ...(memes ? [
+      "/入典 <文案>　把一段文案收进典里，审核过了才抽得到；回复那条消息再发 /入典 也行",
+      "/典来　随机抽一篇典，原样贴出来",
+    ] : []),
     "",
     "账号和其他：",
     "/设置数据源 <大饼/rinnet>　切换查分来源，两边绑定分别记着",
@@ -156,6 +161,41 @@ const MIA_TEMPLATES = Object.freeze({
   // 梨绪那边是另一份命令表，不受影响。
   aliasNeedSpace: "曲目和别名中间要留个空格啦。要写成 /添加别名 id870 八爪鱼，像这样～",
   aliasDeleteDenied: "这件道具只认指定的人哦。你这边按了也不会让美亚删掉的。",
+
+  // — 梗库：/入典、/典来和审典（qq-official 的 memes 开着才有，见 meme-library.cjs）—
+  // /典来 抽出来的那篇是原样发的，**不经过这里**：下面只是收典、审典时她的回话。
+  memeUsage: "在 /入典 后面贴上文案原文就好～也可以回复那条消息，再发 /入典。",
+  memeQuoteUnreadable: "被回复的那条美亚没读到……把原文贴在 /入典 后面吧。",
+  memeQuoteNoText: "被回复的那条里没有字呀，典里只收文字哦。",
+  memeTooShort: "这也太短啦，凑够两个字再入典吧～",
+  memeTooLong: (max, length) => "这篇有 " + length + " 字，太长啦——一篇典最多 " + max + " 字。",
+  memeAdded: (id) => "收进典里啦（#" + id + "）♪",
+  memePending: (id) => "收到～这篇先交给审核，过了之后 /典来 就抽得到啦（#" + id + "）。",
+  memeAlreadyIn: (id) => "这篇早就在典里啦（#" + id + "）。",
+  memeAlreadyPending: (id) => "这篇已经在等审核了（#" + id + "），不用再交一次哦。",
+  memeRejectedBefore: "这篇之前审过，没收进典里哦。",
+  memeRestored: (id) => "这篇之前删掉过，现在放回典里啦（#" + id + "）。",
+  memeUserQueueFull: (max) => "你交的典已经有 " + max + " 篇在等审核了，等审完再来吧～",
+  memeQueueFull: "待审的典攒得太多啦，等审完一批再入吧～",
+  memeSaveFailed: "呜喵……这篇没存上，这次不算哦。",
+  memeEmpty: "这里还没有入典的文案呢～先用 /入典 收一篇吧。",
+  memeCooldown: (seconds) => "典来得太快啦，缓 " + seconds + " 秒再抽～",
+  memeSendFailed: "呜喵……这篇典没发出去，美亚记在日志里了。",
+  memeUnavailable: "梗库这会儿打不开……让管理员看一眼日志吧。",
+  memeReviewDenied: "审典这件道具只认指定的人哦。",
+  memeReviewPrivate: "审典要私聊美亚哦，待审的内容就不在群里摊开念啦。",
+  memeNoPending: (count) => "没有待审的典～典里现在有 " + count + " 篇。",
+  memeViewUsage: "要看哪一篇？发 /看典 12 这样。",
+  memeApproveUsage: "要过哪一篇？发 /过典 12，一次可以写好几个号。",
+  memeRemoveUsage: "要删哪一篇？发 /删典 12，或者回复那篇典再发 /删典。",
+  memeQuoteNotFound: "被回复的那条不在这里的典里哦。",
+  memeQuoteAmbiguous: (ids) => "对上了好几篇：" + ids + "，用编号删吧。",
+  // 过典、删典一次可以写好几个号，结果分三种分开说；ids 是拼好的「#12、#13」。
+  memeApproved: (ids) => "好～过了：" + ids + "。",
+  memeRemoved: (ids) => "删掉了：" + ids + "。",
+  memeAlreadyApproved: (ids) => ids + " 本来就在典里。",
+  memeAlreadyRemoved: (ids) => ids + " 本来就删掉了。",
+  memeNotFound: (ids) => "没找到 " + ids + "，编号再看一眼？",
 
   // 参数不全的 Rating 计算：**拒绝，并把正确的格式给回去**。
   // 核心那边缺参数会静默按「铃铛无 / 连击无」算出一个具体的数（输出里虽然写了

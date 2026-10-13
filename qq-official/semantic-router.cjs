@@ -120,7 +120,8 @@ function queryReply(query, options = {}) {
   return { ...clarification(publicQuery.formatResult(result)), preformatted: true, queryState: result.query, querySelection: result.selectionKeys,
     ...(markdown ? { markdown } : {}), ...(paged ? { pager: { page: result.query.page, pages: result.pages } } : {}) };
 }
-async function routeIntent({ settings, messages, specs, targets = [], queryState, querySelection = [], media = {}, fetchImpl = fetch, signal, dispatcher, validateAction, log = () => {}, pickIndex }) {
+// notes：宿主按开关补的说明（梗库开着时说「入典」「典来」不是工具），不传就跟没有这一项时逐字一样。
+async function routeIntent({ settings, messages, specs, targets = [], queryState, querySelection = [], media = {}, fetchImpl = fetch, signal, dispatcher, validateAction, log = () => {}, pickIndex, notes = "" }) {
   const current = messages.filter(m => m.role === "user").at(-1)?.content || "";
   // A vision-capable model still cannot read pixels the host never sent.
   if (media?.hasImage && media?.visionAvailable) return null;
@@ -150,7 +151,7 @@ async function routeIntent({ settings, messages, specs, targets = [], queryState
   const system = ROUTING_RULES + "\n当前角色：" + (settings.characterName || "美亚") + `（本机美亚的正式名为${SELF_CHARACTER}）。\nquestion 字段的口吻：轻快自然，自称我或美亚，猫语只作点缀；先说清问题，不责怪用户。`
     + (mentions.length ? "\n原话里程序从角色索引认出的称呼：" + mentions.map(m => `「${m.alias}」＝${m.names.join(" 或 ")}`).join("、") + "。查询里的角色字段只能用这些正式名（“你”仍指美亚本人，代词可沿用上文角色）。" : "")
     + "\n公共资料 schema：" + JSON.stringify(publicQuery.SCHEMA)
-    + "\n工具清单：" + JSON.stringify(specs.filter(s => s.name !== "songsearch")) + "\n本次可选target：" + JSON.stringify(targets)
+    + "\n工具清单：" + JSON.stringify(specs.filter(s => s.name !== "songsearch")) + (notes ? "\n" + notes : "") + "\n本次可选target：" + JSON.stringify(targets)
     + "\n本用户最近成功的查询，仅供承接：" + JSON.stringify(queryState || null)
     + "\n图片接入状态：" + JSON.stringify({ ...media, visionAvailable: false })
     + "\n无论历史回复是什么格式，本次都只输出一个含 route 的 JSON 对象，不能输出角色台词、查询结果或 Markdown。追问台词只放 question 字段。";

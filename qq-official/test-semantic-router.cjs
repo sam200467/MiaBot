@@ -335,3 +335,14 @@ test("自然语言问 ID 强制返回短 ID；明确问官方曲目 ID 才返回
   const official = await routeIntent({ settings, specs, messages: [{ role: "user", content: "光焔のラテラルアーク的官方曲目ID是多少" }], fetchImpl: scriptedRoute([decision]).fetchImpl });
   assert.match(official.text, /官方曲目ID：601129/);
 });
+
+test("宿主补的说明（notes）跟在工具清单后面；不传时提示词跟原来逐字一样", async () => {
+  const plain = scriptedRoute([{ route: "chat" }]), noted = scriptedRoute([{ route: "chat" }]);
+  const messages = [{ role: "user", content: "怎么把一段话入典呀" }];
+  await routeIntent({ settings, specs, messages, fetchImpl: plain.fetchImpl });
+  await routeIntent({ settings, specs, messages, fetchImpl: noted.fetchImpl, notes: "「入典」「典来」不是工具。" });
+  const before = plain.calls[0].messages[0].content, after = noted.calls[0].messages[0].content;
+  assert.doesNotMatch(before, /入典/);
+  assert.equal(after.replace("\n「入典」「典来」不是工具。", ""), before);
+  assert.match(after, /\n工具清单：[^\n]*\n「入典」「典来」不是工具。\n本次可选target：/);
+});

@@ -355,7 +355,9 @@ async function requestReply(settings, messages, options={}) {
   // 因为给回复模型的说明（gateRule）取决于它；真正的搜索放在下面 webOptions 备好之后。
   const now=typeof options.now==="number"?options.now:Date.now();
   const searchState=options.searchState||{};
-  const gated=gate?await prepareGate({settings,gate,messages,searchState,now,fetchImpl:options.fetchImpl,signal,dispatcher:options.dispatcher}):null;
+  const gated=gate?await prepareGate({settings,gate,messages,searchState,now,fetchImpl:options.fetchImpl,signal,dispatcher:options.dispatcher,
+    // 宿主给的「机器人自己的功能」那几个词（QQ 侧梗库开着时是「入典」「典来」）：提到它们的句子不自动搜
+    ...(Array.isArray(options.ownFeatures)&&options.ownFeatures.length?{ownFeatures:options.ownFeatures}:{})}):null;
   // 提议有冷却：同一个人十分钟里被问好几次「要不要我去查」就烦了。
   const offerAllowed=Boolean(gated&&gate.mode==="auto"&&gated.decision.action==="offer"&&now-(Number(searchState.lastOfferAt)||0)>=gate.offerCooldownMinutes*60000);
   if(plan.required&&!settings.search?.apiKey)return {text:'这个问题需要先查资料核实，当前联网搜索'+(settings.search?.error?'配置读取失败':'未启用')+'，暂时不能给你有依据的攻略。请管理员在本机检查 Kimi 搜索设置。',emotion:'neutral',scene:'explanation',expressionIds:[],attempts:0,research:{reason:plan.reason,webCalls:0,sourceCount:0,status:'unavailable'}};
@@ -1088,7 +1090,7 @@ function createChat(settings, host, deps={}) {
         ? await adapter.routeIntent({messages,message,queryState:old?.queryState,querySelection:old?.querySelection,signal:controller.signal,dispatcher}) : null;
       const images=typeof adapter.images==="function"?(adapter.images(message)||[]):[];
       const result=routed || await requestReply(settings,messages,{fetchImpl:deps.fetchImpl,webFetchImpl:deps.webFetchImpl,dispatcher,signal:controller.signal,ability:ability,
-        searchState,now:time,actions:adapter.routeIntent?[]:actionSpecs,actionTarget:Boolean(adapter.actionTarget),personalRecommendationNotice:typeof adapter.personalRecommendationNotice==='function'?()=>adapter.personalRecommendationNotice(message):undefined,
+        searchState,now:time,actions:adapter.routeIntent?[]:actionSpecs,...(Array.isArray(adapter.ownFeatures)?{ownFeatures:adapter.ownFeatures}:{}),actionTarget:Boolean(adapter.actionTarget),personalRecommendationNotice:typeof adapter.personalRecommendationNotice==='function'?()=>adapter.personalRecommendationNotice(message):undefined,
         images,
         // 别名解析与候选落盘都由宿主注入（QQ 侧接 mia-core 的 SongAliasStore）：
         // 聊天侧只拿一个正式曲名，不实现第二套解析规则。propose 绑到本条消息上，

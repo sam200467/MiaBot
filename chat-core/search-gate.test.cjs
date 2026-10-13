@@ -711,3 +711,23 @@ test("提议的说法：主语和动词之间夹了副词、动词是「打听�
   assert.equal(result.text, "唔——美亚也不太确定，要不要美亚现在去帮你查一查？", "实测出现过：同一条回复问了两遍");
   assert.equal(result.searchState.pending.target, "腾不出手 梗 出处");
 });
+
+test("宿主给的「机器人自己的功能」：提到它的句子不自动搜、不提议，明说要搜照搜；不给就跟原来一样", async () => {
+  const d = args => gate.decide({ mode: "auto", text: "", explicit: null, pending: null, lastTarget: null, obs: null, veto: "", haystack: "", now: T0, ...args });
+  const asking = obs({ target: "怎么把一段话入典", unknownTerms: ["入典"] });
+  const hay = "怎么把一段话入典呀";
+  assert.equal(d({ obs: asking, haystack: hay }).action, "search", "不给功能词时照旧会搜（2026-10-13 真模型抽查抓到的就是这一句）");
+  const own = d({ obs: asking, haystack: hay, ownFeature: "入典" });
+  assert.deepEqual([own.action, own.reason], ["none", "问的是机器人自己的功能（入典）"]);
+  assert.equal(d({ obs: obs({ target: "入典 意思" }), haystack: "入典是什么意思", ownFeature: "入典" }).action, "none", "提议也撤掉");
+  assert.equal(d({ explicit: { rest: "入典" }, obs: asking, haystack: "搜一下入典是什么梗", ownFeature: "入典" }).action, "search", "明说要搜照搜");
+  // 整条链路：判断照跑（回法照选），只是不搜；没提到功能词的句子不受影响
+  const model = fakeModel({ observe: asking }), web = fakeWeb();
+  const result = await requestReply(settingsWith({ mode: "auto" }), say(hay), { fetchImpl: model.fetchImpl, webFetchImpl: web.webFetchImpl, ownFeatures: ["入典", "典来"] });
+  assert.equal(model.calls.gate.length, 1);
+  assert.equal(web.calls.length, 0);
+  assert.equal(result.searchGate.decision.reason, "问的是机器人自己的功能（入典）");
+  const other = fakeModel({ observe: obs({ target: "CHUNITHM 新版本", fresh: true }) }), otherWeb = fakeWeb();
+  const searched = await requestReply(settingsWith({ mode: "auto" }), say("CHUNITHM 新版本出了吗"), { fetchImpl: other.fetchImpl, webFetchImpl: otherWeb.webFetchImpl, ownFeatures: ["入典", "典来"] });
+  assert.equal(searched.searchGate.decision.action, "search");
+});
