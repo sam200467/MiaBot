@@ -31,7 +31,7 @@ function compileApp() {
     renderCompletionTheme = async data => { captured.plate = data; return Buffer.from("test"); };
     renderLevelScoreTheme = async data => { captured.level = data; return Buffer.from("test"); };
     module.exports = { captured, runJobData, runSongDetailJobData, runCompletionJobData, runLevelScoreJobData, completionVersionSongs, getCompletionPlate,
-      collectJacketItems, localizeJackets, findCachedJacket, buildChartInfoThemeData, levelScoreCharts };
+      collectJacketItems, localizeJackets, findCachedJacket, buildChartInfoThemeData, levelScoreCharts, buildLevelScoreThemeData };
   `, file);
   return loaded.exports;
 }
@@ -125,6 +125,32 @@ test("已删的ユーフィリア《Hand in Hand》（id212）不算进進撃牌
   assert.ok(!plate.some(song => song.id === 212));
   for (const level of ["2", "7", "8+", "12"]) assert.ok(!app.levelScoreCharts(level).some(chart => chart.songId === 212), "/等级 " + level);
   assert.ok(app.levelScoreCharts("11+").some(chart => chart.songId === 380), "同名的 livetune 那首照常在");
+});
+
+test("等级图顶部统计是包含关系：SSS 含 SSS+，AB、FB 都含 ABFB，白金星是至少 N 星", () => {
+  // 作者定的口径：「拿到 AB 的谱面」包括同时 FB 的，跟牌子完成度一样数。
+  // 以前 AB、FB 只数单独拿到的，SSS 不含 SSS+，白金星只数正好 N 星的
+  const app = compileApp();
+  const charts = app.levelScoreCharts("14").slice(0, 6);
+  const scores = [
+    { tech_score_max: 1010000, is_all_break: true, is_full_bell: true, platinum_score_star: 6 },   // SSS+ · ABFB · 5+ 星
+    { tech_score_max: 1008000, is_all_break: true, is_full_bell: false, platinum_score_star: 5 },  // SSS+ · AB · 5 星
+    { tech_score_max: 1003000, is_all_break: false, is_full_bell: true, platinum_score_star: 4 },  // SSS · FB · 4 星
+    { tech_score_max: 1000000, is_all_break: true, is_full_bell: true, platinum_score_star: 2 },   // SSS · ABFB · 2 星
+    { tech_score_max: 990000, is_all_break: false, is_full_bell: false, platinum_score_star: 1 },  // 只有 1 星
+    { tech_score_max: 0, is_all_break: true, is_full_bell: true, platinum_score_star: 5 },         // 接口给没玩过的谱面也回一条 0 分记录，不算
+  ];
+  const records = charts.map((chart, index) => ({
+    music: { name: chart.song.name, artist: chart.song.artistName, music_id: chart.songId },
+    levelInfo: { difficulty: chart.difficultyId },
+    score: { ...scores[index], is_full_combo: scores[index].is_all_break },
+  }));
+  const { summary } = app.buildLevelScoreThemeData("14", charts, records, { playerName: "测试玩家" }, 1);
+  const { total, played, sssPlus, sss, allBreak, fullBell, allBreakFullBell } = summary;
+  assert.deepEqual({ total, played, sssPlus, sss, allBreak, fullBell, allBreakFullBell },
+    { total: 6, played: 5, sssPlus: 2, sss: 4, allBreak: 3, fullBell: 3, allBreakFullBell: 2 });
+  assert.deepEqual([summary.star5, summary.star4, summary.star3, summary.star2, summary.star1], [2, 3, 3, 4, 5],
+    "5 星含 5+，4 星含 5 星，1 星就是拿到星的全部谱面");
 });
 
 // 曲绘是公网图，国内时通时不通。缓存逻辑决定了这件事的代价：
