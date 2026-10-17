@@ -932,12 +932,14 @@ function describeImage(kind, image, caption) {
         difficultyName(item.difficultyId) + " " + (item.techScore ?? "未游玩") + (marks(item) ? " " + marks(item, " · ") : "")).join("；");
     }
     if (kind === "level") {
+      // 数是核心按包含关系数好的（SSS 含 SSS+，AB、FB 都含 ABFB），这里写明，
+      // 不然模型会当成互斥的，把几项加起来回答「一共多少」
       const bits = [
         meta.total != null ? "ALL " + meta.total : null,
         meta.sssPlus != null ? "SSS+ " + meta.sssPlus : null,
-        meta.sss != null ? "SSS " + meta.sss : null,
-        meta.allBreak != null ? "AB " + meta.allBreak : null,
-        meta.fullBell != null ? "FB " + meta.fullBell : null,
+        meta.sss != null ? "SSS " + meta.sss + "（含 SSS+）" : null,
+        meta.allBreak != null ? "AB " + meta.allBreak + "（含 ABFB）" : null,
+        meta.fullBell != null ? "FB " + meta.fullBell + "（含 ABFB）" : null,
         meta.allBreakFullBell != null ? "ABFB " + meta.allBreakFullBell : null,
       ].filter(Boolean);
       return bits.length ? head + "｜" + bits.join(" · ") : head;

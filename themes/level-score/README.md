@@ -2,9 +2,11 @@
 
 用于 Discord Bot 的 `/level`（中文 `/等级`）指令。可输入 LEVEL 0～15+、一位小数的谱面定数（如 `14.1`）或 `ABFB`，页码不填时默认为 1。显示等级与定数查询会将除已删除曲外的所有命中谱面（BASIC、ADVANCED、EXPERT、MASTER、LUNATIC 和 BONUS TRACK）按每行 7 张、每页最多 10 行输出。API 返回的 0 分记录按未游玩处理。
 
-排序规则为个人最佳 TECHNICAL SCORE 降序，同分时按谱面定数降序，未游玩谱面保留并置于末尾，同时使用明显的低饱和高亮褪色样式与已游玩谱面区分。输出为 1440px 宽的 JPEG，高度按当页行数计算。顶部统计依次显示 ALL、SSS+、SSS、AB、FB、ABFB 和白金分 5～1 星；其中 AB、FB 分别只统计单独获得该标记的谱面，ABFB 统计两者同时获得的谱面。白金星使用 `assets/platinum_score_icon.png`。卡片会把 TECHNICAL RANK 作为图片显示在难度条上方；曲绘下第一行显示定数和分数，第二行显示曲名。玩家已获得的白金分星级仍显示在曲绘右上角，FB 使用独立的下端槽位。
+排序规则为个人最佳 TECHNICAL SCORE 降序，同分时按谱面定数降序，未游玩谱面保留并置于末尾，同时使用明显的低饱和高亮褪色样式与已游玩谱面区分。输出为 1440px 宽的 JPEG，高度按当页行数计算。白金星使用 `assets/platinum_score_icon.png`。卡片会把 TECHNICAL RANK 作为图片显示在难度条上方；曲绘下第一行显示定数和分数，第二行显示曲名。玩家已获得的白金分星级仍显示在曲绘右上角，FB 使用独立的下端槽位。
 
-`ABFB` 查询只保留同时获得 AB 和 FB 的已游玩谱面，跨全部显示等级与五种难度。排序依次为 LUNATIC、MASTER（紫）、EXPERT（红）、ADVANCED（黄）、BASIC（绿），同一难度内部按 `/calculate` 使用的单曲 Rating 公式降序排列。
+顶部统计依次显示 ALL、SSS+、SSS、AB、FB、ABFB 和白金分 5～1 星，按包含关系计数：SSS+ 统计 TECHNICAL SCORE 1,007,500 及以上的谱面，SSS 统计 1,000,000 及以上的谱面（含 SSS+）；AB、FB 分别统计获得该标记的全部谱面（都含两者同时获得的谱面），ABFB 统计两者同时获得的谱面。白金分 N 星统计至少获得 N 星的谱面：4 星含 5 星，5 星含 5+，1 星就是获得白金星的全部谱面。ALL 是本次查询命中的全部谱面，其余各项只算已游玩谱面。
+
+`ABFB` 查询只保留同时获得 AB 和 FB 的已游玩谱面，跨全部显示等级与五种难度，所以顶部的 AB、FB、ABFB 三项都等于 ALL。排序依次为 LUNATIC、MASTER（紫）、EXPERT（红）、ADVANCED（黄）、BASIC（绿），同一难度内部按 `/calculate` 使用的单曲 Rating 公式降序排列。
 
 主题专用图片全部位于 `assets/`：背景、五种难度条、十二种 TECHNICAL RANK、AB/FC/FB 徽章和白金星图标。等级长图使用 `assets/background.png`，渲染时旋转 90° 并添加 25px 高斯模糊，且会随分页高度自动铺满。跨主题共用字体继续位于 `themes/shared/fonts/`。
 

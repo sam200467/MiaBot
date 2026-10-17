@@ -2683,21 +2683,25 @@ function buildLevelScoreThemeData(queryInput, charts, records, profile, requeste
       to: start + pageCharts.length,
       total: mapped.length,
     },
+    // 顶部统计是包含关系：SSS 含 SSS+，AB、FB 各自都含两样都拿到的 ABFB，
+    // 白金星是「至少 N 星」（4 星含 5 星和 5+，1 星就是拿到星的全部谱面）。
+    // 「拿到 AB 的谱面」本来就包括同时 FB 的，牌子完成度也是这么数的
+    // （以前这里数成互斥：AB 只数没 FB 的，SSS 只数没到 SSS+ 的，星数只数正好 N 星的）。
     summary: {
       total: mapped.length,
       played: mapped.filter((chart) => chart.played).length,
       unplayed: mapped.filter((chart) => !chart.played).length,
       theory: mapped.filter((chart) => chart.techScore === 1010000).length,
       sssPlus: mapped.filter((chart) => chart.played && chart.techScore >= 1007500).length,
-      sss: mapped.filter((chart) => chart.played && chart.techScore >= 1000000 && chart.techScore < 1007500).length,
-      allBreak: mapped.filter((chart) => chart.isAllBreak && !chart.isFullBell).length,
-      fullBell: mapped.filter((chart) => chart.isFullBell && !chart.isAllBreak).length,
+      sss: mapped.filter((chart) => chart.played && chart.techScore >= 1000000).length,
+      allBreak: mapped.filter((chart) => chart.isAllBreak).length,
+      fullBell: mapped.filter((chart) => chart.isFullBell).length,
       allBreakFullBell: mapped.filter((chart) => chart.isAllBreak && chart.isFullBell).length,
       star5: mapped.filter((chart) => chart.platinumScoreStar >= 5).length,
-      star4: mapped.filter((chart) => chart.platinumScoreStar === 4).length,
-      star3: mapped.filter((chart) => chart.platinumScoreStar === 3).length,
-      star2: mapped.filter((chart) => chart.platinumScoreStar === 2).length,
-      star1: mapped.filter((chart) => chart.platinumScoreStar === 1).length,
+      star4: mapped.filter((chart) => chart.platinumScoreStar >= 4).length,
+      star3: mapped.filter((chart) => chart.platinumScoreStar >= 3).length,
+      star2: mapped.filter((chart) => chart.platinumScoreStar >= 2).length,
+      star1: mapped.filter((chart) => chart.platinumScoreStar >= 1).length,
     },
   };
 }
@@ -3829,15 +3833,15 @@ async function main() {
     const fakeLevel14Played = fakeLevel14.map(completionAchievement).filter((achievement) => achievement.techScore > 0);
     const expectedLevel14Summary = {
       sssPlus: fakeLevel14Played.filter((achievement) => achievement.techScore >= 1007500).length,
-      sss: fakeLevel14Played.filter((achievement) => achievement.techScore >= 1000000 && achievement.techScore < 1007500).length,
-      allBreak: fakeLevel14Played.filter((achievement) => achievement.isAllBreak && !achievement.isFullBell).length,
-      fullBell: fakeLevel14Played.filter((achievement) => achievement.isFullBell && !achievement.isAllBreak).length,
+      sss: fakeLevel14Played.filter((achievement) => achievement.techScore >= 1000000).length,
+      allBreak: fakeLevel14Played.filter((achievement) => achievement.isAllBreak).length,
+      fullBell: fakeLevel14Played.filter((achievement) => achievement.isFullBell).length,
       allBreakFullBell: fakeLevel14Played.filter((achievement) => achievement.isAllBreak && achievement.isFullBell).length,
       star5: fakeLevel14Played.filter((achievement) => achievement.platinumScoreStar >= 5).length,
-      star4: fakeLevel14Played.filter((achievement) => achievement.platinumScoreStar === 4).length,
-      star3: fakeLevel14Played.filter((achievement) => achievement.platinumScoreStar === 3).length,
-      star2: fakeLevel14Played.filter((achievement) => achievement.platinumScoreStar === 2).length,
-      star1: fakeLevel14Played.filter((achievement) => achievement.platinumScoreStar === 1).length,
+      star4: fakeLevel14Played.filter((achievement) => achievement.platinumScoreStar >= 4).length,
+      star3: fakeLevel14Played.filter((achievement) => achievement.platinumScoreStar >= 3).length,
+      star2: fakeLevel14Played.filter((achievement) => achievement.platinumScoreStar >= 2).length,
+      star1: fakeLevel14Played.filter((achievement) => achievement.platinumScoreStar >= 1).length,
     };
     const level14Theme = buildLevelScoreThemeData(
       "14",

@@ -276,7 +276,10 @@ assert.equal(core.selectBinding({ email: "o@x", password: "p" }).dataSource, "ot
     core.describeImage("chart", { meta: { rating: 16.749, counts: { best: 50, new: 10, platinum: 50 }, top: [{ title: "A", techScore: 1003154, allBreak: false, fullBell: true }] } }, "X 的分表"),
     "X 的分表｜RATING 16.749 · 三榜 50/10/50 曲 · 榜首 A 1003154 分 FB");
   assert.equal(core.describeImage("level", { meta: { total: 42, sssPlus: 3, sss: 10 } }, "X 的 LEVEL 14 成绩"),
-    "X 的 LEVEL 14 成绩｜ALL 42 · SSS+ 3 · SSS 10");
+    "X 的 LEVEL 14 成绩｜ALL 42 · SSS+ 3 · SSS 10（含 SSS+）");
+  // 等级图的统计是包含关系，摘要要写明，模型才不会把 AB、FB、ABFB 加起来当总数
+  assert.equal(core.describeImage("level", { meta: { total: 42, sssPlus: 3, sss: 10, allBreak: 6, fullBell: 9, allBreakFullBell: 4 } }, "X 的 LEVEL 14 成绩"),
+    "X 的 LEVEL 14 成绩｜ALL 42 · SSS+ 3 · SSS 10（含 SSS+） · AB 6（含 ABFB） · FB 9（含 ABFB） · ABFB 4");
   assert.equal(core.describeImage("plate", { meta: { summary: { master: { allBreak: 12, fullBell: 3, total: 50 } } } }, "X 的闪击完成度"),
     "X 的闪击完成度｜MASTER AB 12/50 · FB 3/50");
   assert.equal(core.describeImage("chartinfo", { meta: { difficulty: "MASTER", constant: 14.2, noteCount: 1234 } }, "谱面分析"),
