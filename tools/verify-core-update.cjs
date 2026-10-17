@@ -11,9 +11,14 @@ const manifest = JSON.parse(fs.readFileSync(path.join(pkg, "manifest.json"), "ut
 assert.equal(manifest.kind, "core-and-entry");
 assert.equal(manifest.liveVerified, false);
 assert.equal(manifest.verificationStatus, "pending-server-validation");
-assert.equal(manifest.version, "4.1.6-render-timeout");
-assert.deepEqual(manifest.dataSources,["u.otogame.net","rinnet"]);
-assert.deepEqual(manifest.constantSources,{otogame:"server-rating-inference-only",rinnet:"server-music-catalog-only"});
+// 版本按源码核对：原来写死 v4.1.6，build-core-update.cjs 有了 --notes 以后打的包都过不了这一关。
+// dataSources / constantSources 只有不带 --notes 的那份 v4.1.6 说明才写进清单。
+const sourceVersion = fs.readFileSync(path.join(root, "app-template.js"), "utf8").match(/const VERSION\s*=\s*"([^"]+)"/)?.[1];
+assert.equal(manifest.version, sourceVersion);
+if ("dataSources" in manifest || "constantSources" in manifest) {
+  assert.deepEqual(manifest.dataSources,["u.otogame.net","rinnet"]);
+  assert.deepEqual(manifest.constantSources,{otogame:"server-rating-inference-only",rinnet:"server-music-catalog-only"});
+}
 assert.equal(manifest.files.length, 2);
 assert.equal(manifest.files[0].path, "qq-official/ongeki-core.exe");
 assert.equal(manifest.files[1].path, "qq-official/mia-entry.cjs");
@@ -22,7 +27,7 @@ assert.equal(fs.statSync(sourceCore).size, manifest.files[0].bytes);
 assert.equal(fileHash(sourceCore), manifest.files[0].sha256);
 const selftest = spawnSync(sourceCore, ["--selftest"], {encoding:"utf8", windowsHide:true, timeout:120000});
 assert.equal(selftest.status, 0, selftest.stdout + selftest.stderr);
-assert.match(selftest.stdout, /SELFTEST OK v4\.1\.6-render-timeout/);
+assert.ok(selftest.stdout.split(/\r?\n/).some(line => line.trim() === "SELFTEST OK v" + manifest.version), selftest.stdout + selftest.stderr);
 const sourceEntry = path.join(pkg,"payload/qq-official/mia-entry.cjs");
 assert.equal(fs.statSync(sourceEntry).size,manifest.files[1].bytes);
 assert.equal(fileHash(sourceEntry),manifest.files[1].sha256);
