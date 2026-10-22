@@ -106,6 +106,21 @@ test("没有 msg_id 时按主动消息发（不带被动回复凭据）", async 
   await transport.stop(); await mock.stop();
 });
 
+test("主动更新日志不复用旧消息凭据，Markdown 降级也保持主动发送", async () => {
+  const { mock, transport } = await connected({ reuseLatestPassiveCredential: true });
+  try {
+    mock.push("GROUP_MESSAGE_CREATE", { id: "recent-message", group_openid: "G1", content: "刚才的消息", author: { member_openid: "U1" } });
+    await mock.waitFor(() => false, 60);
+    mock.state.nextError = { status: 400, err_code: 40054010, message: "no markdown" };
+    await transport.sendMarkdown({ kind: "group", openid: "G1" }, "### 更新日志", "更新日志", undefined, undefined, { proactive: true });
+    assert.equal(mock.state.sent.length, 1);
+    assert.equal(mock.state.sent[0].body.msg_type, 0);
+    assert.equal(mock.state.sent[0].body.msg_id, undefined);
+    assert.equal(mock.state.sent[0].body.event_id, undefined);
+    assert.equal(mock.state.sent[0].body.msg_seq, undefined);
+  } finally { await transport.stop(); await mock.stop(); }
+});
+
 test("同一条消息重复投递：相同内容被抑制", async () => {
   // 抑制要挡的是「同一条消息被推了两遍」，所以凭据（msg_id）相同才算重复。
   const { mock, transport } = await connected({ duplicateWindowMs: 60000 });

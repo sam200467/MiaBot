@@ -11,7 +11,7 @@
 //   - 事件走 WebSocket 网关；Identify(op=2) → Hello(op=10) → Ready → 心跳(op=1)/心跳ACK(op=11)
 //   - **发消息不走 WS**，走 REST，且要带被动回复凭据 msg_id + 递增的 msg_seq
 //   - 被动回复时效：群聊 5 分钟 5 次、单聊 60 分钟 4～5 次，超了报 40034128
-//   - 主动消息自 2025-04 起基本不可用，本层不提供主动推送能力
+//   - 更新日志可尝试主动消息；群设置或平台权限不足时由上层等消息补发
 
 const { WebSocket } = require("ws");
 
@@ -300,7 +300,7 @@ function createOfficial(host) {
     return "/v2/users/" + target.openid + "/files";
   }
 
-  async function sendText(target, text, msgId, refId, markdown, keyboard) {
+  async function sendText(target, text, msgId, refId, markdown, keyboard, { proactive = false } = {}) {
     const run = async () => {
       const key = targetKey(target);
       const suppress = suppressKey(key, text, msgId);
@@ -310,7 +310,7 @@ function createOfficial(host) {
       if (delay > 0) await new Promise((r) => setTimeout(r, delay));
 
       // 被动回复必须带 msg_id；msg_seq 对同一个 msg_id 要递增，否则被当成重复发送
-      const useId = effectiveMsgId(target, msgId);
+      const useId = proactive ? undefined : effectiveMsgId(target, msgId);
       const body = markdown ? { msg_type: 2, markdown: { content: String(markdown) } } : { content: String(text), msg_type: 0 };
       if (markdown && keyboard) body.keyboard = { content: keyboard };
       applyCredential(body, useId);
@@ -365,12 +365,12 @@ function createOfficial(host) {
     // QQ 频道是另一套接口，没实测过，照旧发纯文本。
     if (markdownRejected || !config.markdown || target.kind === "channel") {
       if (options.requireMarkdown) throw new Error("Markdown 不可用（" + (markdownRejected ? "平台拒收过" : "没开或是频道") + "）");
-      return sendText(target, text, msgId, refId);
+      return sendText(target, text, msgId, refId, undefined, undefined, options);
     }
     let keyboardError = null;
     if (options.keyboard && config.keyboard && !keyboardRejected) {
       try {
-        return await sendText(target, text, msgId, refId, headingFirstLine(markdown), options.keyboard);
+        return await sendText(target, text, msgId, refId, headingFirstLine(markdown), options.keyboard, options);
       } catch (error) {
         if (!rejected(error)) throw error;
         keyboardError = error;
@@ -380,10 +380,10 @@ function createOfficial(host) {
     if (options.heading) markdown = headingFirstLine(markdown);
     let result;
     try {
-      result = await sendText(target, text, msgId, refId, markdown);
+      result = await sendText(target, text, msgId, refId, markdown, undefined, options);
     } catch (error) {
       if (!rejected(error) || options.requireMarkdown) throw error;
-      result = await sendText(target, text, msgId, refId);
+      result = await sendText(target, text, msgId, refId, undefined, undefined, options);
       markdownRejected = true;
       log("Markdown 消息被拒（" + (error.code ?? error.status) + "），之后改发纯文本：" + error.message);
       return result;

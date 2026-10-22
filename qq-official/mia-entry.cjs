@@ -21,6 +21,7 @@ const { pagerKeyboard, parseOwnedData } = require("./pager-buttons.cjs");
 const { MIA_TEMPLATES: T, miaHelp } = require("./mia-voice.cjs");
 const { createAssetBrowser } = require("./asset-browser.cjs");
 const { chatLogSettings, createChatLog, turnRecord } = require("./chat-log.cjs");
+const { createUpdateNotice } = require("./update-notice.cjs");
 const { memeSettings, createMemeLibrary, MEME_ABILITY, MEME_ROUTER_NOTE, MEME_WORDS } = require("./meme-library.cjs");
 
 const HERE = __dirname;
@@ -280,6 +281,8 @@ function createMiaBot(config, deps = {}) {
 
   const allowGroups = new Set((config.allowedGroupIds || []).map(String));
   const allowPrivate = config.allowPrivateChat !== false;
+  // 独立入口注入本次发布说明；嵌入式调用可显式传 deps.release。
+  const updateNotice = createUpdateNotice(config, { release: deps.release, log });
 
   // ── 聊天记录（默认关）──────────────────────────────────────────────
   // 开着时美亚每回一轮群聊就记一行，连同她当时看到的群上下文（见 chat-log.cjs）。
@@ -638,6 +641,9 @@ function createMiaBot(config, deps = {}) {
       return;
     }
 
+    await updateNotice.send(event, (event, text, markdown) =>
+      transport.sendMarkdown(makeTarget(event), markdown, text, event.msgId));
+
     const attachments = Array.isArray(event.raw?.attachments) ? event.raw.attachments : [];
     const imageAttachments = attachments.filter(isImageAttachment);
     // 读引用关着时 quote 恒为 null，下面每一项都跟改造前一样。
@@ -789,7 +795,7 @@ function createMiaBot(config, deps = {}) {
 
   // 网关连接状态：图形界面据此点灯。连接是在 transport.start 之后异步建立的，
   // 所以要轮询而不能只看返回值。
-  let gatewayTimer = null, gatewayOn = false;
+  let gatewayTimer = null, gatewayOn = false, updateAttempted = false;
   function watchGateway() {
     gatewayTimer = setInterval(() => {
       const up = transport.state.connected && transport.healthy();
@@ -797,6 +803,12 @@ function createMiaBot(config, deps = {}) {
       gatewayOn = up;
       mark("MIA_GATEWAY:" + (up ? "1" : "0"));
       if (up) mark("MIA_READY");     // 第一次连上才算就绪，和 BOT_READY 语义一致
+      if (up && !updateAttempted && typeof transport.sendMarkdown === "function") {
+        updateAttempted = true;
+        void updateNotice.broadcast([...allowGroups], (target, text, markdown) =>
+          transport.sendMarkdown(target, markdown, text, undefined, undefined, { proactive: true }))
+          .catch(error => log("⚠ 更新日志通知失败：" + error.message));
+      }
     }, 1500);
     gatewayTimer.unref?.();
   }
@@ -875,7 +887,9 @@ function createMiaBot(config, deps = {}) {
 
 async function main() {
   const config = loadConfig();
-  const bot = createMiaBot(config, { log: makeFileLog(path.join(HERE, "mia.log")) });
+  const bot = createMiaBot(config, {
+    log: makeFileLog(path.join(HERE, "mia.log")), release: require("./update-notes.json"),
+  });
   await bot.start();
   const shutdown = () => { bot.stop(); setTimeout(() => process.exit(0), 300); };
   process.on("SIGINT", shutdown);

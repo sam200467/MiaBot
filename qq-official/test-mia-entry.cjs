@@ -132,6 +132,50 @@ const c2cEvent = (over = {}) => ({
   timestamp: new Date().toISOString(), author: { user_openid: "U2" }, ...over,
 });
 
+test("更新后连接 QQ 即向白名单群发送更新日志，普通重启不重复通知", async t => {
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "mia-update-start-"));
+  t.after(() => fs.rmSync(workDir, { recursive: true, force: true }));
+  const release = { version: "notice-test", notes: ["上线通知"] };
+  for (let run = 0; run < 2; run++) {
+    const { mock, bot } = await setup({ workDir }, { botDeps: { release } });
+    try {
+      if (run === 0) {
+        assert.ok(await mock.waitFor(() => mock.state.sent.length === 1, 5000));
+        assert.match(lastText(mock), /美亚 更新日志[\s\S]*notice-test[\s\S]*上线通知/);
+        assert.equal(mock.state.sent[0].path, "/v2/groups/" + GROUP + "/messages");
+        assert.equal(mock.state.sent[0].body.msg_id, undefined);
+      } else {
+        await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "/帮助" }));
+        assert.ok(await mock.waitFor(() => mock.state.sent.length > 0));
+        await new Promise(resolve => setTimeout(resolve, 1600));
+        assert.ok(mock.state.sent.every(s => !JSON.stringify(s.body).includes("更新日志")));
+      }
+    } finally { bot.stop(); await mock.stop(); }
+  }
+});
+
+test("主动通知被拒后普通群消息补发；名单外群、私聊不发，原指令照常回复", async () => {
+  const release = { version: "notice-fallback", notes: ["新增通知"] };
+  const logs = [];
+  const { mock, bot } = await setup({}, { botDeps: { release, log: line => logs.push(line) } });
+  try {
+    // 在启动广播前拒绝主动发送的 Markdown 和纯文本两个尝试。
+    mock.state.nextError = { status: 400, err_code: 40034105, message: "proactive disabled", times: 2 };
+    assert.ok(await mock.waitFor(() => logs.some(line => line.includes("更新日志发送或保存失败")), 5000));
+    assert.equal(mock.state.sent.length, 0);
+    await bot.handleEvent("GROUP_MESSAGE_CREATE", groupEvent({ group_openid: OTHER_GROUP, content: "你好" }));
+    await bot.handleEvent("C2C_MESSAGE_CREATE", c2cEvent({ content: "/帮助" }));
+    assert.ok(mock.state.sent.every(s => !JSON.stringify(s.body).includes("更新日志")));
+    const message = groupEvent({ content: "普通群消息" });
+    await bot.handleEvent("GROUP_MESSAGE_CREATE", message);
+    assert.match(lastText(mock), /更新日志[\s\S]*新增通知/);
+    assert.equal(mock.state.sent.at(-1).body.msg_id, message.id);
+    await bot.handleEvent("GROUP_AT_MESSAGE_CREATE", groupEvent({ content: "/帮助" }));
+    assert.ok(await mock.waitFor(() => !JSON.stringify(mock.state.sent.at(-1).body).includes("更新日志")));
+    assert.equal(mock.state.sent.filter(s => JSON.stringify(s.body).includes("更新日志")).length, 1);
+  } finally { bot.stop(); await mock.stop(); }
+});
+
 test("结构化查询状态按用户隔离，闲聊后仍可翻页，重置后清除", async () => {
   const calls = [];
   const fetchImpl = async (_, options) => {
