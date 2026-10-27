@@ -67,7 +67,7 @@ const BROWSER_CANDIDATES = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
 ];
-const VERSION = "4.2.4-chart-capture";
+const VERSION = "4.2.5-level-constant";
 
 // 开发模式（node ongenki-exe.js 直跑）时用 cwd，exe 模式用 exe 所在目录；
 // GUI 会把核心解压到临时目录运行，用 ONGEKI_APP_DIR 指回 GUI 所在目录（配置文件放那里）
@@ -1541,7 +1541,7 @@ function findCachedJacket(songId) {
 }
 
 // 带歌曲 ID 或大饼资源哈希缓存键、且有公网 jacketUrl 的对象，都是可缓存的曲绘。
-// 四种主题（分表/单曲/牌子/等级）的数据形状不同，但这一点是共同的。
+// 各主题（分表/单曲/牌子/等级/谱面图/定数表）的数据形状不同，但这一点是共同的。
 function collectJacketItems(value, found = []) {
   if (Array.isArray(value)) {
     for (const item of value) collectJacketItems(item, found);
@@ -2794,7 +2794,9 @@ function buildConstantTableData(input) {
   return {query,total:charts.length,groups,canvas:{width:1440,height}};
 }
 async function runConstantTableJobData(job){
-  const data=buildConstantTableData(job.query);
+  // 曲绘先走本地缓存，跟分表、等级图一样：一张定数表要几百张曲绘（12 有 463 张），全交给浏览器去公网拉，
+  // 图源一卡就等满 120 秒、整张失败。缓存没有的由核心在下载预算内补，补不上换本地占位图。
+  const data=await localizeJackets(buildConstantTableData(job.query));
   const image=await renderConstantTableTheme(data);
   const name='音击定数表_'+data.query+'.jpg';
   if(job.streamOutput) console.log('CONSTANT_OUTPUT_BASE64:'+name+':'+image.toString('base64'));
@@ -2809,13 +2811,16 @@ const CHART_IMAGE_MAX_SIDE = 16000;
 const CHART_IMAGE_MAX_PIXELS = 32000000;
 const CHART_IMAGE_TARGET_BYTES = 4.5 * 1024 * 1024;
 
-async function captureChartPreview(cdp, width, height) {
-  let scale = Math.min(CHART_IMAGE_MAX_SCALE, CHART_IMAGE_MAX_SIDE / width,
+// 大图截图：谱面图、等级长图、定数表共用。服务器上的 Unable to capture screenshot 只出在这几张大图上，
+// 本机复现不了，所以都要有兜底：改倍率后先等画面刷新；截图失败先同倍率重试一次，仍失败（或文件超过
+// targetBytes）就降倍率，最低 0.75 倍，不裁切内容。
+async function captureLargeImage(cdp, width, height, { label, maxScale, targetBytes, qualities }) {
+  let scale = Math.min(maxScale, CHART_IMAGE_MAX_SIDE / width,
     CHART_IMAGE_MAX_SIDE / height, Math.sqrt(CHART_IMAGE_MAX_PIXELS / (width * height)));
   const minScale = Math.min(scale, 0.75);
   for (;;) {
     const dimensions = `${Math.round(width * scale)}×${Math.round(height * scale)}`;
-    console.log(`  正在渲染 ${dimensions} 谱面图…`);
+    console.log(`  正在渲染 ${dimensions} ${label}…`);
     await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: scale, mobile: false });
     await cdp.send("Page.bringToFront");
     // __THEME_READY__ 是调整视口之前的状态。改尺寸后再等两帧，让页面完成布局刷新。
@@ -2825,7 +2830,7 @@ async function captureChartPreview(cdp, width, height) {
     let captureError = null;
     for (let retry = 0; retry < 2; retry++) {
       try {
-        for (const quality of [92, 85, 78]) {
+        for (const quality of qualities) {
           const shot = await cdp.send("Page.captureScreenshot", {
             format: "jpeg", quality, fromSurface: true,
             // 视口已覆盖整张图，不再让截图命令临时扩大视口。
@@ -2834,7 +2839,7 @@ async function captureChartPreview(cdp, width, height) {
           });
           buffer = Buffer.from(shot.data || "", "base64");
           if (buffer.length < 1000) throw new Error("Unable to capture screenshot（返回数据过小）");
-          if (buffer.length <= CHART_IMAGE_TARGET_BYTES) break;
+          if (buffer.length <= targetBytes) break;
         }
         captureError = null;
         break;
@@ -2842,21 +2847,27 @@ async function captureChartPreview(cdp, width, height) {
         // 只重试截图/编码失败；连接关闭、页面崩溃和命令超时应直接交给上层处理。
         if (!/Unable to (?:capture|encode) screenshot/i.test(String(error?.message || error))) throw error;
         captureError = error;
-        console.log(`  ⚠ 谱面图截图失败（${dimensions}，第 ${retry + 1}/2 次）：${error.message}`);
+        console.log(`  ⚠ ${label}截图失败（${dimensions}，第 ${retry + 1}/2 次）：${error.message}`);
         if (retry === 0) await sleep(500);
       }
     }
-    if (!captureError && (buffer.length <= CHART_IMAGE_TARGET_BYTES || scale <= minScale)) {
-      console.log(`  ✓ 谱面图渲染完成（${Math.round(buffer.length / 1024)} KB，${scale.toFixed(2)} 倍）`);
+    if (!captureError && (buffer.length <= targetBytes || scale <= minScale)) {
+      console.log(`  ✓ ${label}渲染完成（${Math.round(buffer.length / 1024)} KB，${scale.toFixed(2)} 倍）`);
       return buffer;
     }
     if (scale <= minScale) {
-      throw new Error(`谱面图截图在重试并降至 ${dimensions} 后仍失败：${captureError.message}`);
+      throw new Error(`${label}截图在重试并降至 ${dimensions} 后仍失败：${captureError.message}`);
     }
-    // 明确走到 1 倍，再尝试 0.75 倍；不裁切谱面内容。
+    // 明确走到 1 倍，再尝试 0.75 倍；不裁切内容。
     scale = scale > 1 ? Math.max(1, scale * 0.8) : minScale;
     console.log(`  ⚠ ${captureError ? "截图仍失败" : "图片文件过大"}，降低倍率至 ${scale.toFixed(2)} 后重试`);
   }
+}
+
+async function captureChartPreview(cdp, width, height) {
+  return captureLargeImage(cdp, width, height, {
+    label: "谱面图", maxScale: CHART_IMAGE_MAX_SCALE, targetBytes: CHART_IMAGE_TARGET_BYTES, qualities: [92, 85, 78],
+  });
 }
 
 function buildChartPreviewThemeData(song, difficultyId, ogkr) {
@@ -2954,6 +2965,16 @@ async function renderChartPreviewTheme(data) {
   }
 }
 
+// 定数表按 1 倍出图，但 12、13 两档高一万多像素（1500～1700 万像素），跟 2 倍的等级长图差不多大，
+// 所以也走大图截图的重试和降倍率。文件控制在 QQ 发送上限（8 MiB）以内。
+const CONSTANT_TABLE_IMAGE_TARGET_BYTES = 7.5 * 1024 * 1024;
+
+async function captureConstantTableImage(cdp, width, height) {
+  return captureLargeImage(cdp, width, height, {
+    label: "定数表", maxScale: 1, targetBytes: CONSTANT_TABLE_IMAGE_TARGET_BYTES, qualities: [90, 85, 80],
+  });
+}
+
 async function renderConstantTableTheme(data) {
   const themeDir = ensureLocalThemeFiles();
   const rendererDir = path.join(themeDir, "constant-table", "renderer");
@@ -2981,17 +3002,7 @@ async function renderConstantTableTheme(data) {
     });
     await cdp.navigate(pathToFileURL(htmlPath).href);
     await waitForLocalTheme(cdp, 120000);
-    const shot = await cdp.send("Page.captureScreenshot", {
-      format: "jpeg",
-      quality: 90,
-      fromSurface: true,
-      captureBeyondViewport: false,
-      clip: { x: 0, y: 0, width, height, scale: 1 },
-    });
-    const buffer = Buffer.from(shot.data || "", "base64");
-    if (buffer.length < 1000) throw new Error("定数表截图数据异常（文件过小）");
-    console.log(`  ✓ 定数表渲染完成（${Math.round(buffer.length / 1024)} KB）`);
-    return buffer;
+    return await captureConstantTableImage(cdp, width, height);
   } finally {
     cdp?.close();
     if (browser) {
@@ -3001,6 +3012,14 @@ async function renderConstantTableTheme(data) {
     }
     try { if (fs.existsSync(dataPath)) fs.rmSync(dataPath, { force: true }); } catch {}
   }
+}
+
+// 高清：按 2 倍像素、JPEG 质量 95 截图，超过 LEVEL_SCORE_IMAGE_TARGET_BYTES 先降质量、再降倍率。
+// 2 倍截图失败时同倍率重试一次，再逐步降到 1 倍（2026-10-17 之前一直按 1 倍出图），最低 0.75 倍。
+async function captureLevelScoreImage(cdp, width, height) {
+  return captureLargeImage(cdp, width, height, {
+    label: "等级成绩长图", maxScale: LEVEL_SCORE_IMAGE_MAX_SCALE, targetBytes: LEVEL_SCORE_IMAGE_TARGET_BYTES, qualities: [95, 90, 85],
+  });
 }
 
 async function renderLevelScoreTheme(data) {
@@ -3030,29 +3049,8 @@ async function renderLevelScoreTheme(data) {
     });
     await cdp.navigate(pathToFileURL(htmlPath).href);
     await waitForLocalTheme(cdp, 120000);
-    // 高清：按 2 倍像素截图，文件控制在 LEVEL_SCORE_IMAGE_TARGET_BYTES 左右；
-    // 超了先降 JPEG 质量，还超再降倍率
-    let scale = Math.min(LEVEL_SCORE_IMAGE_MAX_SCALE, CHART_IMAGE_MAX_SIDE / width, CHART_IMAGE_MAX_SIDE / height);
-    let buffer = null;
-    for (let attempt = 0; attempt < 4; attempt++) {
-      await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: scale, mobile: false });
-      await sleep(200);
-      for (const quality of [95, 90, 85]) {
-        const shot = await cdp.send("Page.captureScreenshot", {
-          format: "jpeg",
-          quality,
-          fromSurface: true,
-          captureBeyondViewport: false,
-          clip: { x: 0, y: 0, width, height, scale: 1 },
-        });
-        buffer = Buffer.from(shot.data || "", "base64");
-        if (buffer.length <= LEVEL_SCORE_IMAGE_TARGET_BYTES) break;
-      }
-      if (buffer.length <= LEVEL_SCORE_IMAGE_TARGET_BYTES || scale <= 1) break;
-      scale = Math.max(1, scale * 0.85);
-    }
-    if (!buffer || buffer.length < 100000) throw new Error("等级成绩长图截图数据异常（文件过小）");
-    console.log(`  ✓ 等级成绩长图渲染完成（${Math.round(buffer.length / 1024)} KB，${Math.round(width * scale)}×${Math.round(height * scale)}）`);
+    const buffer = await captureLevelScoreImage(cdp, width, height);
+    if (buffer.length < 100000) throw new Error("等级成绩长图截图数据异常（文件过小）");
     return buffer;
   } finally {
     cdp?.close();

@@ -9,7 +9,7 @@ test.after(()=>{assert.ok(fs.realpathSync(cache).startsWith(fs.realpathSync(outp
 const file=path.join(__dirname,"app-template.js"),loaded=new Module(file,module);
 loaded.filename=file;loaded.paths=module.paths;
 let source=fs.readFileSync(file,"utf8").replace("const JACKET_DOWNLOAD_BUDGET_MS = 20000;","const JACKET_DOWNLOAD_BUDGET_MS = 250;");
-loaded._compile(source.slice(0,source.lastIndexOf("\nmain().catch"))+"\nmodule.exports={downloadJacket,localizeJackets,fetchWithTimeout,CDP,captureChartPreview};",file);
+loaded._compile(source.slice(0,source.lastIndexOf("\nmain().catch"))+"\nmodule.exports={downloadJacket,localizeJackets,fetchWithTimeout,CDP,captureChartPreview,captureLevelScoreImage,captureConstantTableImage};",file);
 const app=loaded.exports;
 async function stalledServer() {
   let requests=0;
@@ -130,4 +130,44 @@ test("浏览器连接断开不应当成截图容量问题反复重试",async()=>
   const cdp=screenshotBrowser(()=>{throw new Error("浏览器连接已关闭");});
   await assert.rejects(()=>app.captureChartPreview(cdp,1800,1600),/浏览器连接已关闭/);
   assert.equal(cdp.events.filter(e=>e.method==="Page.captureScreenshot").length,1);
+});
+test("等级长图仍按 2 倍、质量 95 截图；2 倍连续失败时同倍率重试一次，再逐级降到 1 倍",async()=>{
+  const ok=screenshotBrowser(()=>smallScreenshot);
+  await app.captureLevelScoreImage(ok,1440,2981);
+  assert.deepEqual(ok.events.filter(e=>e.method==="Page.captureScreenshot").map(e=>[e.scale,e.params.quality]),[[2,95]]);
+  const cdp=screenshotBrowser((_params,scale)=>{
+    if(scale>1) throw new Error("CDP 错误: Unable to capture screenshot");
+    return smallScreenshot;
+  });
+  await app.captureLevelScoreImage(cdp,1440,2981);
+  const shots=cdp.events.filter(e=>e.method==="Page.captureScreenshot");
+  assert.equal(shots.filter(e=>e.scale===2).length,2);
+  assert.equal(shots.at(-1).scale,1);
+  assert.ok(shots.every(e=>e.params.clip.width===1440 && e.params.clip.height===2981));
+});
+test("定数表按 1 倍、质量 90 截图；失败时同倍率重试一次，再降到 0.75 倍，不裁切",async()=>{
+  const cdp=screenshotBrowser((_params,scale)=>{
+    if(scale>=1) throw new Error("CDP 错误: Unable to capture screenshot");
+    return smallScreenshot;
+  });
+  await app.captureConstantTableImage(cdp,1440,11712);
+  const shots=cdp.events.filter(e=>e.method==="Page.captureScreenshot");
+  assert.deepEqual(shots.map(e=>[e.scale,e.params.quality]),[[1,90],[1,90],[0.75,90]]);
+  assert.ok(shots.every(e=>e.params.clip.width===1440 && e.params.clip.height===11712));
+});
+test("定数表的曲绘由本地缓存接管：命中的用本地文件，缺的换占位图，不留公网地址给浏览器",async()=>{
+  const server=await stalledServer();
+  const jackets=path.join(cache,"jacket-cache");
+  fs.mkdirSync(jackets,{recursive:true});
+  fs.writeFileSync(path.join(jackets,"6001.webp"),Buffer.alloc(2048,1));
+  const data={query:"12",total:2,canvas:{width:1440,height:714},groups:[{constant:"12.9",charts:[
+    {songId:6001,difficultyId:3,title:"缓存命中",jacketUrl:server.url},
+    {songId:6002,difficultyId:3,title:"缓存缺失",jacketUrl:server.url},
+  ]}]};
+  try {
+    await app.localizeJackets(data);
+    const [hit,miss]=data.groups[0].charts;
+    assert.match(hit.jacketUrl,/^file:.*6001\.webp$/);
+    assert.match(miss.jacketUrl,/^data:image\//);
+  } finally {await server.close();}
 });
