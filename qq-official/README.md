@@ -286,12 +286,17 @@ node qq-official/mia-entry.cjs
 
 ## 日常运行
 
-**双击 `启动美亚.vbs`** —— 无窗口后台跑，日志写到同目录 `mia.log`。
-**双击 `停止美亚.vbs`** —— 只结束命令行里带 `mia-entry` 的 node 进程。
+**双击 `启动美亚.vbs`** —— 无窗口后台跑，日志写到同目录 `mia.log`。已经有美亚在跑就不再开第二个；
+连上 QQ 会弹窗说一声，没起来也弹窗说原因（启动时的报错在 `mia-stderr.log`）。
+有计划任务 `MiaBot`（服务器上的开机自启）时交给它启动，注销远程桌面也不会停。
+**双击 `停止美亚.vbs`** —— 结束命令行里带 `mia-entry` 的 node 进程，连同它开的出图核心和浏览器，别的 node 程序不动。
 
 ⚠️ **不要同时开两个** —— 两条 WebSocket 连接会让它把每句话回两遍。
 
 > 这两个 VBS 是**生成物**，不提交。丢了就跑 `node qq-official/make-launchers.cjs` 重新生成。
+> 跟 AnnaBot 一样只有一个启动器：以前带日志窗口的启动器和 `启动美亚（后台）.vbs` 都不要了，生成时会删掉旧的后台启动器。
+> 真正干活的是同目录的 `mia-background.cjs`（照 AnnaBot 的 `tools/background.cjs`）；实际把美亚跑起来的是 `mia-task.cmd`：
+> 不开第二个，清掉 `%TEMP%` 里出图剩下的 `ongeki-exe-*`，`mia.log` 超过 50 MB 改名成 `mia.old.log`。
 > （VBScript 只认 UTF-16LE，手写容易踩编码坑，所以由脚本生成。）
 
 ## 一个必须知道的事
