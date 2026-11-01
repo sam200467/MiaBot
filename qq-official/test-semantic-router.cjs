@@ -193,6 +193,24 @@ test("图片点评以角色对话解释看不到，不调指令；成绩图仍�
   const action = await routeIntent({ settings, specs, messages: [{ role: "user", content: "给我生成B50分数图看看" }], fetchImpl: model.fetchImpl });
   assert.equal(action.action.name, "chart");
 });
+test("路由判成问图、可图不沾边时按闲聊（2026-11-01 线上单发「喵」）；带图、引用没读到的消息、原话提到图时照旧", async () => {
+  const model = scriptedRoute([{ route: "media" }]);
+  const logs = [];
+  const route = (media, content, log) => routeIntent({ settings, specs, media, messages: [{ role: "user", content }], fetchImpl: model.fetchImpl, ...(log ? { log } : {}) });
+  assert.equal(await route({ hasImage: false, hasReference: false }, "喵", (line) => logs.push(line)), null);
+  assert.ok(logs.some((line) => /按闲聊处理/.test(line)), logs.join("\n"));
+  assert.equal(await route({}, "早上好呀"), null);
+  // 读引用开着、被引用那条读到了而且里面没图：也不认
+  assert.equal(await route({ hasImage: false, hasReference: true, quotedImages: 0 }, "喵"), null);
+  for (const [label, media, content] of [
+    ["本条带图但没能读图", { hasImage: true }, "喵"],
+    ["引用了一条没读到内容的消息", { hasImage: false, hasReference: true }, "喵"],
+    ["原话提到图", {}, "群里上面那张图好看吗"],
+    ["原话提到截屏", {}, "刚才那个截屏是什么歌"],
+  ]) {
+    assert.match((await route(media, content))?.text || "", /看不到图片里的内容/, label);
+  }
+});
 test("下一页沿用程序保存的查询；没有查询或已到末尾不猜", async () => {
   const model = scriptedRoute([]);
   const queryState = queryDecision("title", "contains", "ai").query;

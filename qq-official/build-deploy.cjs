@@ -98,6 +98,8 @@ for (const file of [
   path.join(ROOT, "test-data-source-vault.cjs"),
   // 面板那条「命令表和描述必须一一对应」是防漂移的唯一防线，进闸门才有意义
   path.join(HERE, "test-mia-command-panel.cjs"),
+  // 启动器背后的 mia-background.cjs：认进程、认计划任务、等「已就绪」
+  path.join(HERE, "test-mia-background.cjs"),
   // 美亚的入口 bundle 里有 chat.cjs，引擎契约坏了这边一样会挂
   path.join(ROOT, "chat-core/knowledge.test.cjs"),
   path.join(ROOT, "chat-core/research-policy.test.cjs"),
@@ -211,26 +213,14 @@ execFileSync(process.execPath, [
 ], { stdio: "inherit" });
 console.log("带上 check-song-query.cjs");
 
-// ── 5. 启动器（用同一套生成器，只是输出到部署目录）──────────────────
-{
-  const vbsQuote = (v) => '"' + String(v).replace(/"/g, '""') + '"';
-  const write = (fileName, comment, command, visible) => {
-    const body = [
-      "' " + comment,
-      'Set shell = CreateObject("WScript.Shell")',
-      'Set fso = CreateObject("Scripting.FileSystemObject")',
-      "shell.CurrentDirectory = fso.GetParentFolderName(WScript.ScriptFullName)",
-      "shell.Run " + vbsQuote(command) + (visible ? ", 1, True" : ", 0, False"),
-      "",
-    ].join("\r\n");
-    fs.writeFileSync(path.join(outEntryDir, fileName), Buffer.from("﻿" + body, "utf16le"));
-  };
-  // 默认显示日志窗口：状态只有日志里看得见，纯静默启动出了事完全不知道。
-  // 入口自己也写 mia.log，所以窗口关掉日志还在。
-  write("启动美亚.vbs", "启动美亚并显示实时日志。关掉窗口即停止。日志同时写到 mia.log。", "cmd /k node " + vbsQuote("mia-entry.cjs"), true);
-  write("启动美亚（后台）.vbs", "无窗口后台启动美亚。日志只写到 mia.log。", "cmd /c node " + vbsQuote("mia-entry.cjs") + " > " + vbsQuote("mia.log") + " 2>&1", false);
-  write("停止美亚.vbs", "停止美亚。只结束命令行里带 mia-entry 的 node 进程。", "cmd /c node " + vbsQuote("stop-mia.cjs") + " & timeout /t 3", true);
+// ── 5. 启动器（跟开发目录同一个生成器）和它背后的两个文件 ─────────────────
+// 启动美亚.vbs / 停止美亚.vbs 只是壳，干活的是 mia-background.cjs；真正跑美亚的是 mia-task.cmd
+// （服务器上的计划任务 MiaBot 也是跑它）。两个都只用 Node 和 Windows 自带的东西，原样拷过去，不打包。
+for (const file of ["mia-background.cjs", "mia-task.cmd"]) {
+  fs.copyFileSync(path.join(HERE, file), path.join(outEntryDir, file));
+  console.log("带上 " + file);
 }
+for (const name of require("./make-launchers.cjs").writeLaunchers(outEntryDir)) console.log("写出 " + name);
 
 // ── 6. 开机自启（可选，放个说明而不是直接改注册表）───────────────────
 fs.writeFileSync(path.join(OUT, "开机自启.txt"),

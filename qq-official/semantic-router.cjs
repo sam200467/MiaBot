@@ -98,6 +98,18 @@ function applyIdIntent(result, text) {
   return result;
 }
 
+// 路由模型偶尔把跟图毫不沾边的话判成「在问图片」：2026-11-01 线上单发一句「喵」，就收到「这边暂时看不到图片里的内容」，
+// 拿真模型带五种群背景重放 25 次都没复现。手边根本没图时，这句固定话术只会让人以为美亚不会聊天了。
+// 所以只有图真沾边时才认 media：本条带图（读引用开着时也算被引用那条里的图）、引用了一条程序没读到内容的消息
+// （可能是图），或者原话提到了图。其余当闲聊，交给聊天模型 —— 群背景说明里本来就写了「读不到图片内容，被问到就直说」。
+const IMAGE_WORDS = /图|照片|相片|截图|截屏|表情包|photo|image|picture|\bpic/i;
+function imageInPlay(text, media = {}) {
+  if (media?.hasImage) return true;
+  // quotedImages 只在读到被引用那条时才有：有它说明那条里没图，没有它就不知道那条是什么
+  if (media?.hasReference && media.quotedImages === undefined) return true;
+  return IMAGE_WORDS.test(String(text || ""));
+}
+
 function imageRequest(text, media) {
   return ((!text.trim() || text === "[图片]" || text === "[图片（内容看不到）]") && media?.hasImage) || /(?:点评|评价|辨认|识别|读|看看|看一下|看懂|描述|分析|写了|是什么|什么意思).{0,18}(?:这张图|这幅图|图片|照片|截图)|(?:这张图|这幅图|图片|照片|截图).{0,18}(?:点评|评价|内容|写了|什么意思|是什么|看得|看懂)/.test(text);
 }
@@ -182,7 +194,11 @@ async function routeIntent({ settings, messages, specs, targets = [], queryState
           throw Error("empty model output");
         }
         // Accept a whole JSON code fence, never extract a fragment from prose.
-        const value = JSON.parse(typeof rawDecision === "string" ? rawDecision.trim().replace(/^```(?:json)?\s*\n([\s\S]*?)\n```$/i, "$1") : rawDecision);
+        let value = JSON.parse(typeof rawDecision === "string" ? rawDecision.trim().replace(/^```(?:json)?\s*\n([\s\S]*?)\n```$/i, "$1") : rawDecision);
+        if (value?.route === "media" && !imageInPlay(current, media)) {
+          log("语义路由判成问图，但这条没带图、没引用、也没提到图，按闲聊处理");
+          value = { route: "chat" };
+        }
         stage = "validation";
         if (review && !(review.recheckRoute ? ["query", "clarify", "chat", "media"] : ["query", "clarify"]).includes(value?.route)) throw Error("invalid review route");
         const result = applyIdIntent(validateDecision(value, specs, targets), current);
