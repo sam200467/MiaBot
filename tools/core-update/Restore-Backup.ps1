@@ -1,4 +1,4 @@
-param([string]$TargetRoot = 'C:\MiaBot\deploy-windows-server', [Parameter(Mandatory=$true)][string]$BackupPath)
+﻿param([string]$TargetRoot = 'C:\MiaBot\deploy-windows-server', [Parameter(Mandatory=$true)][string]$BackupPath)
 $ErrorActionPreference = 'Stop'
 function Get-CoreHash([string]$File) {
     $stream = [IO.File]::OpenRead($File)

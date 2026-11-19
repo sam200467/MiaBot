@@ -21,6 +21,13 @@ if(!skipLiveVerification){
 const out=path.join(root,"server-updates",name);
 if(fs.existsSync(out))throw new Error("Package already exists: "+out);
 const core=path.join(root,"ongeki-core.exe");
+const scriptDir=path.join(__dirname,"core-update");
+// 安装脚本里是中文提示：Windows PowerShell 5.1 会把没有 BOM 的文件当 ANSI 读，中文就成了乱码。
+// 少了 BOM 就别打包，直接在这里拦下来。
+for(const script of ["Apply-Update.ps1","Restore-Backup.ps1"]){
+  const bytes=fs.readFileSync(path.join(scriptDir,script));
+  if(!(bytes[0]===0xEF&&bytes[1]===0xBB&&bytes[2]===0xBF))throw new Error("缺少 UTF-8 BOM（中文提示会乱码）: "+script);
+}
 const entry=path.join(root,"output","mia-entry-server-constants.cjs");
 fs.mkdirSync(path.dirname(entry),{recursive:true});
 execFileSync(process.execPath,[path.join(root,"node_modules/esbuild/bin/esbuild"),path.join(root,"qq-official/mia-entry.cjs"),"--bundle","--platform=node","--format=cjs","--target=node22","--external:bufferutil","--external:utf-8-validate","--outfile="+entry],{stdio:"inherit",windowsHide:true});
@@ -34,25 +41,32 @@ if(!version)throw new Error("Missing core version");
 const entryBytes=fs.readFileSync(entry);
 fs.writeFileSync(path.join(payload,"mia-entry.cjs"),entryBytes);
 fs.writeFileSync(path.join(out,"manifest.json"),JSON.stringify({name,version,kind:"core-and-entry",platform:"win32-x64",...(notes?{}:{dataSources:["u.otogame.net","rinnet"],constantSources:{otogame:"server-rating-inference-only",rinnet:"server-music-catalog-only"}}),liveVerified,verificationStatus:liveVerified?"passed":"pending-server-validation",files:[{path:"qq-official/ongeki-core.exe",bytes:bytes.length,sha256:hash},{path:"qq-official/mia-entry.cjs",bytes:entryBytes.length,sha256:crypto.createHash("sha256").update(entryBytes).digest("hex")}]},null,2)+"\n");
-for(const file of ["Apply-Update.ps1","Restore-Backup.ps1"])fs.copyFileSync(path.join(__dirname,"core-update",file),path.join(out,file));
-fs.writeFileSync(path.join(out,"Apply-Update.cmd"),'@echo off\r\nif "%~1"=="" (\r\n powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Apply-Update.ps1"\r\n) else (\r\n powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Apply-Update.ps1" -TargetRoot "%~1"\r\n)\r\nif errorlevel 1 (echo UPDATE FAILED. Read the error above.)\r\npause\r\n');
+for(const file of ["Apply-Update.ps1","Restore-Backup.ps1"])fs.copyFileSync(path.join(scriptDir,file),path.join(out,file));
+fs.writeFileSync(path.join(out,"Apply-Update.cmd"),'@echo off\r\nif "%~1"=="" (\r\n powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Apply-Update.ps1"\r\n) else (\r\n powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Apply-Update.ps1" -TargetRoot "%~1"\r\n)\r\nset RC=%errorlevel%\r\nif not "%RC%"=="0" echo.\r\nif not "%RC%"=="0" echo Updater exited with code %RC% - read the message above.\r\npause\r\nexit /b %RC%\r\n');
 if(withPanel){
   execFileSync(process.execPath,[path.join(root,"node_modules/esbuild/bin/esbuild"),path.join(root,"qq-official/register-panel-update.cjs"),"--bundle","--platform=node","--format=cjs","--target=node22","--external:bufferutil","--external:utf-8-validate","--outfile="+path.join(out,"panel","register-panel-update.cjs")],{stdio:"inherit",windowsHide:true});
   fs.writeFileSync(path.join(out,"Update-Panel.cmd"),'@echo off\r\nset "ROOT=%~1"\r\nif "%ROOT%"=="" set "ROOT=C:\\MiaBot\\deploy-windows-server"\r\nnode "%~dp0panel\\register-panel-update.cjs" "%ROOT%\\qq-official\\config.local.json"\r\nif errorlevel 1 (echo PANEL UPDATE FAILED. The bot itself is not affected; retry later.)\r\npause\r\n');
 }
 const commonInstall=[
-"安装",
-"1. 完整解压更新包到独立目录。暂停自动重启任务，停止机器人，并等待出图任务结束。",
-"2. 默认路径可双击 Apply-Update.cmd。自定义路径在 PowerShell 中执行：",
-'powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\Apply-Update.ps1 -TargetRoot "D:\\实际部署目录"',
-"加 -CheckOnly 可仅检查，不修改部署文件。",
-"3. 看到 UPDATE COMPLETE 后，用原启动方式启动机器人，再恢复自动重启任务。",
+"安装（双击就行）",
+"1. 把更新包完整解压到任意目录 —— 不用解到部署目录里，也不用先停机器人。",
+"2. 双击 Apply-Update.cmd。剩下的它自己做：找部署目录 → 停美亚（连同她开的出图核心和无头浏览器）→ 校验、备份、替换 → 重新启动美亚 → 等 mia.log 里出现「已就绪，等待消息」。",
+"   有计划任务 MiaBot 时用 Start-ScheduledTask 启动，跟开机自启一模一样，注销远程桌面也不会停；没有就照 qq-official\\mia-task.cmd 起。",
+"3. 看到 UPDATE COMPLETE，以及「美亚：已重新启动并连上 QQ」就完事了。不用再手动启动，也不用暂停/恢复任何任务。",
+"",
+"自动找错了目录（机器上不止一个部署，或者部署在别的盘）：把部署目录拖到 Apply-Update.cmd 上，或者这样运行：",
+'  Apply-Update.cmd "D:\\实际部署目录"',
+"只想看看能不能装，不动文件也不停美亚：",
+'  powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\Apply-Update.ps1 -CheckOnly',
+"不想让它碰美亚、只换文件：解压后运行 Apply-Update.ps1 -NoService",
 "",
 "安装程序按 config.local.json 的 corePath 定位核心，同时更新 qq-official/mia-entry.cjs。两者一并备份和回退，保留账号绑定、配置、别名、曲绘缓存及所有其他程序。",
+"替换中途失败会自动把两个文件换回原样，并把美亚重新启动起来；退出码 1 = 没装成（文件已恢复），2 = 文件装好了但美亚没确认连上 QQ，先看 mia.log / mia-stderr.log。",
+"装的时候会记下找到的部署目录（%LOCALAPPDATA%\\MiaBot\\update-target.txt），下次双击直接用它，但计划任务指的方向永远优先。",
 ...(withPanel?["","指令面板（可选）","机器人启动后双击 Update-Panel.cmd（自定义路径：Update-Panel.cmd \"D:\\实际部署目录\"），把新指令加进 QQ 群的指令面板。面板更新失败不影响机器人本身，直接打字发指令照样可用。"]:[]),
 "",
 "回退",
-"停止机器人后，使用安装程序打印的 Backup 路径执行：",
+"回退要先停美亚（旧文件换回去时不能被她占着）。停止机器人后，使用安装程序打印的 Backup 路径执行：",
 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\Restore-Backup.ps1 -TargetRoot "D:\\实际部署目录" -BackupPath "D:\\实际部署目录\\update-backups\\本次备份目录"',
 "",
 "包中只含核心及安装工具，个人成绩、账号、密码、令牌、曲绘缓存均未打包。"

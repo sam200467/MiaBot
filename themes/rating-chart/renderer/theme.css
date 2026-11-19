@@ -651,11 +651,15 @@ body {
    右下：Total plays count
    ========================= */
 
+/* 右下这一列（总游玩次数 / 最后游玩时间 + 日期）与左下两行文字按「墨迹中线」对齐：
+   左边两行占 y≈1532–1715，中线 1623.5；右边三行整块高 244px，居中后是 1503–1747。
+   所以这里的 top 是 1500，.last-play 是 1610 —— 比原来各上移 40px。
+   改字号 / 行高 / 行距时请重新量一遍，别只改其中一个。 */
 .play-count {
   position: absolute;
 
   left: 3015px;
-  top: 1540px;
+  top: 1500px;
 
   color: #0719ff;
 
@@ -670,6 +674,8 @@ body {
   paint-order: stroke fill;
 }
 
+/* 只有这一行（rinnet 没有最后游玩时间）时，单行自己居中：top 1595 让墨迹中线
+   同样落在 1623 附近，不要跟着上面那一列一起上移。 */
 .play-count.solo {
   top: 1595px;
 }
@@ -683,7 +689,7 @@ body {
   position: absolute;
 
   left: 3015px;
-  top: 1650px;
+  top: 1610px;
 
   width: 585px;
 
