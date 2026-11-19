@@ -1,0 +1,16 @@
+MiaBot /单曲 谱师栏收窄截断与 /分表 页脚对齐更新（2026-11-19，v4.2.7-song-designer-truncate）
+适用于已部署的 Windows x64 MiaBot，同时更新 QQ 入口与出图核心。
+
+本次变化
+1. 优化 /单曲 成绩图谱师栏（themes/song-detail）：
+   - 保持网格第 7 列 570px 及左右技术分、Chain、Bell 与无谱面横杠对齐位置不变，将 .chart-row .designer 收窄为 420px 并居中（translateX(71px)），使文本区域居中于技术分与 Chain 之间，左右留白约 80px（6 位分约 99.5px）。
+   - 将谱师栏最小缩字下限从 24px 提高到 30px，常规谱师名维持 42px 完整显示，超长谱师名在 30px 处以省略号提前截断，不再贴近或重叠左右数字。
+2. 包含 4.2.6 改动：
+   - /分表 右下角「总游玩次数 / 最后游玩时间 / 日期」三行整体上移 40px（.play-count top: 1500px，.last-play top: 1610px；rinnet 单行 .play-count.solo 保持 1595px），与左下两行署名按墨迹中线对齐。
+   - 更新包支持双击 Apply-Update.cmd 自动查找部署目录、停止运行中的 MiaBot、校验并替换核心与入口，并在完成后自动重新启动且等待就绪。
+3. 同步更新 qq-official/update-notes.json 至 4.2.7-song-designer-truncate，重启上线后将向白名单 QQ 群发送一次更新日志。本次未新增或改动斜杠指令，无需更新指令面板。
+
+验收
+1. 本地已重新生成预览图核对 Glorious Crown（999,275 + usg over-Over-OVERCUTE LAUNDRY）、7 位满分极限（1,010,000 + 超长日文组合谱师）、仅 Lunatic 与常规曲目，截断省略号及白描边无裁切，左右留白均衡。
+2. 核心构建与自测通过（SELFTEST OK v4.2.7-song-designer-truncate），全量测试与更新包双阶段自动化校验（含 ZIP 完整性校验）通过；服务器上尚未实测。
+3. 部署后启动机器人，检查白名单群收到版本 4.2.7-song-designer-truncate 的更新日志，并使用 /单曲 与 /分表 核对实际出图效果。

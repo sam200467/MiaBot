@@ -97,7 +97,7 @@
     fitSingleLine($("boss-level"), 18);
     fitSingleLine($("attribute"), 22);
     document.querySelectorAll(".difficulty").forEach((element) => fitSingleLine(element, 32));
-    document.querySelectorAll(".designer").forEach((element) => fitSingleLine(element, 24));
+    document.querySelectorAll(".designer").forEach((element) => fitSingleLine(element, 30));
   }
 
   window.__FIT_SONG_THEME_TEXT__ = fitThemeText;
